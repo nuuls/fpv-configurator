@@ -17,10 +17,16 @@ work in a directory another agent is using.
 3. **Finish**: `git fetch origin && git rebase origin/master` (resolve conflicts, keep both sides' additions) →
    `pnpm check` → commit on your branch → `git push -u origin <branch>`. Committing and pushing **your own
    branch** needs no permission; report the branch name and what it contains.
+   **A pushed but unmerged branch is not a completed task — it waits for the user.** End that report with a
+   `needs input:` line asking whether to merge, on its own line, e.g.
+   `needs input: feat/osd-tab is pushed and passes pnpm check — merge into master?`
+   Do **not** write a `result:` line yet, so the job shows up as needing input instead of done.
 4. **Merging into `master` happens only when the user asks.** Then: rebase once more, `pnpm check`, fast-forward
    (`git checkout master && git merge --ff-only <branch> && git push`), delete the branch and remove the worktree
    (`git worktree remove …`, `git branch -d …`, `git push origin --delete …`). Don't touch other agents' branches
-   or worktrees.
+   or worktrees. Only now — after the merge, or once the user says the branch should stay unmerged — write the
+   `result:` line. Tasks that change no files (questions, investigations) have nothing to merge and end with
+   `result:` as usual.
 
 To keep branches mergeable, stay out of each other's way in the files everyone touches:
 
