@@ -33,6 +33,28 @@ describe('OSD against the mock FC', () => {
     expect((await readOsdSnapshot(client)).canvas).toEqual({ cols: 53, rows: 20 })
   })
 
+  it('places elements on the rows the display has, so a reboot does not pile them up', async () => {
+    const config = defaultMockConfig()
+    config.settings['osd_displayport_device'] = 'MSP' // "auto" video system on an MSP displayport: 13 rows
+    const { fc, transport, client } = await connect(new MockFlightController({ config }))
+    const snapshot = await readOsdSnapshot(client)
+    expect(snapshot.canvas).toEqual({ cols: 30, rows: 13 })
+    // osdInit already moved the cell voltage from row 14 onto the last row
+    expect(toDraft(snapshot).elements.find((el) => el.index === 22)).toMatchObject({ x: 1, y: 12 })
+
+    let draft = toDraft(snapshot)
+    for (const index of [11, 12, 10, 29]) draft = setElementShown(draft, index, true, snapshot.canvas)
+    await saveOsd(client, snapshot, draft)
+
+    const dropped = new Promise<void>((resolve) => transport.onClose(resolve))
+    await sendReboot(client)
+    await dropped
+    const after = toDraft(await readOsdSnapshot((await connect(fc)).client))
+    expect(after.elements.filter((el) => el.shown)).toEqual(draft.elements.filter((el) => el.shown))
+    const cells = after.elements.filter((el) => el.shown).map((el) => `${el.x},${el.y}`)
+    expect(new Set(cells).size).toBe(cells.length)
+  })
+
   it('saves elements persistently and leaves the others alone', async () => {
     const { fc, transport, client } = await connect()
     const snapshot = await readOsdSnapshot(client)

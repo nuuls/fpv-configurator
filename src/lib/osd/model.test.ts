@@ -141,7 +141,13 @@ describe('MSP_SET_OSD_CONFIG', () => {
 })
 
 describe('canvas', () => {
-  it('is fixed for SD and reported for HD', () => {
+  it('is what the FC reports, else what the video system implies', () => {
+    // "auto" on an MSP displayport or with an NTSC camera: 13 rows, not PAL's 16
+    expect(canvasFor(VIDEO_SYSTEM.AUTO, { cols: 30, rows: 13 })).toEqual({ cols: 30, rows: 13 })
+    expect(canvasFor(VIDEO_SYSTEM.PAL, { cols: 28, rows: 15 })).toEqual({ cols: 28, rows: 15 })
+    expect(canvasFor(VIDEO_SYSTEM.AUTO, { cols: 0, rows: 0 })).toEqual(SD)
+    expect(canvasFor(VIDEO_SYSTEM.NTSC, { cols: 0, rows: 0 })).toEqual({ cols: 30, rows: 13 })
+    // an HD build without a display reports its HD default whatever the video system is
     expect(canvasFor(VIDEO_SYSTEM.AUTO, HD)).toEqual(SD)
     expect(canvasFor(VIDEO_SYSTEM.PAL, HD)).toEqual(SD)
     expect(canvasFor(VIDEO_SYSTEM.NTSC, HD)).toEqual({ cols: 30, rows: 13 })

@@ -8,16 +8,14 @@ import {
   encodeSetOsdElement,
   encodeSetOsdTimer,
   planOsdWrites,
-  VIDEO_SYSTEM,
   type OsdDraft,
   type OsdSnapshot,
 } from './model'
 
 export async function readOsdSnapshot(client: MspClient): Promise<OsdSnapshot> {
   const config = decodeOsdConfig(await client.request(MSP.OSD_CONFIG))
-  // Only HD displays have a canvas size of their own; SD is fixed by the video system.
-  const reported =
-    config.videoSystem === VIDEO_SYSTEM.HD ? decodeOsdCanvas(await client.request(MSP.OSD_CANVAS)) : { cols: 0, rows: 0 }
+  // The size of the display the FC found at boot — also for SD, where "auto" can mean 16 or 13 rows.
+  const reported = decodeOsdCanvas(await client.request(MSP.OSD_CANVAS))
   return { config, canvas: canvasFor(config.videoSystem, reported) }
 }
 

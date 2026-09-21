@@ -151,6 +151,9 @@ Firmware facts that are easy to get wrong (verified against Betaflight 2026.6.2 
 - OSD element position (u16): x bits 0–4 plus bit 10 (HD, x ≥ 32), y bits 5–9, visible-in-profile bits 11–13,
   variant bits 14–15. `MSP_SET_OSD_CONFIG` first byte: element index, `-2` = timer, `-1` = general settings.
   The custom message elements (81–84) have no CLI setting and their text can't be read back.
+- `osdInit` sets `osd_canvas_width/height` (`MSP_OSD_CANVAS`) to the detected display — also for SD: video system
+  AUTO is 13 rows on an MSP displayport or with an NTSC camera — and clamps every element outside of it onto the
+  last row/column at boot. Use the reported canvas, don't derive the rows from the video system.
 - `MSP_SIMPLIFIED_TUNING` is 53 bytes (17 PID sliders, 18 D-term filter, 18 gyro filter) and carries the same
   lowpass cutoffs as `MSP_FILTER_CONFIG`. A filter slider only rescales filters whose cutoff isn't 0, and only
   `MSP_SET_FILTER_CONFIG` re-initialises the running filters — send it last. `dyn_notch_count` max is 7.

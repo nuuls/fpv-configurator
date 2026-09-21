@@ -243,11 +243,19 @@ const PAL_ROWS = 16
 const NTSC_ROWS = 13
 const HD_DEFAULT: Canvas = { cols: 53, rows: 20 }
 
-/** Character grid of the display. `reported` is MSP_OSD_CANVAS, which only means something for HD. */
+/**
+ * Character grid of the display. `reported` is MSP_OSD_CANVAS, which `osdInit` sets to the display's real size:
+ * with video system "auto" that can be NTSC's 13 rows (always, on an MSP displayport). It matters because at
+ * boot the firmware moves every element below the display onto its last row, where they pile up. Without a
+ * display an HD build keeps reporting its 53 × 20 default, which no SD video system has — then the video system
+ * decides.
+ */
 export function canvasFor(videoSystem: number, reported: Canvas): Canvas {
-  if (videoSystem !== VIDEO_SYSTEM.HD) return { cols: SD_COLS, rows: videoSystem === VIDEO_SYSTEM.NTSC ? NTSC_ROWS : PAL_ROWS }
-  const valid = reported.cols > 0 && reported.cols <= MAX_X + 1 && reported.rows > 0 && reported.rows <= MAX_Y + 1
-  return valid ? reported : HD_DEFAULT
+  const hd = videoSystem === VIDEO_SYSTEM.HD
+  const maxCols = hd ? MAX_X + 1 : SD_COLS
+  const valid = reported.cols > 0 && reported.cols <= maxCols && reported.rows > 0 && reported.rows <= MAX_Y + 1
+  if (valid) return reported
+  return hd ? HD_DEFAULT : { cols: SD_COLS, rows: videoSystem === VIDEO_SYSTEM.NTSC ? NTSC_ROWS : PAL_ROWS }
 }
 
 // ---- snapshot → draft → writes ----

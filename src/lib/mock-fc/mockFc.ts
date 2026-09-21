@@ -43,6 +43,7 @@ import {
 } from '@/lib/motors/model'
 import { decodeBoardAlignment, encodeBoardAlignment, type BoardAlignment } from '@/lib/orientation/model'
 import {
+  decodePosition,
   decodeSetOsdConfig,
   elementIndex,
   encodeOsdCanvas,
@@ -51,6 +52,7 @@ import {
   FIRMWARE_ELEMENT_COUNT,
   VIDEO_SYSTEM,
   VIDEO_SYSTEM_NAMES,
+  type Canvas,
 } from '@/lib/osd/model'
 import { PORT_FUNCTION } from '@/lib/ports/model'
 import {
@@ -244,6 +246,7 @@ export class MockFlightController {
     this.gyroSampleRateHz = options.gyroSampleRateHz ?? 8000
     this.saved = structuredClone(options.config ?? defaultMockConfig())
     this.running = structuredClone(this.saved)
+    this.osdInit()
     this.parser = new MspParser((frame) => this.handleFrame(frame))
   }
 
@@ -414,8 +417,7 @@ export class MockFlightController {
         return EMPTY
       }
       case MSP.OSD_CANVAS:
-        // `osd_canvas_width/height`: the HD default until goggles announce something else, else SD PAL.
-        return encodeOsdCanvas(this.videoSystem() === VIDEO_SYSTEM.HD ? { cols: 53, rows: 20 } : { cols: 30, rows: 16 })
+        return encodeOsdCanvas(this.osdCanvas())
 
       case MSP.MODE_RANGES:
         return encodeModeRanges(this.running.modeSlots)
@@ -584,6 +586,30 @@ export class MockFlightController {
     return Math.max(0, VIDEO_SYSTEM_NAMES.findIndex((n) => n.toUpperCase() === name))
   }
 
+  /**
+   * `osd_canvas_width/height`, which `osdInit` sets to the display's size: the HD default until goggles announce
+   * something else; an MSP displayport has NTSC's 13 rows unless the video system is PAL; the MAX7456 sees a PAL
+   * camera.
+   */
+  private osdCanvas(): Canvas {
+    const videoSystem = this.videoSystem()
+    if (videoSystem === VIDEO_SYSTEM.HD) return { cols: 53, rows: 20 }
+    const msp = this.running.settings['osd_displayport_device'] === 'MSP'
+    const ntsc = msp ? videoSystem !== VIDEO_SYSTEM.PAL : videoSystem === VIDEO_SYSTEM.NTSC
+    return { cols: 30, rows: ntsc ? 13 : 16 }
+  }
+
+  /** Like the firmware's `osdInit`: at boot, elements outside the display move onto its last column / row. */
+  private osdInit(): void {
+    const { cols, rows } = this.osdCanvas()
+    const { positions } = this.running.osd
+    positions.forEach((raw, i) => {
+      const position = decodePosition(raw)
+      if (position.x < cols && position.y < rows) return
+      positions[i] = encodePosition({ ...position, x: Math.min(position.x, cols - 1), y: Math.min(position.y, rows - 1) })
+    })
+  }
+
   /** Like the firmware: selection first, then the table's dimensions and (optionally) a wipe of the table. */
   private setVtxConfig(request: Uint8Array): boolean {
     const vtx = this.running.vtx
@@ -619,6 +645,7 @@ export class MockFlightController {
 
   private reboot(): void {
     this.running = structuredClone(this.saved)
+    this.osdInit()
     this.motors = new Array<number>(8).fill(MOTOR_STOP)
     this.armingDisabledByMsp = false
     this.parser.reset()

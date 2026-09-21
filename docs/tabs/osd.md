@@ -30,7 +30,7 @@ Betaflight's OSD tab without its right-hand column: element list on the left, sc
 | ------- | ---- | ------------------------ | ---------------- | ----- |
 | Element on/off | toggle × 13 | profile bits 11–13 of `osd_*_pos` · `MSP_OSD_CONFIG` (84) / `MSP_SET_OSD_CONFIG` (85) | firmware: only Warnings on | see element table |
 | X / Y | 2 numbers per shown element | bits 0–4 + 10 (x), 5–9 (y) of the same value | 0 … columns−1 / rows−1 | same value the preview edits |
-| Preview | drag & drop, arrow keys on a focused element | — | canvas: 30×16 (PAL/auto), 30×13 (NTSC), HD from `MSP_OSD_CANVAS` (189), 53×20 if unset | sample text per element, one character per cell |
+| Preview | drag & drop, arrow keys on a focused element | — | canvas: the display's size from `MSP_OSD_CANVAS` (189); if that is unset or can't be right: 30×16 (PAL/auto), 30×13 (NTSC), 53×20 (HD) | sample text per element, one character per cell |
 | Hide other elements | button | clears the profile bits of every other element | — | only offered when the FC shows elements this app doesn't manage |
 
 Elements (firmware index → `osd_item_e`):
@@ -59,6 +59,10 @@ Elements (firmware index → `osd_item_e`):
   Save sets its source to total armed time (Betaflight's default), keeping precision and alarm.
 - Switching on an element that still sits on the firmware's default pile (all elements start on one spot near
   the centre) moves it to a suggested free spot for the canvas; an element that was placed before keeps its place.
+- **Canvas:** at boot the firmware sets `osd_canvas_width/height` to the display it found and moves every element
+  outside of it onto the last row / column, where they pile up. So the reported canvas counts for SD too: video
+  system "auto" is 13 rows on an MSP displayport or with an NTSC camera, not 16. Only an SD video system with a
+  reported canvas wider than 30 columns (HD build without a display) falls back to the video system's size.
 - Dragging keeps the whole sample text on screen; the number fields allow every cell. Out-of-range numbers block Save.
 - Elements the firmware doesn't know (shorter `MSP_OSD_CONFIG`, e.g. no custom messages) aren't listed.
 - No OSD in the firmware build → notice instead of the editor. No OSD device detected → warning, still editable.
@@ -77,6 +81,7 @@ Mock FC (auto video system → 30 × 16; Warnings and average cell voltage on, p
 
 - [x] 13 elements listed; Warnings and cell voltage on with X/Y fields, the rest off; preview shows both samples
 - [x] Switching on Timer 2 places it top right (not on the pile); Save without reboot; it is still on after a reload
+- [x] MSP displayport with auto video system → 30 × 13; elements switched on there keep their rows over a reboot
 - [x] Arrow keys move the focused preview element, the X/Y fields follow; Revert puts it back
 - [x] X beyond the last column blocks saving with a message
 - [x] "1 other element (Crosshairs)" notice; Hide + Save clears it on the FC and the notice disappears
