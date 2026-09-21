@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { describeError } from '@/hooks/useFcSnapshot'
 import { readEscs } from '@/lib/esc/io'
-import { differingSettings, type EscReport } from '@/lib/esc/model'
+import { combineReports, differingSettings, type EscOverview, type EscReport } from '@/lib/esc/model'
 import type { MspClient } from '@/lib/msp/client'
 import { useConnectionStore } from '@/stores/connection'
 
@@ -63,18 +63,60 @@ export function EscReportList({ reports }: { reports: EscReport[] }) {
   if (reports.length === 0) {
     return <Notice tone="warning">The flight controller has no ESC outputs to read. Check the motor protocol on the Motors tab.</Notice>
   }
+  const overview = combineReports(reports)
+  if (overview.view === 'combined') return <CombinedEscCard overview={overview} />
+
   const differing = differingSettings(reports)
   return (
     <>
       {reports.every((report) => report.status === 'missing') && (
         <Notice tone="warning">No ESC answered. Plug in the flight battery, then read again.</Notice>
       )}
+      {overview.reason && <Notice tone="warning">{overview.reason}</Notice>}
       <div className="mt-4 grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {reports.map((report, index) => (
           <EscCard key={index} number={index + 1} report={report} differing={differing[index] ?? new Set()} />
         ))}
       </div>
     </>
+  )
+}
+
+/** All ESCs are alike: their settings once, and what is set per motor listed by ESC. */
+function CombinedEscCard({ overview }: { overview: Extract<EscOverview, { view: 'combined' }> }) {
+  return (
+    <Card role="group" aria-label="All ESCs" className="mt-4 max-w-xl">
+      <CardHeader>
+        <CardDescription>All {overview.count} ESCs — same firmware, same settings</CardDescription>
+        <CardTitle>
+          {overview.firmware} {overview.version}
+        </CardTitle>
+        <CardDescription>{overview.hardware}</CardDescription>
+      </CardHeader>
+      <CardContent className="text-sm">
+        {overview.note && <p className="text-muted-foreground">{overview.note}</p>}
+        <dl className="divide-y">
+          {overview.settings.map((setting) => (
+            <div key={setting.key} className="flex items-baseline justify-between gap-3 py-1.5">
+              <dt className="text-muted-foreground">{setting.label}</dt>
+              <dd className="text-right font-medium">
+                {setting.values.length === 1 ? (
+                  setting.values[0]
+                ) : (
+                  <ul>
+                    {setting.values.map((value, index) => (
+                      <li key={index}>
+                        <span className="text-muted-foreground font-normal">ESC {index + 1}</span> {value}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </CardContent>
+    </Card>
   )
 }
 

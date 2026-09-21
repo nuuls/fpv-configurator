@@ -15,6 +15,22 @@ Read-only.
 +-------------------------------------------------------------------------+
 | [Read ESCs]   Plug in the flight battery first — the ESCs need power.   |
 |               Props off: the ESCs restart while they are being read.    |
++-------------------------------------------+-----------------------------+
+| All 4 ESCs — same firmware, same settings |
+| Bluejay 0.21.0                            |
+| Z-H-30 · EFM8BB21                         |
+| Motor direction             ESC 1 Normal  |
+|                             ESC 2 Reversed|
+|                             …             |
+| PWM frequency                      48 kHz |
+| …                                         |
++-------------------------------------------+
+```
+
+When the ESCs are not alike (or one couldn't be read), a card per ESC instead:
+
+```
+| The ESCs are not set up alike (PWM frequency), so they are listed …     |
 +------------------+------------------+------------------+----------------+
 | ESC 1            | ESC 2            | ESC 3            | ESC 4          |
 | Bluejay 0.21.0   | Bluejay 0.21.0   | BLHeli_S 16.7    | AM32 2.18      |
@@ -35,7 +51,8 @@ Read-only.
 | Firmware | readout per ESC | settings block (below) | BLHeli_S / Bluejay / AM32 + version | Bluejay: `main.sub` + the suffix in its name field, e.g. `0.21.0`. AM32: `major.minor` with two digits |
 | Hardware | readout per ESC | BLHeli_S / Bluejay: `LAYOUT` field + MCU from the bootloader signature. AM32: firmware file name (16 bytes, 32 below the settings) | e.g. `Z-H-30 · EFM8BB21`, `AIKON_F051` | AM32 builds without a file name: flash size from the signature instead |
 | Settings | readout list per ESC | settings block: SiLabs 0x1A00 (BB1/BB21) or 0x3000 (BB51), 0x70 bytes. AM32 0x7C00 (32 k flash), 0xF800 (64 k) or 0x7E00 (128 k, address shifted by 2), 48 bytes | see `src/lib/esc/model.ts` | Only settings that matter on a multirotor; shown with the unit and wording of ESC Configurator |
-| "differs" badge | readout | — | — | On a setting whose value is not the one of the first ESC with the same firmware. Motor direction is left out — it is per motor on purpose |
+| Combined view | readout | — | — | Shown instead of the cards per ESC once all ESCs are read and they are alike: every one readable, same firmware, version, settings layout and hardware, and the same value for every setting. Motor direction may vary — it is then listed per ESC |
+| "differs" badge | readout | — | — | Cards per ESC only. On a setting whose value is not the one of the first ESC with the same firmware. Motor direction is left out — it is per motor on purpose |
 
 Settings shown — BLHeli_S (layout 32, 33): motor direction, startup power, motor timing, demag compensation,
 temperature protection, low RPM power protection, brake on stop, beep strength, beacon strength, beacon delay.
@@ -57,6 +74,10 @@ sinusoidal startup, protocol, temperature and current limit, low voltage cutoff,
 - Every ESC is reset (`cmd_DeviceReset`) right after it was read so it leaves its bootloader, and
   `cmd_InterfaceExit` is sent on every exit path, also after an error. If the FC doesn't leave the 4-way interface the
   page says so and asks to replug it.
+- All ESCs are always read. Only then they are compared: alike (see "Combined view") → one view with the firmware,
+  hardware and settings once. Otherwise a card per ESC, below a notice saying what keeps them apart — different
+  firmware, different hardware, or the names of the settings that differ. No such notice when an ESC wasn't readable:
+  its card says so. A single ESC is shown as its card.
 - An ESC that doesn't answer gets a card saying so (battery, signal wire); the others are still read. No ESC
   answering at all: a hint to plug in the battery. `MSP_SET_PASSTHROUGH` reporting 0 ESCs: a notice pointing to the
   Motors tab (motor protocol).
@@ -76,12 +97,16 @@ sinusoidal startup, protocol, temperature and current limit, low voltage cutoff,
 
 ## Acceptance
 
-Mock FC (4 ESCs: two Bluejay 0.21.0 — the second one reversed and with another PWM frequency —, a BLHeli_S 16.7 and
-an AM32 2.18; like real ones they only answer once the signal wire was high for 0.7 s):
+Mock FC (4 Bluejay 0.21.0 ESCs set up alike, motors 2 and 3 reversed; like real ones they only answer once the
+signal wire was high for 0.7 s). The checks on ESCs that are not alike run against `mixedMockEscs()` (two Bluejay
+0.21.0 — the second one reversed and with another PWM frequency —, a BLHeli_S 16.7 and an AM32 2.18) in the tests:
 
 - [x] Nothing is read before "Read ESCs" is pressed
-- [x] Read ESCs → four cards with firmware, version, hardware and settings; ESC 2 shows "Reversed"
-- [x] ESC 2's PWM frequency carries "differs"; its motor direction doesn't
+- [x] Read ESCs → all four are read, then one combined view with firmware, version, hardware and settings; motor
+      direction listed per ESC (ESC 2 and 3 "Reversed"); no cards per ESC
+- [x] ESCs with different firmware → four cards with firmware, version, hardware and settings, and a notice
+- [x] A setting that differs → cards per ESC, the notice names it and the ESC's value carries "differs"; its motor
+      direction doesn't
 - [x] The FC answers MSP again afterwards (another tab opens and reads)
 - [x] An ESC that doesn't answer is shown as such next to the ones that do; none answering → battery hint
 - [x] No write / erase command reaches the 4-way interface (the mock rejects and counts them)
@@ -105,8 +130,12 @@ On real hardware:
 - AM32 is told apart from BLHeli_32 (same interface mode) by the bootloader's input pin code, like ESC Configurator
   does: only PA2, PB4 and PA6 are AM32.
 - AM32 timing advance: raw 0–3 is ×7.5°, raw 10–42 is (raw − 10) × 0.9375° (`Src/main.c`).
-- The mock's four ESCs run three different firmwares so that "Connect Mock FC" shows every supported one. Not a
-  realistic quad, but a realistic one would leave two decoders invisible.
+- One combined view for ESCs that are alike (user request): four identical lists say nothing, and whether they are
+  identical is the actual question. Hardware has to match too — the view has one header — and a differing motor
+  direction doesn't keep them apart, it is per motor on purpose.
+- The mock's default ESCs are a realistic quad (four Bluejay set up alike) so that "Connect Mock FC" shows the combined
+  view. The earlier set with three firmwares lives on as `mixedMockEscs()` for the tests, which keeps the BLHeli_S and
+  AM32 decoders and the cards per ESC covered — they are no longer visible through "Connect Mock FC".
 
 ## Open questions
 

@@ -326,6 +326,72 @@ export function describeEsc(raw: EscRawRead): EscReport {
   return report('BLHeli_S', `${main}.${sub}`, hardware, layoutRevision, BLHELI_S_SETTINGS, bytes)
 }
 
+export interface CombinedEscSetting {
+  key: string
+  label: string
+  /** One value when every ESC has the same; one per ESC, in motor order, for a `perMotor` setting that varies. */
+  values: string[]
+}
+
+/** How the page shows a finished read: one view for ESCs that are all alike, otherwise a card per ESC. */
+export type EscOverview =
+  | {
+      view: 'combined'
+      count: number
+      firmware: EscFirmware
+      version: string
+      hardware: string
+      settings: CombinedEscSetting[]
+      note: string | null
+    }
+  /** `reason`: why the ESCs can't share a view, unless the cards say so themselves (an ESC that wasn't read). */
+  | { view: 'separate'; reason: string | null }
+
+type ReadableEsc = Extract<EscReport, { status: 'ok' }>
+
+/**
+ * All ESCs of a quad should be the same hardware, run the same firmware and be set up alike — except for what is
+ * `perMotor`. Only then they are shown as one.
+ */
+export function combineReports(reports: EscReport[]): EscOverview {
+  const escs = reports.filter((report): report is ReadableEsc => report.status === 'ok')
+  const first = escs[0]
+  if (!first || reports.length < 2 || escs.length < reports.length) return { view: 'separate', reason: null }
+
+  const sameFirmware = escs.every(
+    (esc) => esc.firmware === first.firmware && esc.version === first.version && esc.layoutRevision === first.layoutRevision,
+  )
+  if (!sameFirmware) return { view: 'separate', reason: "The ESCs don't all run the same firmware, so they are listed one by one." }
+  if (!escs.every((esc) => esc.hardware === first.hardware)) {
+    return { view: 'separate', reason: 'The ESCs are not all the same hardware, so they are listed one by one.' }
+  }
+
+  // Same firmware and layout: the same rows — unless a value hides one (`format` returning null).
+  const rows = new Map<string, EscSetting>()
+  for (const esc of escs) for (const setting of esc.settings) if (!rows.has(setting.key)) rows.set(setting.key, setting)
+
+  const settings: CombinedEscSetting[] = []
+  const differing: string[] = []
+  for (const { key, label, perMotor } of rows.values()) {
+    const values = escs.map((esc) => esc.settings.find((setting) => setting.key === key)?.value ?? '—')
+    const same = values.every((value) => value === values[0])
+    if (!same && !perMotor) differing.push(label)
+    settings.push({ key, label, values: same ? values.slice(0, 1) : values })
+  }
+  if (differing.length > 0) {
+    return { view: 'separate', reason: `The ESCs are not set up alike (${differing.join(', ')}), so they are listed one by one.` }
+  }
+  return {
+    view: 'combined',
+    count: escs.length,
+    firmware: first.firmware,
+    version: first.version,
+    hardware: first.hardware,
+    settings,
+    note: first.note,
+  }
+}
+
 /**
  * Keys of the settings that differ from the first ESC running the same firmware and layout, per ESC.
  * All ESCs of a quad should be set up alike — except for what is `perMotor`.

@@ -117,8 +117,13 @@ export function mockAm32Esc(): MockEsc {
   }
 }
 
-/** Two Bluejay ESCs (the second reversed and built for 24 kHz), a BLHeli_S and an AM32: every supported firmware. */
+/** A 4-in-1 Bluejay ESC: four ESCs that are set up alike, motors 2 and 3 reversed. */
 export function defaultMockEscs(): MockEsc[] {
+  return [mockBluejayEsc(), mockBluejayEsc({ reversed: true }), mockBluejayEsc({ reversed: true }), mockBluejayEsc()]
+}
+
+/** Two Bluejay ESCs (the second reversed and built for 24 kHz), a BLHeli_S and an AM32: every supported firmware. */
+export function mixedMockEscs(): MockEsc[] {
   return [mockBluejayEsc(), mockBluejayEsc({ reversed: true, pwmKhz: 24 }), mockBlheliSEsc(), mockAm32Esc()]
 }
 

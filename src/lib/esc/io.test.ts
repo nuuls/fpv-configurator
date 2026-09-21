@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultMockEscs, mockAm32Esc, mockBluejayEsc, type MockEsc } from '@/lib/mock-fc/mockEscs'
+import { defaultMockEscs, mixedMockEscs, mockAm32Esc, mockBluejayEsc, type MockEsc } from '@/lib/mock-fc/mockEscs'
 import { MockFlightController } from '@/lib/mock-fc/mockFc'
 import { readFcInfo } from '@/lib/msp/api'
 import { MspClient } from '@/lib/msp/client'
@@ -25,7 +25,7 @@ async function connect(escs?: MockEsc[]) {
 
 describe('readEscs against the mock FC', () => {
   it('reads every ESC, reports progress and hands the link back to MSP', async () => {
-    const { fc, client, options } = await connect()
+    const { fc, client, options } = await connect(mixedMockEscs())
     const progress: string[] = []
     const reports = await readEscs(client, (index, count) => progress.push(`${index + 1}/${count}`), options)
 

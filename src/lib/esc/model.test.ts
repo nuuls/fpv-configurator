@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { mockAm32Esc, mockBlheliSEsc, mockBluejayEsc, type MockEsc } from '@/lib/mock-fc/mockEscs'
 import { INTERFACE_MODE } from './fourway'
 import {
+  combineReports,
   decodeDeviceInfo,
   describeEsc,
   describeUnsupported,
@@ -202,5 +203,57 @@ describe('differingSettings', () => {
       describeEsc(rawRead(mockBlheliSEsc(), { 0x1f: 3 })),
     ]
     expect(differingSettings(reports).map((keys) => [...keys])).toEqual([[], ['pwmFrequency'], [], [], ['demag']])
+  })
+})
+
+describe('combineReports', () => {
+  const bluejay = (options?: Parameters<typeof mockBluejayEsc>[0], patch?: Record<number, number>) =>
+    describeEsc(rawRead(mockBluejayEsc(options), patch))
+
+  it('shows ESCs that are alike as one, with the motor direction per ESC', () => {
+    const overview = combineReports([bluejay(), bluejay({ reversed: true }), bluejay({ reversed: true }), bluejay()])
+    expect(overview).toMatchObject({ view: 'combined', count: 4, firmware: 'Bluejay', version: '0.21.0', hardware: 'Z-H-30 · EFM8BB21' })
+    if (overview.view !== 'combined') return
+    const values = Object.fromEntries(overview.settings.map((setting) => [setting.label, setting.values]))
+    expect(values['Motor direction']).toEqual(['Normal', 'Reversed', 'Reversed', 'Normal'])
+    expect(values['PWM frequency']).toEqual(['48 kHz'])
+    expect(overview.settings.map((setting) => setting.key)).toEqual(
+      (bluejay() as Extract<EscReport, { status: 'ok' }>).settings.map((setting) => setting.key),
+    )
+  })
+
+  it('gives a per-motor setting once when it is the same everywhere', () => {
+    const overview = combineReports([bluejay(), bluejay()])
+    expect(overview.view === 'combined' && overview.settings.find((setting) => setting.key === 'direction')?.values).toEqual(['Normal'])
+  })
+
+  it('keeps the ESCs apart when a setting differs, and names it', () => {
+    const overview = combineReports([bluejay(), bluejay({ pwmKhz: 24 }), bluejay(undefined, { 0x1f: 3 }), bluejay()])
+    expect(overview).toEqual({
+      view: 'separate',
+      reason: 'The ESCs are not set up alike (PWM frequency, Demag compensation), so they are listed one by one.',
+    })
+  })
+
+  it('counts a setting that only some ESCs show as differing', () => {
+    // PWM frequency byte 0xFF: not a value Bluejay knows, the row is hidden for that ESC.
+    const overview = combineReports([bluejay(), bluejay(undefined, { 0x0a: 0xff })])
+    expect(overview).toMatchObject({ view: 'separate', reason: expect.stringContaining('PWM frequency') })
+  })
+
+  it('keeps the ESCs apart when firmware, version or hardware differ', () => {
+    const am32 = describeEsc(rawRead(mockAm32Esc()))
+    expect(combineReports([bluejay(), am32])).toMatchObject({ view: 'separate', reason: expect.stringContaining('same firmware') })
+    expect(combineReports([bluejay(), bluejay(undefined, { 0x01: 20 })])).toMatchObject({ reason: expect.stringContaining('same firmware') })
+    const otherBoard = describeEsc(rawRead({ ...mockBluejayEsc(), signature: 0xe8b1 }))
+    expect(combineReports([bluejay(), otherBoard])).toMatchObject({ view: 'separate', reason: expect.stringContaining('same hardware') })
+  })
+
+  it('leaves it to the cards when an ESC was not read, and never combines a single ESC', () => {
+    const missing: EscReport = { status: 'missing', description: '' }
+    expect(combineReports([bluejay(), missing, bluejay()])).toEqual({ view: 'separate', reason: null })
+    expect(combineReports([missing, missing])).toEqual({ view: 'separate', reason: null })
+    expect(combineReports([bluejay()])).toEqual({ view: 'separate', reason: null })
+    expect(combineReports([])).toEqual({ view: 'separate', reason: null })
   })
 })
