@@ -3,6 +3,35 @@
 A simplified Betaflight configurator that runs entirely in the browser. It talks MSP (MultiWii Serial
 Protocol) to the flight controller over the Web Serial API. Static SPA — there is no backend.
 
+## Working in parallel — one task, one branch, one worktree
+
+Several agents work on this repo at the same time. **Never edit, commit or push on `master` directly**, and never
+work in a directory another agent is using.
+
+1. **Start** every task in your own git worktree on your own branch, cut from the latest `origin/master`:
+   use the worktree tool (it creates `.claude/worktrees/<name>`), or
+   `git fetch origin && git worktree add .claude/worktrees/<name> -b <branch> origin/master`.
+   Branch names: `feat/<topic>`, `fix/<topic>`, `docs/<topic>` — e.g. `feat/osd-tab`. One task per branch.
+2. Run `pnpm install` in the new worktree (each has its own `node_modules`; the pnpm store makes it quick).
+   `pnpm dev` picks a free port by itself, so several dev servers can run side by side.
+3. **Finish**: `git fetch origin && git rebase origin/master` (resolve conflicts, keep both sides' additions) →
+   `pnpm check` → commit on your branch → `git push -u origin <branch>`. Committing and pushing **your own
+   branch** needs no permission; report the branch name and what it contains.
+4. **Merging into `master` happens only when the user asks.** Then: rebase once more, `pnpm check`, fast-forward
+   (`git checkout master && git merge --ff-only <branch> && git push`), delete the branch and remove the worktree
+   (`git worktree remove …`, `git branch -d …`, `git push origin --delete …`). Don't touch other agents' branches
+   or worktrees.
+
+To keep branches mergeable, stay out of each other's way in the files everyone touches:
+
+- `src/routes.ts`, `src/lib/msp/codes.ts`, `src/lib/mock-fc/mockFc.ts`, `src/index.css`: only **add** lines, in
+  the place they belong (codes are sorted by number); don't reorder, reformat or rename what is there.
+- Tests for a new tab go in their own file (`src/pages/<Tab>.test.tsx`, helpers from `src/test/app.tsx`), not into
+  `src/pages/tabs.test.tsx`.
+- `docs/SPEC.md` is the user's document: change only the lines your task is about. Your tab's
+  `docs/tabs/<tab>.md` is yours.
+- Don't run `pnpm format` on files you didn't otherwise change, and don't bump dependencies as a side effect.
+
 ## Specs — read before building features
 
 `docs/SPEC.md` (scope, layout, global behaviour) and `docs/tabs/<tab>.md` (one per tab) define what the app
@@ -102,7 +131,7 @@ many fields we don't edit, keep the raw payload in the snapshot and patch bytes 
 of decoding everything — see `lib/tuning` and `lib/motors`.
 
 UI tests: wait for the reboot/reload to finish before asserting (`saveAndReboot` / `saveWithoutReboot` helpers
-in `src/pages/tabs.test.tsx`) — elements of the pre-save page are still mounted right after the click.
+in `src/test/app.tsx`, next to `openTab`, `nudge` and `resetAppAfterEach`) — elements of the pre-save page are still mounted right after the click.
 
 Firmware facts that are easy to get wrong (verified against Betaflight 2026.6.2 source):
 

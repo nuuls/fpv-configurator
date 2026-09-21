@@ -1,46 +1,9 @@
 /** Acceptance checks for the Setup, Blackbox, Orientation, Modes, PID Tuning and Motors tabs (docs/tabs/*.md). */
-import { render, screen, waitFor, within } from '@testing-library/react'
-import userEvent, { type UserEvent } from '@testing-library/user-event'
-import { afterEach, describe, expect, it } from 'vitest'
-import App from '@/App'
-import { useConnectionStore } from '@/stores/connection'
+import { screen, within } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
+import { nudge, openTab, resetAppAfterEach, saveAndReboot, saveWithoutReboot } from '@/test/app'
 
-afterEach(async () => {
-  await useConnectionStore.getState().disconnect()
-  window.location.hash = ''
-})
-
-async function openTab(name: string): Promise<UserEvent> {
-  const user = userEvent.setup()
-  render(<App />)
-  await user.click(screen.getByRole('button', { name: 'Connect Mock FC' }))
-  await user.click(await screen.findByRole('link', { name }))
-  await screen.findByRole('heading', { name })
-  return user
-}
-
-const afterReboot = { timeout: 3000 }
-
-/** Clicks Save & Reboot and waits until the app has reconnected and the tab is showing again. */
-async function saveAndReboot(user: UserEvent) {
-  await user.click(screen.getByRole('button', { name: 'Save & Reboot' }))
-  await screen.findByText('Rebooting flight controller…')
-  await waitFor(() => expect(screen.queryByText('Rebooting flight controller…')).toBeNull(), afterReboot)
-}
-
-/** Clicks Save and waits until the tab has re-read the FC (nothing left to revert). */
-async function saveWithoutReboot(user: UserEvent) {
-  await user.click(screen.getByRole('button', { name: 'Save' }))
-  // "Save" (not "Saving…") and disabled = written, re-read from the FC, and nothing left to save
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled())
-  expect(screen.queryByText('Rebooting flight controller…')).toBeNull()
-}
-
-/** Radix sliders are driven with the keyboard in jsdom. */
-async function nudge(user: UserEvent, thumb: HTMLElement, keys: string) {
-  thumb.focus()
-  await user.keyboard(keys)
-}
+resetAppAfterEach()
 
 describe('sidebar', () => {
   it('mirrors the scope in docs/SPEC.md', async () => {
@@ -84,7 +47,7 @@ describe('Blackbox tab', () => {
     const user = await openTab('Blackbox')
     await user.click(await screen.findByRole('button', { name: 'Erase storage' }))
     await user.click(await screen.findByRole('button', { name: 'Erase' }))
-    expect(await screen.findByText(/Onboard flash: 0 kB of/, {}, afterReboot)).toBeInTheDocument()
+    expect(await screen.findByText(/Onboard flash: 0 kB of/, {}, { timeout: 3000 })).toBeInTheDocument()
   })
 
   it('restarts as a USB drive and explains how to get back', async () => {
@@ -124,7 +87,7 @@ describe('Orientation tab', () => {
     await user.click(calibrate)
     expect(await screen.findByText('Keep the quad still…')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Calibrating…' })).toBeDisabled()
-    expect(await screen.findByText('Calibration finished and saved.', {}, afterReboot)).toBeInTheDocument()
+    expect(await screen.findByText('Calibration finished and saved.', {}, { timeout: 3000 })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Calibrate accelerometer' })).toBeEnabled()
   })
 })
