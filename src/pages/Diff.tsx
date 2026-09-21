@@ -3,6 +3,7 @@ import { Notice } from '@/components/Notice'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Switch } from '@/components/ui/switch'
 import { describeError } from '@/hooks/useFcSnapshot'
 import { readDiff } from '@/lib/diff/io'
 import { countDifferences, tuningOnly, type DiffEntry, type DiffReport, type DiffSection } from '@/lib/diff/model'
@@ -19,6 +20,8 @@ export function DiffPage() {
   // Tagged with the read it belongs to, so a reconnect or "Read again" starts from scratch.
   const [result, setResult] = useState<{ client: MspClient; generation: number; state: ReadState } | null>(null)
   const state: ReadState = result && result.client === client && result.generation === generation ? result.state : { phase: 'reading' }
+  // The setup part of the diff, which the tab leaves out unless asked.
+  const [showHidden, setShowHidden] = useState(false)
 
   useEffect(() => {
     if (!client) return
@@ -45,24 +48,28 @@ export function DiffPage() {
             {state.phase === 'reading' ? 'Reading…' : 'Read again'}
           </Button>
           {state.phase === 'done' && <CopyButton text={state.report.text} />}
+          <div className="flex items-center gap-2">
+            <Switch id="show-hidden" checked={showHidden} onCheckedChange={setShowHidden} />
+            <label htmlFor="show-hidden">Show hidden differences</label>
+          </div>
           <p className="text-muted-foreground" aria-live="polite">
             {state.phase === 'reading' && 'Asking the flight controller for its diff…'}
-            {state.phase === 'done' && summary(state.report)}
+            {state.phase === 'done' && summary(state.report, showHidden)}
           </p>
         </CardContent>
       </Card>
 
       {state.phase === 'failed' && <Notice tone="error">{state.message}</Notice>}
-      {state.phase === 'done' && <DiffReportView report={tuningOnly(state.report)} />}
+      {state.phase === 'done' && <DiffReportView report={showHidden ? state.report : tuningOnly(state.report)} all={showHidden} />}
     </>
   )
 }
 
-function summary(report: DiffReport): string {
+function summary(report: DiffReport, showHidden: boolean): string {
   const count = countDifferences(tuningOnly(report))
   const hidden = countDifferences(report) - count
   const differences = count === 1 ? '1 tuning difference' : `${count} tuning differences`
-  return [differences, hidden > 0 && `${hidden} other hidden`, report.board, report.firmware].filter(Boolean).join(' · ')
+  return [differences, hidden > 0 && `${hidden} other ${showHidden ? 'shown' : 'hidden'}`, report.board, report.firmware].filter(Boolean).join(' · ')
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -88,7 +95,7 @@ const SIDES = {
   current: 'bg-success/25',
 } as const
 
-function DiffReportView({ report }: { report: DiffReport }) {
+function DiffReportView({ report, all }: { report: DiffReport; all: boolean }) {
   return (
     <>
       {report.errors.map((error, index) => (
@@ -97,7 +104,9 @@ function DiffReportView({ report }: { report: DiffReport }) {
         </Notice>
       ))}
       {report.sections.length === 0 && report.errors.length === 0 && (
-        <Notice>No tuning differences — PIDs, rates and filters are at their defaults.</Notice>
+        <Notice>
+          {all ? 'No differences — every setting is at its default.' : 'No tuning differences — PIDs, rates and filters are at their defaults.'}
+        </Notice>
       )}
       {report.sections.length > 0 && (
         <p className="mt-4 font-mono text-xs text-muted-foreground">

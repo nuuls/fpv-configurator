@@ -6,13 +6,14 @@ Route: `/diff` · Page: `src/pages/Diff.tsx`
 ## Purpose
 
 See every **tuning** setting — PIDs, rates, filters — that is not at its Betaflight default: what makes this quad
-fly differently from a stock one. The setup (ports, modes, VTX table, OSD, …) is left out.
+fly differently from a stock one. The setup (ports, modes, VTX table, OSD, …) is left out unless
+"Show hidden differences" is switched on.
 
 ## Layout
 
 ```
 +-----------------------------------------------------------------+
-| [Read again] [Copy full diff]                                   |
+| [Read again] [Copy full diff] (o ) Show hidden differences      |
 |        3 tuning differences · 7 other hidden · board · firmware |
 +-----------------------------------------------------------------+
   [Betaflight default] → [this flight controller]
@@ -36,9 +37,11 @@ Coloured like `git diff`: a section is a "file"; in a line the default is marked
 | ------- | ---- | ------------------------ | ---------------- | ----- |
 | Read again | button | CLI `diff all defaults` | — | The tab also reads once when it is opened |
 | Copy full diff | button | — | — | The **complete** CLI output as it came (setup included), to paste into a bug report |
-| Summary | readout | `# version`, `board_name`, `manufacturer_id` lines | — | Number of tuning differences · how many other differences are hidden · board · firmware |
+| Show hidden differences | switch | — | off / on · off | On: the view shows the complete diff — every section, the lines that aren't a `set` included. Not remembered when the tab is left |
+| Summary | readout | `# version`, `board_name`, `manufacturer_id` lines | — | Number of tuning differences · how many other differences are hidden ("N other shown" while the switch is on) · board · firmware |
 | Legend | readout | — | — | Red "Betaflight default" → green "this flight controller"; only while there are differences |
-| Section block | readout | CLI headings `master`, `profile N`, `rateprofile N` | — | Only sections with tuning differences; every PID / rate profile (`all`). Header: heading · number of differences |
+| Section block | readout | CLI headings `master`, `profile N`, `rateprofile N` | — | Only sections with tuning differences — with the switch on every section the CLI printed (`feature`, `serial`, `aux`, …); every PID / rate profile (`all`). Header: heading · number of differences |
+| Command line | readout | `serial …` + `#serial …` | — | Only with the switch on: a line that isn't a `set`, as the CLI printed it — a `#…` default line red, a current line green; they don't pair up |
 | Setting line | readout | `set name = value` + `#set name = default` | — | One line: `set name = default → value`, the default marked red, the value green; only the green value if the FC printed no default. Long values wrap |
 
 ## Behaviour
@@ -58,6 +61,9 @@ Coloured like `git diff`: a section is a "file"; in a line the default is marked
 - Hidden: all other `master` settings (board alignment, receiver, OSD, VTX, GPS, failsafe, …), battery profiles, the
   craft name and every line that isn't a `set` — `feature`, `serial`, `aux`, `adjrange`, `vtxtable`, `resource`,
   `timer`, `dma`, `beeper`, `map`, … The summary says how many differences are hidden; "Copy full diff" has them.
+- "Show hidden differences" shows them in place: the view switches from `tuningOnly(report)` to the whole parsed
+  report, without reading again. The switch keeps its position over "Read again" and a reconnect, not over leaving
+  the tab. Empty state with it on: "No differences — every setting is at its default."
 - Also left out of the view: what the CLI prints for pasting the diff into another FC (`batch start`, `defaults nosave`,
   `profile 0` restores, `save`, `mcu_id`, `signature`). "Copy as text" keeps them.
 - Errors: no STX echo within 1 s → "did not start its command line" (the FC ignores it while armed); output that
@@ -68,7 +74,8 @@ Coloured like `git diff`: a section is a "file"; in a line the default is marked
 ## Hidden on purpose
 
 - The CLI itself: no command input, no `dump`, no applying or restoring a diff.
-- The setup part of the diff (see Behaviour) — the other tabs show it, and "Copy full diff" still has it.
+- The setup part of the diff (see Behaviour), until "Show hidden differences" is on — the other tabs show it, and
+  "Copy full diff" always has it.
 - Filtering / searching, and comparing with a saved diff or a drone-type preset (SPEC §2 "Drone type" will need
   its own diff of what it is going to change).
 
@@ -80,6 +87,8 @@ Checkable with **Connect Mock FC** (so the mock has to support it):
       and two modes are setup, so there are no cards
 - [x] Motors → Bidirectional DShot on, props out → Save & Reboot → Diff Checker → "1 tuning difference · 7 other
       hidden", `master` lists only `set dshot_bidir = OFF → ON` (not `yaw_motors_reversed`)
+- [x] Show hidden differences on → "0 tuning differences · 6 other shown", sections `feature`, `serial`, `aux` …
+      appear with their lines, no empty state; it stays on over Read again; off → hidden again
 - [x] Read again reads again; Copy full diff puts the complete raw CLI output on the clipboard
 - [x] Afterwards other tabs load as usual (the FC is back in MSP)
 
@@ -102,6 +111,9 @@ _Made while building without asking (2026-09-21) — change freely._
 - Tuning only (2026-09-21, asked for by the user). Which `master` settings count as tuning is an allow-list of
   names from the firmware's `cli/settings.c`; commands other than `set` are all setup. The copy button keeps the
   complete diff (renamed "Copy full diff"), so nothing is lost for bug reports, and the summary counts what is hidden.
+- "Show hidden differences" (2026-09-21, asked for by the user) is a switch in the toolbar that shows the complete
+  diff instead of adding the hidden part below: the CLI's section order stays, and `master` isn't split in two. Off
+  by default and not persisted — the tab is about the tune.
 - CLI names and values are shown as they are, not translated — the tab is a debugging tool.
 - Coloured like `git diff` (2026-09-21, asked for by the user — the three-column table was hard to read), condensed
   to one line per setting on the user's request: `set name = default → value`, the default marked red and the value

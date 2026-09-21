@@ -38,6 +38,28 @@ describe('Diff Checker tab', () => {
     expect(await screen.findByText(/^1 tuning difference/)).toBeInTheDocument()
   })
 
+  it('shows the hidden setup differences while "Show hidden differences" is on', async () => {
+    const user = await openTab('Diff Checker')
+    await screen.findByText(/^0 tuning differences · 6 other hidden/)
+    const toggle = screen.getByRole('switch', { name: 'Show hidden differences' })
+    expect(toggle).not.toBeChecked()
+
+    await user.click(toggle)
+    expect(screen.getByText(/^0 tuning differences · 6 other shown/)).toBeInTheDocument()
+    expect(screen.queryByText(/^No tuning differences/)).toBeNull()
+    expect(lines('serial')).toContain('serial UART2 64 115200 57600 0 115200')
+    const shown = screen.getAllByRole('group').flatMap((group) => within(group).getAllByRole('listitem'))
+    expect(shown.length).toBeGreaterThanOrEqual(6)
+
+    // stays on for the next read
+    await user.click(screen.getByRole('button', { name: 'Read again' }))
+    expect(await screen.findByText(/^0 tuning differences · 6 other shown/)).toBeInTheDocument()
+
+    await user.click(toggle)
+    expect(screen.getByText(/^0 tuning differences · 6 other hidden/)).toBeInTheDocument()
+    expect(screen.queryAllByRole('group')).toEqual([])
+  })
+
   it('copies the complete diff, setup included', async () => {
     const user = await openTab('Diff Checker')
     await user.click(await screen.findByRole('button', { name: 'Copy full diff' }))
