@@ -1,14 +1,42 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Notice } from '@/components/Notice'
+import { NumberInput } from '@/components/NumberInput'
+import { SaveBar } from '@/components/SaveBar'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import { Switch } from '@/components/ui/switch'
+import { useDraft } from '@/hooks/useDraft'
 import { describeError } from '@/hooks/useFcSnapshot'
-import { readEscs } from '@/lib/esc/io'
-import { combineReports, differingSettings, type EscOverview, type EscReport } from '@/lib/esc/model'
+import { useSave } from '@/hooks/useSave'
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
+import { readEscs, writeEscs } from '@/lib/esc/io'
+import {
+  alignGroup,
+  changedEscs,
+  combineReports,
+  differingSettings,
+  draftRaw,
+  editableGroups,
+  numberToRaw,
+  rawToNumber,
+  setDraftRaw,
+  toEscDraft,
+  unevenSettings,
+  type EscDraft,
+  type EscGroup,
+  type EscOverview,
+  type EscReport,
+  type EscSettingDef,
+} from '@/lib/esc/model'
 import type { MspClient } from '@/lib/msp/client'
+import { confirm } from '@/stores/confirm'
 import { useConnectionStore } from '@/stores/connection'
+import { confirmDiscardChanges } from '@/stores/unsaved'
+
+const PATH = '/esc'
 
 type ReadState =
   | { phase: 'reading'; index: number; count: number }
@@ -24,7 +52,7 @@ export function EscPage() {
   const reading = state?.phase === 'reading'
 
   const start = async () => {
-    if (!client) return
+    if (!client || !(await confirmDiscardChanges())) return
     const update = (next: ReadState) => setRead({ client, state: next })
     update({ phase: 'reading', index: 0, count: 0 })
     try {
@@ -37,7 +65,7 @@ export function EscPage() {
 
   return (
     <>
-      <PageHeader title="ESC" description="Firmware and settings of the ESCs, read through the flight controller. Nothing is changed." />
+      <PageHeader title="ESC" description="Firmware and settings of the ESCs, read and changed through the flight controller." />
       <Card>
         <CardContent className="flex flex-wrap items-center gap-4 text-sm">
           <Button disabled={!client || reading} onClick={() => void start()}>
@@ -54,36 +82,107 @@ export function EscPage() {
       </Card>
 
       {state?.phase === 'failed' && <Notice tone="error">{state.message}</Notice>}
-      {state?.phase === 'done' && <EscReportList reports={state.reports} />}
+      {state?.phase === 'done' && client && (
+        <EscEditor client={client} reports={state.reports} onWritten={(reports) => setRead({ client, state: { phase: 'done', reports } })} />
+      )}
     </>
   )
 }
 
-export function EscReportList({ reports }: { reports: EscReport[] }) {
+/** The read result with its editable settings; Save writes the changed ones to the ESCs. */
+function EscEditor({ client, reports, onWritten }: { client: MspClient; reports: EscReport[]; onWritten: (reports: EscReport[]) => void }) {
+  const { draft, setDraft, dirty, revert } = useDraft(reports, toEscDraft)
+  // The ESCs are read back while they are written, so there is nothing to reload afterwards.
+  const { saving, error, save } = useSave(() => {})
+  useUnsavedChanges(PATH, dirty)
+
+  const write = async () => {
+    const escs = changedEscs(reports, draft).map((index) => index + 1)
+    const confirmed = await confirm({
+      title: 'Write the settings to the ESCs?',
+      description: `ESC ${escs.join(', ')} will be changed and restarted. Keep the flight battery plugged in and the props off until it is done.`,
+      confirmLabel: 'Write settings',
+    })
+    if (!confirmed) return
+    await save(async () => {
+      onWritten(await writeEscs(client, reports, draft))
+      return false
+    })
+  }
+
+  return (
+    <>
+      <EscReportList reports={reports} draft={draft} onChange={setDraft} />
+      {error && <Notice tone="error">{error}</Notice>}
+      {draft.some((block) => block !== null) && <SaveBar dirty={dirty} saving={saving} reboot={false} onRevert={revert} onSave={() => void write()} />}
+    </>
+  )
+}
+
+interface EscReportListProps {
+  reports: EscReport[]
+  /** The settings as edited; without one the ESCs are shown as they were read. */
+  draft?: EscDraft
+  onChange?: (draft: EscDraft) => void
+}
+
+export function EscReportList({ reports, draft = toEscDraft(reports), onChange = () => {} }: EscReportListProps) {
   if (reports.length === 0) {
     return <Notice tone="warning">The flight controller has no ESC outputs to read. Check the motor protocol on the Motors tab.</Notice>
   }
+  const groups = editableGroups(reports)
   const overview = combineReports(reports)
-  if (overview.view === 'combined') return <CombinedEscCard overview={overview} />
+  if (overview.view === 'combined') return <CombinedEscCard overview={overview} group={groups[0]} draft={draft} onChange={onChange} />
 
   const differing = differingSettings(reports)
+  const unsupported = new Set(reports.flatMap((report) => (report.status === 'unsupported' ? [report.description] : [])))
   return (
     <>
       {reports.every((report) => report.status === 'missing') && (
         <Notice tone="warning">No ESC answered. Plug in the flight battery, then read again.</Notice>
       )}
+      {[...unsupported].map((description) => (
+        <Notice key={description} tone="error">
+          {description}
+        </Notice>
+      ))}
       {overview.reason && <Notice tone="warning">{overview.reason}</Notice>}
       <div className="mt-4 grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {reports.map((report, index) => (
           <EscCard key={index} number={index + 1} report={report} differing={differing[index] ?? new Set()} />
         ))}
       </div>
+      {groups.map((group) => (
+        <Card key={group.firmware} role="group" aria-label={`${group.firmware} settings`} className="mt-4 max-w-xl">
+          <CardHeader>
+            <CardTitle>
+              Change {group.firmware} {group.version} settings
+            </CardTitle>
+            <CardDescription>
+              {group.escs.length === 1 ? `ESC ${group.escs.map((esc) => esc + 1).join()}` : `ESC ${group.escs.map((esc) => esc + 1).join(', ')} — set up alike`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm">
+            <GroupEditor group={group} draft={draft} onChange={onChange} />
+          </CardContent>
+        </Card>
+      ))}
     </>
   )
 }
 
 /** All ESCs are alike: their settings once, and what is set per motor listed by ESC. */
-function CombinedEscCard({ overview }: { overview: Extract<EscOverview, { view: 'combined' }> }) {
+interface CombinedEscCardProps {
+  overview: Extract<EscOverview, { view: 'combined' }>
+  /** The ESCs' editable settings, if this firmware has any: they are edited below the ones that are only shown. */
+  group: EscGroup | undefined
+  draft: EscDraft
+  onChange: (draft: EscDraft) => void
+}
+
+function CombinedEscCard({ overview, group, draft, onChange }: CombinedEscCardProps) {
+  const edited = new Set(group?.settings.map((def) => def.key))
+  const readOnly = overview.settings.filter((setting) => !edited.has(setting.key))
   return (
     <Card role="group" aria-label="All ESCs" className="mt-4 max-w-xl">
       <CardHeader>
@@ -95,8 +194,17 @@ function CombinedEscCard({ overview }: { overview: Extract<EscOverview, { view: 
       </CardHeader>
       <CardContent className="text-sm">
         {overview.note && <p className="text-muted-foreground">{overview.note}</p>}
+        <Warnings warnings={overview.warnings} />
+        {group && (
+          <>
+            <div className="mt-3">
+              <GroupEditor group={group} draft={draft} onChange={onChange} />
+            </div>
+            <h3 className="mt-6 mb-1 font-medium">Other settings</h3>
+          </>
+        )}
         <dl className="divide-y">
-          {overview.settings.map((setting) => (
+          {readOnly.map((setting) => (
             <div key={setting.key} className="flex items-baseline justify-between gap-3 py-1.5">
               <dt className="text-muted-foreground">{setting.label}</dt>
               <dd className="text-right font-medium">
@@ -126,13 +234,19 @@ function EscCard({ number, report, differing }: { number: number; report: EscRep
       <CardHeader>
         <CardDescription>ESC {number}</CardDescription>
         <CardTitle>
-          {report.status === 'ok' ? `${report.firmware} ${report.version}` : report.status === 'missing' ? 'Not responding' : 'Unknown firmware'}
+          {report.status === 'ok' || report.status === 'unsupported'
+            ? `${report.firmware} ${report.version}`
+            : report.status === 'missing'
+              ? 'Not responding'
+              : 'Unknown firmware'}
         </CardTitle>
-        <CardDescription>{report.status === 'ok' ? report.hardware : report.description}</CardDescription>
+        <CardDescription>{report.status === 'ok' || report.status === 'unsupported' ? report.hardware : report.description}</CardDescription>
       </CardHeader>
+      {report.status === 'unsupported' && <CardContent className="text-sm text-destructive">Version not supported</CardContent>}
       {report.status === 'ok' && (
         <CardContent className="text-sm">
           {report.note && <p className="text-muted-foreground">{report.note}</p>}
+          <Warnings warnings={report.warnings} />
           <dl className="divide-y">
             {report.settings.map((setting) => (
               <div key={setting.key} className="flex items-baseline justify-between gap-3 py-1.5">
@@ -151,5 +265,134 @@ function EscCard({ number, report, differing }: { number: number; report: EscRep
         </CardContent>
       )}
     </Card>
+  )
+}
+
+function Warnings({ warnings }: { warnings: string[] }) {
+  return warnings.map((warning) => (
+    <Notice key={warning} tone="warning">
+      {warning}
+    </Notice>
+  ))
+}
+
+interface GroupEditorProps {
+  group: EscGroup
+  draft: EscDraft
+  onChange: (draft: EscDraft) => void
+}
+
+/** The settings of ESCs that are edited as one. A change goes to all of them, except for what is set per motor. */
+function GroupEditor({ group, draft, onChange }: GroupEditorProps) {
+  const first = group.escs[0] ?? 0
+  const uneven = unevenSettings(draft, group)
+  const raw = (key: string) => {
+    const def = group.settings.find((other) => other.key === key)
+    return def ? draftRaw(draft, first, def) : 0
+  }
+  const sections = [...new Set(group.settings.map((def) => def.group))]
+
+  return (
+    <>
+      {uneven.length > 0 && (
+        <Notice tone="warning">
+          Not the same on these ESCs: {uneven.join(', ')}. ESC {first + 1}&apos;s values are shown.{' '}
+          <Button size="sm" variant="outline" className="ml-1" onClick={() => onChange(alignGroup(draft, group))}>
+            Use them for all
+          </Button>
+        </Notice>
+      )}
+      {sections.map((section) => (
+        <Fragment key={section ?? ''}>
+          {section && <h3 className="mt-6 mb-1 font-medium">{section}</h3>}
+          <div className="divide-y">
+            {group.settings
+              .filter((def) => def.group === section)
+              .map((def) => {
+                const disabled = def.enabled ? !def.enabled(raw) : false
+                const id = `esc-${group.firmware}-${def.key}`
+                return (
+                  <div key={def.key} className="flex items-center justify-between gap-3 py-1.5">
+                    <div>
+                      <label htmlFor={def.perMotor ? undefined : id} className="font-medium">
+                        {def.label}
+                      </label>
+                      {def.hint && <p className="text-xs text-muted-foreground">{def.hint}</p>}
+                    </div>
+                    {def.perMotor ? (
+                      <ul className="flex flex-col items-end gap-1.5">
+                        {group.escs.map((esc) => (
+                          <li key={esc} className="flex items-center gap-2">
+                            <label htmlFor={`${id}-${esc}`} className="text-muted-foreground">
+                              ESC {esc + 1}
+                            </label>
+                            <SettingControl
+                              id={`${id}-${esc}`}
+                              def={def}
+                              raw={draftRaw(draft, esc, def)}
+                              disabled={disabled}
+                              onChange={(next) => onChange(setDraftRaw(draft, [esc], def, next))}
+                            />
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <SettingControl
+                        id={id}
+                        def={def}
+                        raw={draftRaw(draft, first, def)}
+                        disabled={disabled}
+                        onChange={(next) => onChange(setDraftRaw(draft, group.escs, def, next))}
+                      />
+                    )}
+                  </div>
+                )
+              })}
+          </div>
+        </Fragment>
+      ))}
+    </>
+  )
+}
+
+interface SettingControlProps {
+  id: string
+  def: EscSettingDef
+  raw: number
+  disabled: boolean
+  onChange: (raw: number) => void
+}
+
+function SettingControl({ id, def, raw, disabled, onChange }: SettingControlProps) {
+  const { control } = def
+  if (!control) return null
+  if (control.kind === 'switch') return <Switch id={id} checked={raw !== 0} disabled={disabled} onCheckedChange={(on) => onChange(on ? 1 : 0)} />
+  if (control.kind === 'select') {
+    return (
+      <NativeSelect id={id} value={raw} disabled={disabled} onChange={(e) => onChange(Number(e.target.value))}>
+        {/* a value the list doesn't have stays selectable as what it is */}
+        {!control.options.some((option) => option.raw === raw) && <NativeSelectOption value={raw}>{def.format(raw)}</NativeSelectOption>}
+        {control.options.map((option) => (
+          <NativeSelectOption key={option.raw} value={option.raw}>
+            {option.label}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
+    )
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <NumberInput
+        id={id}
+        min={control.min}
+        max={control.max}
+        step={control.step}
+        value={rawToNumber(control, raw)}
+        disabled={disabled}
+        onValueChange={(value) => onChange(numberToRaw(control, value))}
+        className="h-9 w-24 rounded-md border bg-transparent px-3 disabled:opacity-50 dark:bg-input/30"
+      />
+      {control.unit && <span className="text-muted-foreground">{control.unit}</span>}
+    </div>
   )
 }

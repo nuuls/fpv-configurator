@@ -164,7 +164,10 @@ Firmware facts that are easy to get wrong (verified against Betaflight 2026.6.2 
 - `MSP_SET_PASSTHROUGH` (245) without payload starts the BLHeli 4-way interface even when it reports 0 ESCs: the
   port stops speaking MSP until `cmd_InterfaceExit`, then the FC re-enables the motor outputs by itself (no
   reboot). Run such sessions through `MspClient.exclusive` (see `lib/esc/io.ts`) so polls wait instead of
-  corrupting them. `lib/esc` is read-only on purpose — flashing is under **Never**.
+  corrupting them. `lib/esc` only ever erases / writes the settings block — flashing is under **Never**.
+- ESC settings are written as the whole block that was read, with bytes patched: SiLabs (Bluejay) 0xFF bytes after a
+  `cmd_DevicePageErase` (page = address / 512; the startup melody shares that page), AM32 0xB8 bytes with one
+  `cmd_DeviceWrite` (its bootloader erases). Bluejay 0.21 = layout 208, AM32 2.21 = `eeprom_version` 4.
 - ESCs don't sit in their bootloader when the 4-way interface starts: they jump into it once the signal wire was
   high for a few hundred ms (longer with a startup tune), and the FC's `cmd_DeviceInitFlash` gives up within ~50 ms.
   Wait (1.2 s) before the first one and retry with pauses — an immediate attempt always fails on real ESCs.

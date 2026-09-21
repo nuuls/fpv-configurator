@@ -7,7 +7,9 @@ import { MockTransport } from '@/lib/transport/mock'
 import { encodeFrame, MspParser } from '@/lib/msp/codec'
 import { MSP } from '@/lib/msp/codes'
 import { Emitter, type Transport } from '@/lib/transport/types'
-import { PassthroughStuckError, readEscs } from './io'
+import { FOURWAY_CMD } from './fourway'
+import { EscWriteError, PassthroughStuckError, readEscs, writeEscs } from './io'
+import { editableGroups, setDraftRaw, toEscDraft, type EscDraft, type EscReport } from './model'
 
 /** Waiting only moves the mock FC's clock, so the ESCs "boot" without the tests taking seconds. */
 async function connect(escs?: MockEsc[]) {
@@ -33,7 +35,7 @@ describe('readEscs against the mock FC', () => {
       'Bluejay 0.21.0',
       'Bluejay 0.21.0',
       'BLHeli_S 16.7',
-      'AM32 2.18',
+      'AM32 2.21',
     ])
     expect(progress).toEqual(['1/4', '2/4', '3/4', '4/4'])
     expect(fc.escPassthrough?.exited).toBe(true)
@@ -44,6 +46,7 @@ describe('readEscs against the mock FC', () => {
     const { fc, client, options } = await connect()
     await readEscs(client, undefined, options)
     expect(fc.escPassthrough?.refusedCommands).toEqual([])
+    expect(fc.escPassthrough?.flashChanges).toEqual([])
   })
 
   it('makes MSP requests issued meanwhile wait instead of corrupting the passthrough', async () => {
@@ -121,5 +124,96 @@ describe('readEscs against the mock FC', () => {
       onClose: () => () => {},
     }
     await expect(readEscs(new MspClient(transport), undefined, { timeoutMs: 10 })).rejects.toBeInstanceOf(PassthroughStuckError)
+  })
+})
+
+/** The draft with one setting of a firmware's ESCs changed, the way the page edits it. */
+function edit(reports: EscReport[], firmware: string, key: string, raw: number, escs?: number[]): EscDraft {
+  const group = editableGroups(reports).find((other) => other.firmware === firmware)
+  const def = group?.settings.find((other) => other.key === key)
+  if (!group || !def) throw new Error(`no editable ${firmware} setting ${key}`)
+  return setDraftRaw(toEscDraft(reports), escs ?? group.escs, def, raw)
+}
+
+const settingOf = (report: EscReport | undefined, key: string) =>
+  report?.status === 'ok' ? report.settings.find((setting) => setting.key === key)?.value : undefined
+
+describe('writeEscs against the mock FC', () => {
+  it('erases and writes the settings page of every changed Bluejay ESC, and nothing else', async () => {
+    const escs = defaultMockEscs()
+    const { fc, client, options } = await connect(escs)
+    const reports = await readEscs(client, undefined, options)
+    const before = escs.map((esc) => [...(esc.flash[0x1a00] ?? [])])
+
+    const written = await writeEscs(client, reports, edit(reports, 'Bluejay', 'timing', 3), options)
+
+    expect(fc.escPassthrough?.flashChanges).toEqual(
+      [0, 1, 2, 3].flatMap((esc) => [
+        { esc, command: FOURWAY_CMD.DEVICE_PAGE_ERASE, address: 0x1a00, length: 0 },
+        { esc, command: FOURWAY_CMD.DEVICE_WRITE, address: 0x1a00, length: 0xff },
+      ]),
+    )
+    escs.forEach((esc, index) => {
+      // One byte changed; direction, name tags and the startup melody on the same page are back as they were.
+      expect(esc.flash[0x1a00]).toEqual(before[index]?.with(0x15, 3))
+    })
+    expect(written.map((report) => settingOf(report, 'timing'))).toEqual(Array(4).fill('15° (medium)'))
+    expect(fc.escPassthrough?.exited).toBe(true)
+    expect((await readFcInfo(client)).variant).toBe('BTFL')
+    // What the ESCs say when they are read again is what writeEscs resolved with.
+    expect(await readEscs(client, undefined, options)).toEqual(written)
+  })
+
+  it('writes an AM32 block without a page erase — its bootloader does that', async () => {
+    const escs = [mockAm32Esc(), mockAm32Esc()]
+    const { fc, client, options } = await connect(escs)
+    const reports = await readEscs(client, undefined, options)
+    const before = [...(escs[1]?.flash[0x7c00] ?? [])]
+
+    const written = await writeEscs(client, reports, edit(reports, 'AM32', 'direction', 1, [1]), options)
+
+    expect(fc.escPassthrough?.flashChanges).toEqual([{ esc: 1, command: FOURWAY_CMD.DEVICE_WRITE, address: 0x7c00, length: 0xb8 }])
+    expect(escs[1]?.flash[0x7c00]).toEqual(before.with(17, 1))
+    expect(written.map((report) => settingOf(report, 'direction'))).toEqual(['Normal', 'Reversed'])
+    expect(written[0]).toBe(reports[0])
+  })
+
+  it('touches nothing when nothing changed, or when the firmware is only shown', async () => {
+    const { fc, client, options } = await connect(mixedMockEscs())
+    const reports = await readEscs(client, undefined, options)
+    expect(toEscDraft(reports)[2]).toBeNull() // BLHeli_S
+    expect(await writeEscs(client, reports, toEscDraft(reports), options)).toEqual(reports)
+    expect(fc.escPassthrough?.flashChanges).toEqual([])
+  })
+
+  it('refuses an ESC whose settings are no longer the ones that were read', async () => {
+    const escs = defaultMockEscs()
+    const { fc, client, options } = await connect(escs)
+    const reports = await readEscs(client, undefined, options)
+    const changedElsewhere = escs[0]?.flash[0x1a00]
+    if (changedElsewhere) changedElsewhere[0x1f] = 3
+
+    await expect(writeEscs(client, reports, edit(reports, 'Bluejay', 'timing', 3), options)).rejects.toThrow(/ESC 1: its settings changed/)
+    expect(fc.escPassthrough?.flashChanges).toEqual([])
+    expect(fc.escPassthrough?.exited).toBe(true)
+  })
+
+  it('stops at an ESC that does not answer, and finishes the job when it is tried again', async () => {
+    const escs = defaultMockEscs()
+    const { fc, client, options } = await connect(escs)
+    const reports = await readEscs(client, undefined, options)
+    const draft = edit(reports, 'Bluejay', 'startupPowerMax', 10)
+    const second = escs[1]
+    if (second) second.powered = false
+
+    await expect(writeEscs(client, reports, draft, options)).rejects.toBeInstanceOf(EscWriteError)
+    expect(fc.escPassthrough?.flashChanges.map((change) => change.esc)).toEqual([0, 0])
+    expect(fc.escPassthrough?.exited).toBe(true)
+
+    if (second) second.powered = true
+    const written = await writeEscs(client, reports, draft, options)
+    // ESC 1 already holds the new settings: it is not written a second time.
+    expect(fc.escPassthrough?.flashChanges.map((change) => change.esc)).toEqual([1, 1, 2, 2, 3, 3])
+    expect(written.map((report) => settingOf(report, 'startupPowerMax'))).toEqual(Array(4).fill('1040'))
   })
 })

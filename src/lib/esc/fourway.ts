@@ -7,8 +7,8 @@ import type { Unsubscribe } from '@/lib/transport/types'
  *   host → FC: 0x2F cmd addrHi addrLo len params[len] crcHi crcLo        (len 0 = 256, never empty)
  *   FC → host: 0x2E cmd addrHi addrLo len params[len] ack crcHi crcLo
  *
- * CRC is CRC16/XMODEM over everything before it. Only the read-side commands are listed: this app
- * never writes to an ESC.
+ * CRC is CRC16/XMODEM over everything before it. Page erase and write are only ever used on the settings
+ * block of an ESC (`io.ts`); flashing firmware is out of scope (SPEC "Never").
  */
 export const FOURWAY_CMD = {
   INTERFACE_TEST_ALIVE: 0x30,
@@ -18,7 +18,10 @@ export const FOURWAY_CMD = {
   INTERFACE_EXIT: 0x34,
   DEVICE_RESET: 0x35,
   DEVICE_INIT_FLASH: 0x37,
+  /** params[0] = page; the FC erases at page × 512 (SiLabs) or page × 1024 (ARM). */
+  DEVICE_PAGE_ERASE: 0x39,
   DEVICE_READ: 0x3a,
+  DEVICE_WRITE: 0x3b,
 } as const
 
 export const FOURWAY_ACK = {

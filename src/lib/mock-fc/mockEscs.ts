@@ -7,7 +7,7 @@ import {
   type FourWayFrame,
 } from '@/lib/esc/fourway'
 
-/** A simulated ESC as the FC's 4-way interface sees it: a bootloader signature and readable flash regions. */
+/** A simulated ESC as the FC's 4-way interface sees it: a bootloader signature and its flash regions. */
 export interface MockEsc {
   signature: number
   bootByte: number
@@ -40,6 +40,9 @@ function block(length: number, values: Record<number, number | number[]>): numbe
 /** First 0x100 bytes of program code; BLHeli_S forks are recognised by a marker in here. */
 const SILABS_CODE = new Array<number>(0x100).fill(0x02)
 
+/** Bluejay's default startup melody, which shares the flash page with the settings (`Eep_Pgm_Beep_Melody`). */
+const BLUEJAY_MELODY = [2, 58, 4, 32, 52, 66, 13, 0, 69, 45, 13, 0, 52, 66, 13, 0, 78, 39, 211, 0, 69, 45, 208, 25, 52, 25, 0]
+
 /** Bluejay 0.21.0 (settings layout 208) on a Z-H-30 EFM8BB21 board, built for 48 kHz unless told otherwise. */
 export function mockBluejayEsc(options: { reversed?: boolean; pwmKhz?: number } = {}): MockEsc {
   return {
@@ -49,7 +52,7 @@ export function mockBluejayEsc(options: { reversed?: boolean; pwmKhz?: number } 
     powered: true,
     flash: {
       0x0000: SILABS_CODE,
-      0x1a00: block(0x70, {
+      0x1a00: block(0xff, {
         0x00: [0, 21, 208],
         0x04: 51, // minimum startup power
         0x07: 5, // maximum startup power
@@ -66,6 +69,7 @@ export function mockBluejayEsc(options: { reversed?: boolean; pwmKhz?: number } 
         0x40: ascii('#Z_H_30#', 16),
         0x50: ascii('#BLHELI$EFM8B21#', 16),
         0x60: ascii('Bluejay', 16),
+        0x70: BLUEJAY_MELODY,
       }),
     },
   }
@@ -80,7 +84,7 @@ export function mockBlheliSEsc(): MockEsc {
     powered: true,
     flash: {
       0x0000: SILABS_CODE,
-      0x1a00: block(0x70, {
+      0x1a00: block(0xff, {
         0x00: [16, 7, 33],
         0x09: 9, // startup power
         0x0b: 1, // direction
@@ -97,7 +101,7 @@ export function mockBlheliSEsc(): MockEsc {
   }
 }
 
-/** AM32 2.18 (eeprom version 2) on an STM32F051 (32 k flash, signal on PB4). */
+/** AM32 2.21 (eeprom version 4) on an STM32F051 (32 k flash, signal on PB4). */
 export function mockAm32Esc(): MockEsc {
   return {
     signature: 0x1f06,
@@ -106,12 +110,14 @@ export function mockAm32Esc(): MockEsc {
     powered: true,
     flash: {
       [0x7c00 - 32]: block(32, { 0: ascii('MOCK_ESC_F051', 16, 0) }),
-      0x7c00: block(48, {
-        0: [1, 2, 13, 2, 18], // boot byte, eeprom version, bootloader version, firmware 2.18
-        5: ascii('Mock AM32', 12, 0),
+      0x7c00: block(0xb8, {
+        0: [1, 4, 13, 2, 21], // boot byte, eeprom version, bootloader version, firmware 2.21
+        5: [160, 1, 0, 10, 100, 0, 100, 0, 0], // ramp rate, minimum duty cycle … active brake power, brake on zero throttle
+        14: [0, 0, 0],
         17: [0, 0, 0, 1, 1, 1, 26, 24, 100, 55, 14, 0, 1, 5, 0], // direction … telemetry (offset 31)
         32: [128, 128, 128, 50], // servo settings
         36: [0, 50, 0, 0, 15, 10, 10, 141, 102, 6, 1, 0], // low voltage cutoff … protocol, auto advance
+        48: new Array<number>(128).fill(0), // no startup tune
       }),
     },
   }
@@ -127,15 +133,20 @@ export function mixedMockEscs(): MockEsc[] {
   return [mockBluejayEsc(), mockBluejayEsc({ reversed: true, pwmKhz: 24 }), mockBlheliSEsc(), mockAm32Esc()]
 }
 
+/** cmd_DevicePageErase takes a page number: × 512 on SiLabs, × 1024 on ARM (`serial_4way.c`). */
+const ERASE_UNIT: Record<number, number> = { [INTERFACE_MODE.SILABS_BLB]: 512, [INTERFACE_MODE.ARM_BLB]: 1024 }
+
 /**
- * The FC side of the BLHeli 4-way interface (Betaflight `serial_4way.c`), read-only: write, erase and verify
- * commands are refused and counted, so tests can prove the app never sends one.
+ * The FC side of the BLHeli 4-way interface (Betaflight `serial_4way.c`). Every erase and write that reaches it
+ * is logged, so tests can prove what the app touches — and that reading touches nothing.
  */
 export class MockFourWayInterface {
   /** Set once cmd_InterfaceExit was answered: the port speaks MSP again. */
   exited = false
   /** Commands other than the ones listed in FOURWAY_CMD that reached the interface. */
   refusedCommands: number[] = []
+  /** Every cmd_DevicePageErase (length 0) and cmd_DeviceWrite that was carried out, with the flash address. */
+  flashChanges: { esc: number; command: number; address: number; length: number }[] = []
 
   private readonly escs: MockEsc[]
   private readonly now: () => number
@@ -205,6 +216,14 @@ export class MockFourWayInterface {
           else ack = FOURWAY_ACK.GENERAL_ERROR
           break
         }
+        case FOURWAY_CMD.DEVICE_PAGE_ERASE: {
+          const unit = this.selected && ERASE_UNIT[this.selected.interfaceMode]
+          if (!unit || !this.erase((request.params[0] ?? 0) * unit, unit)) ack = FOURWAY_ACK.GENERAL_ERROR
+          break
+        }
+        case FOURWAY_CMD.DEVICE_WRITE:
+          if (!this.write(request.address, request.params)) ack = FOURWAY_ACK.GENERAL_ERROR
+          break
         default:
           this.refusedCommands.push(request.command)
           ack = FOURWAY_ACK.INVALID_CMD
@@ -222,12 +241,47 @@ export class MockFourWayInterface {
     )
   }
 
-  private read(address: number, length: number): number[] | null {
+  /** The region of the selected ESC's flash that holds these bytes, and where in it they start. */
+  private locate(address: number, length: number): { bytes: number[]; offset: number } | null {
     if (!this.selected) return null
     for (const [start, bytes] of Object.entries(this.selected.flash)) {
       const offset = address - Number(start)
-      if (offset >= 0 && offset + length <= bytes.length) return bytes.slice(offset, offset + length)
+      if (offset >= 0 && offset + length <= bytes.length) return { bytes, offset }
     }
     return null
+  }
+
+  private read(address: number, length: number): number[] | null {
+    const found = this.locate(address, length)
+    return found && found.bytes.slice(found.offset, found.offset + length)
+  }
+
+  /** Erases whatever the mock keeps of the page — its regions are shorter than a real flash page. */
+  private erase(address: number, length: number): boolean {
+    if (!this.selected) return false
+    let erased = false
+    for (const [start, bytes] of Object.entries(this.selected.flash)) {
+      for (let i = 0; i < bytes.length; i++) {
+        if (Number(start) + i < address || Number(start) + i >= address + length) continue
+        bytes[i] = 0xff
+        erased = true
+      }
+    }
+    if (erased) this.log(FOURWAY_CMD.DEVICE_PAGE_ERASE, address, 0)
+    return erased
+  }
+
+  private write(address: number, data: Uint8Array): boolean {
+    const found = this.locate(address, data.length)
+    if (!found || !this.selected) return false
+    // SiLabs flash can only clear bits, so a write without an erase leaves garbage. The AM32 bootloader erases first.
+    const erasesItself = this.selected.interfaceMode === INTERFACE_MODE.ARM_BLB
+    data.forEach((byte, i) => (found.bytes[found.offset + i] = erasesItself ? byte : (found.bytes[found.offset + i] ?? 0xff) & byte))
+    this.log(FOURWAY_CMD.DEVICE_WRITE, address, data.length)
+    return true
+  }
+
+  private log(command: number, address: number, length: number): void {
+    if (this.selected) this.flashChanges.push({ esc: this.escs.indexOf(this.selected), command, address, length })
   }
 }
