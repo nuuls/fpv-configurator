@@ -43,15 +43,36 @@ type Reopen = () => Promise<Transport | null>
 // Kept outside the store: nothing in the UI needs the raw transport.
 let active: { transport: Transport; reopen: Reopen } | null = null
 
+interface OpenedTransport {
+  transport: Transport
+  reopen: Reopen
+  /** Called once the FC answered. */
+  onConnected?: () => void
+  /** Called when opening or identifying the FC failed; returns a hint to append to the error message. */
+  onFailed?: () => string
+}
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-async function openTransport(kind: ConnectionKind): Promise<{ transport: Transport; reopen: Reopen }> {
+async function openTransport(kind: ConnectionKind): Promise<OpenedTransport> {
   if (kind === 'mock') {
     const fc = new MockFlightController()
     return { transport: new MockTransport(fc), reopen: async () => new MockTransport(fc) }
   }
-  const transport = await WebSerialTransport.request()
-  return { transport, reopen: () => WebSerialTransport.findGranted(transport) }
+  // SPEC §5 "Connect": straight to the last used FC when it's there, the browser's picker otherwise.
+  const lastUsed = await WebSerialTransport.findLastUsed()
+  const transport = lastUsed ?? (await WebSerialTransport.request())
+  return {
+    transport,
+    reopen: () => WebSerialTransport.findGranted(transport),
+    onConnected: () => transport.rememberAsLastUsed(),
+    onFailed: () => {
+      if (!lastUsed) return ''
+      // Don't get stuck on a device that doesn't answer: the next attempt shows the picker again.
+      WebSerialTransport.forgetLastUsed()
+      return ' (tried the last used flight controller — press Connect again to choose a port)'
+    },
+  }
 }
 
 export const useConnectionStore = create<ConnectionState>()((set, get) => {
@@ -83,11 +104,14 @@ export const useConnectionStore = create<ConnectionState>()((set, get) => {
     connect: async (kind) => {
       if (get().status !== 'disconnected') return
       set({ status: 'connecting', error: null, notice: null })
+      let opened: OpenedTransport | null = null
       try {
-        const { transport, reopen } = await openTransport(kind)
-        await attach(transport, reopen)
+        opened = await openTransport(kind)
+        await attach(opened.transport, opened.reopen)
+        opened.onConnected?.()
       } catch (error) {
-        set({ ...DISCONNECTED, error: isPickerCancelled(error) ? null : describeError(error) })
+        const hint = opened?.onFailed?.() ?? ''
+        set({ ...DISCONNECTED, error: isPickerCancelled(error) ? null : describeError(error) + hint })
       }
     },
 

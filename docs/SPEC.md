@@ -139,6 +139,11 @@ _Assumed — change freely; the drone-type setup step has no place in the layout
 
 Rules every tab follows. Tab specs only mention deviations.
 
+- **Connect:** goes straight to the last used FC — no port picker — when the browser still has permission for
+  it and exactly one such device is plugged in. Otherwise (first time, not plugged in, several boards of the
+  same USB type) the browser's picker shows. Remembered per browser as USB vendor/product id (all Web Serial
+  exposes), only after the device answered as an FC. If the direct connection fails it is forgotten, so
+  pressing Connect again shows the picker.
 - **Saving:** one **Save** button per tab. Edits stay local until pressed; Save writes to the FC and persists
   (`MSP_EEPROM_WRITE`). If any changed setting needs a reboot the button reads **Save & Reboot**. A **Revert**
   button discards local edits.

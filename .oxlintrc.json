@@ -6,5 +6,5 @@
     "react/exhaustive-deps": "warn",
     "react/only-export-components": ["warn", { "allowConstantExport": true }]
   },
-  "ignorePatterns": ["dist", "src/components/ui"]
+  "ignorePatterns": ["dist", "src/components/ui", ".claude"]
 }

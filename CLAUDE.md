@@ -44,7 +44,7 @@ src/
       messages.ts          typed payload decoders/encoders, one pair per message
       client.ts            MspClient: serialized request/response with timeouts
       api.ts               high-level typed reads/writes (request + decode) — what the UI calls
-    ports/ blackbox/ orientation/ modes/ tuning/ motors/
+    ports/ blackbox/ orientation/ modes/ tuning/ motors/ rates/ setup/
                            one folder per feature: model.ts (types, payload codecs, pure logic) + io.ts
                            (read snapshot / save via MspClient). Core messages stay in msp/messages.ts.
     transport/             byte pipes: types.ts (interface), webserial.ts, mock.ts
@@ -108,6 +108,8 @@ Firmware facts that are easy to get wrong (verified against Betaflight 2026.6.2 
 
 - Version is calendar based: `MSP_FC_VERSION` = (year-2000, month, patch) + version string.
 - Port identifiers: USB VCP 20, UART1 = 51. Never modify the USB VCP port config.
+- PID loop rate = gyro sample rate (u16 near the end of `MSP_BOARD_INFO`) / `pid_process_denom` (byte 1 of
+  `MSP_ADVANCED_CONFIG`). The firmware raises the denominator itself if the motor protocol is too slow.
 - Motor outputs set with `MSP_SET_MOTOR` persist until changed or reboot — always stop them on every exit path.
 - `MSP2_CLI_SETTING` can **write** any CLI variable (`name = value`) but reads always fail in 2026.6.
   Read values through the classic messages instead.

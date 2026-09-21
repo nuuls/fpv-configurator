@@ -127,6 +127,8 @@ export interface MockFcOptions {
   /** Injectable clock so tests get deterministic telemetry. */
   now?: () => number
   config?: MockFcConfig
+  /** Gyro sample rate, a property of the hardware: 8000 (default) or e.g. 3200 for a BMI270. */
+  gyroSampleRateHz?: number
 }
 
 /**
@@ -144,16 +146,19 @@ export class MockFlightController {
 
   private readonly parser: MspParser
   private readonly now: () => number
+  private readonly gyroSampleRateHz: number
   private outbox: Uint8Array[] = []
   private saved: MockFcConfig
   private running: MockFcConfig
   // Runtime state that a reboot clears
   private motors: number[] = new Array<number>(8).fill(MOTOR_STOP)
   private armingDisabledByMsp = false
+  private accCalibrations = 0
   private flash = { usedBytes: 3_500_000, ready: true }
 
   constructor(options: MockFcOptions = {}) {
     this.now = options.now ?? Date.now
+    this.gyroSampleRateHz = options.gyroSampleRateHz ?? 8000
     this.saved = structuredClone(options.config ?? defaultMockConfig())
     this.running = structuredClone(this.saved)
     this.parser = new MspParser((frame) => this.handleFrame(frame))
@@ -167,6 +172,11 @@ export class MockFlightController {
   /** What the ESCs are being told right now (1000 = stopped). */
   get motorOutputs(): number[] {
     return [...this.motors]
+  }
+
+  /** How often MSP_ACC_CALIBRATION was received. */
+  get accCalibrationCount(): number {
+    return this.accCalibrations
   }
 
   get armingDisabled(): boolean {
@@ -217,10 +227,12 @@ export class MockFlightController {
           targetName: 'STM32F405',
           boardName: 'MOCKF405',
           manufacturerId: 'MOCK',
+          gyroSampleRateHz: this.gyroSampleRateHz,
         })
       case MSP.STATUS:
         return encodeStatus({
-          cycleTimeUs: 125,
+          // PID loop time: gyro rate / pid_process_denom
+          cycleTimeUs: Math.round((1e6 * (this.running.advancedConfig[1] ?? 1)) / this.gyroSampleRateHz),
           i2cErrors: 0,
           sensors: 0b100001, // gyro + acc
           modeFlags: 0,
@@ -269,6 +281,12 @@ export class MockFlightController {
         return encodeBoardAlignment(this.running.boardAlignment)
       case MSP.SET_BOARD_ALIGNMENT_CONFIG:
         this.running.boardAlignment = decodeBoardAlignment(request)
+        return EMPTY
+
+      case MSP.ACC_CALIBRATION:
+        // The firmware saves the whole config once the calibration is through (saveConfigAndNotify).
+        this.accCalibrations++
+        this.saved = structuredClone(this.running)
         return EMPTY
 
       case MSP.BLACKBOX_CONFIG:

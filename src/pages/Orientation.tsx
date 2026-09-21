@@ -7,13 +7,13 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { useDraft } from '@/hooks/useDraft'
-import { useFcSnapshot } from '@/hooks/useFcSnapshot'
+import { describeError, useFcSnapshot } from '@/hooks/useFcSnapshot'
 import { useMspPoll } from '@/hooks/useMspPoll'
 import { useSave } from '@/hooks/useSave'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
-import { readAttitude } from '@/lib/msp/api'
+import { readAttitude, readStatus } from '@/lib/msp/api'
 import type { MspClient } from '@/lib/msp/client'
-import { readBoardAlignment, saveBoardAlignment } from '@/lib/orientation/io'
+import { calibrateAccelerometer, readBoardAlignment, saveBoardAlignment } from '@/lib/orientation/io'
 import { alignmentOptions, type BoardAlignment } from '@/lib/orientation/model'
 
 const PATH = '/orientation'
@@ -48,6 +48,22 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Boa
   const [headingZero, setHeadingZero] = useState<number | null>(null)
   if (headingZero === null && attitude) setHeadingZero(attitude.yaw)
   const relative = attitude && { ...attitude, yaw: attitude.yaw - (headingZero ?? attitude.yaw) }
+
+  const status = useMspPoll(readStatus, 1000)
+  const hasAccelerometer = status === null || (status.sensors & 1) !== 0
+  const [calibration, setCalibration] = useState<'idle' | 'running' | 'done'>('idle')
+  const [calibrationError, setCalibrationError] = useState<string | null>(null)
+  const calibrate = async () => {
+    setCalibration('running')
+    setCalibrationError(null)
+    try {
+      await calibrateAccelerometer(client)
+      setCalibration('done')
+    } catch (cause) {
+      setCalibrationError(`Calibration failed: ${describeError(cause)}`)
+      setCalibration('idle')
+    }
+  }
 
   return (
     <>
@@ -107,6 +123,37 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Boa
         </Card>
       </div>
 
+      <Card className="mt-4">
+        <CardHeader>
+          <CardTitle>Accelerometer</CardTitle>
+          <CardDescription>
+            Needed for a level horizon and Angle mode. Put the quad on a level surface, don&apos;t touch it, then
+            calibrate. Do this after the board rotation is saved.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center gap-4 text-sm">
+          <Button
+            variant="outline"
+            disabled={dirty || saving || calibration === 'running' || !hasAccelerometer}
+            onClick={() => void calibrate()}
+          >
+            {calibration === 'running' ? 'Calibrating…' : 'Calibrate accelerometer'}
+          </Button>
+          <span className="text-muted-foreground" aria-live="polite">
+            {!hasAccelerometer
+              ? 'No accelerometer detected.'
+              : dirty
+                ? 'Save the board rotation first.'
+                : calibration === 'running'
+                  ? 'Keep the quad still…'
+                  : calibration === 'done'
+                    ? 'Calibration finished and saved.'
+                    : ''}
+          </span>
+        </CardContent>
+      </Card>
+
+      {calibrationError && <Notice tone="error">{calibrationError}</Notice>}
       {error && <Notice tone="error">{error}</Notice>}
       <SaveBar
         dirty={dirty}

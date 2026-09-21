@@ -1,4 +1,4 @@
-/** Acceptance checks for the Blackbox, Orientation, Modes, PID Tuning and Motors tabs (docs/tabs/*.md). */
+/** Acceptance checks for the Setup, Blackbox, Orientation, Modes, PID Tuning and Motors tabs (docs/tabs/*.md). */
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -52,6 +52,22 @@ describe('sidebar', () => {
   })
 })
 
+describe('Setup tab', () => {
+  it('saves the PID loop frequency across a reboot', async () => {
+    const user = await openTab('Setup')
+    const group = await screen.findByRole('group', { name: 'PID loop frequency' })
+    expect(within(group).getAllByRole('button').map((b) => b.textContent)).toEqual(['4 kHz', '8 kHz'])
+    expect(within(group).getByRole('button', { name: '8 kHz' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Save & Reboot' })).toBeDisabled()
+
+    await user.click(within(group).getByRole('button', { name: '4 kHz' }))
+    await saveAndReboot(user)
+    const after = await screen.findByRole('group', { name: 'PID loop frequency' })
+    expect(within(after).getByRole('button', { name: '4 kHz' })).toHaveAttribute('aria-pressed', 'true')
+    expect(await screen.findByText('250 µs')).toBeInTheDocument()
+  })
+})
+
 describe('Blackbox tab', () => {
   it('shows storage, saves the logging rate across a reboot', async () => {
     const user = await openTab('Blackbox')
@@ -93,6 +109,23 @@ describe('Orientation tab', () => {
     await saveAndReboot(user)
     expect(await screen.findByLabelText('Yaw')).toHaveValue('90')
     expect(screen.getByLabelText('Roll')).toHaveValue('180')
+  })
+
+  it('calibrates the accelerometer, but not with an unsaved rotation', async () => {
+    const user = await openTab('Orientation')
+    const yaw = await screen.findByLabelText('Yaw')
+    const calibrate = screen.getByRole('button', { name: 'Calibrate accelerometer' })
+
+    await user.selectOptions(yaw, '90')
+    expect(calibrate).toBeDisabled()
+    expect(screen.getByText('Save the board rotation first.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Revert' }))
+
+    await user.click(calibrate)
+    expect(await screen.findByText('Keep the quad still…')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Calibrating…' })).toBeDisabled()
+    expect(await screen.findByText('Calibration finished and saved.', {}, afterReboot)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Calibrate accelerometer' })).toBeEnabled()
   })
 })
 

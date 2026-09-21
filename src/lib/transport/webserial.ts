@@ -1,6 +1,34 @@
 import { Emitter, type Transport, type Unsubscribe } from './types'
 
 const DEFAULT_BAUD_RATE = 115200
+const LAST_USED_KEY = 'fpv-configurator.lastSerialPort'
+
+/** What Web Serial tells us about a USB device. Boards of the same type are indistinguishable. */
+export interface UsbPortId {
+  usbVendorId: number
+  usbProductId: number
+}
+
+const isSameDevice = (info: SerialPortInfo, wanted: SerialPortInfo) =>
+  info.usbVendorId === wanted.usbVendorId && info.usbProductId === wanted.usbProductId
+
+/** The port to connect to without asking: the only one that looks like the last used device. Null if none or several do. */
+export function matchLastUsed<P extends { getInfo(): SerialPortInfo }>(ports: P[], lastUsed: UsbPortId | null): P | null {
+  if (!lastUsed) return null
+  const matches = ports.filter((port) => isSameDevice(port.getInfo(), lastUsed))
+  return matches.length === 1 ? (matches[0] ?? null) : null
+}
+
+function readLastUsed(): UsbPortId | null {
+  try {
+    const stored: unknown = JSON.parse(localStorage.getItem(LAST_USED_KEY) ?? 'null')
+    if (typeof stored !== 'object' || stored === null) return null
+    const { usbVendorId, usbProductId } = stored as Record<string, unknown>
+    return typeof usbVendorId === 'number' && typeof usbProductId === 'number' ? { usbVendorId, usbProductId } : null
+  } catch {
+    return null // storage blocked or garbage in it: just ask
+  }
+}
 
 /** Transport over the Web Serial API (Chromium-based browsers only, secure context required). */
 export class WebSerialTransport implements Transport {
@@ -34,6 +62,35 @@ export class WebSerialTransport implements Transport {
   }
 
   /**
+   * The last used FC, if the browser still has permission for it and it is plugged in (`getPorts()` only lists
+   * those) — lets Connect skip the picker. Null when there is nothing remembered or it would be a guess.
+   */
+  static async findLastUsed(baudRate?: number): Promise<WebSerialTransport | null> {
+    if (!WebSerialTransport.isSupported()) return null
+    const match = matchLastUsed(await navigator.serial.getPorts(), readLastUsed())
+    return match ? new WebSerialTransport(match, baudRate) : null
+  }
+
+  static forgetLastUsed(): void {
+    try {
+      localStorage.removeItem(LAST_USED_KEY)
+    } catch {
+      // storage blocked: nothing was remembered either
+    }
+  }
+
+  /** Call once the device turned out to be a flight controller. */
+  rememberAsLastUsed(): void {
+    const { usbVendorId, usbProductId } = this.port.getInfo()
+    if (usbVendorId === undefined || usbProductId === undefined) return
+    try {
+      localStorage.setItem(LAST_USED_KEY, JSON.stringify({ usbVendorId, usbProductId }))
+    } catch {
+      // storage blocked: the picker shows again next time
+    }
+  }
+
+  /**
    * After a reboot the FC re-enumerates on USB and shows up as a new SerialPort object. The
    * browser remembers the permission, so it can be found again without showing the picker.
    * Returns null while the device isn't back yet.
@@ -41,10 +98,7 @@ export class WebSerialTransport implements Transport {
   static async findGranted(previous: WebSerialTransport, baudRate?: number): Promise<WebSerialTransport | null> {
     const wanted = previous.port.getInfo()
     const ports = await navigator.serial.getPorts()
-    const match = ports.find((port) => {
-      const info = port.getInfo()
-      return info.usbVendorId === wanted.usbVendorId && info.usbProductId === wanted.usbProductId
-    })
+    const match = ports.find((port) => isSameDevice(port.getInfo(), wanted))
     return match ? new WebSerialTransport(match, baudRate) : null
   }
 

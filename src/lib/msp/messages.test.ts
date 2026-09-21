@@ -67,6 +67,7 @@ describe('message decoders', () => {
       targetName: 'STM32F405',
       boardName: 'SPEEDYBEEF405V4',
       manufacturerId: 'SPBE',
+      gyroSampleRateHz: 3200,
     }
     expect(decodeBoardInfo(encodeBoardInfo(info))).toEqual(info)
   })
@@ -78,6 +79,7 @@ describe('message decoders', () => {
       targetName: '',
       boardName: '',
       manufacturerId: '',
+      gyroSampleRateHz: 0,
     })
   })
 

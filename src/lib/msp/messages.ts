@@ -60,6 +60,8 @@ export function encodeFcVersion(v: FcVersion): Uint8Array {
 
 // ---- MSP_BOARD_INFO (4) ----
 
+const SIGNATURE_LENGTH = 32
+
 export interface BoardInfo {
   /** 4-character board identifier, e.g. "S405". */
   identifier: string
@@ -68,6 +70,8 @@ export interface BoardInfo {
   targetName: string
   boardName: string
   manufacturerId: string
+  /** `gyro.sampleRateHz`, e.g. 8000 or 3200 (BMI270). API >= 1.43; 0 when the firmware doesn't report it. */
+  gyroSampleRateHz: number
 }
 
 export function decodeBoardInfo(payload: Uint8Array): BoardInfo {
@@ -78,6 +82,7 @@ export function decodeBoardInfo(payload: Uint8Array): BoardInfo {
     targetName: '',
     boardName: '',
     manufacturerId: '',
+    gyroSampleRateHz: 0,
   }
   // boardType:u8, targetCapabilities:u8, then the length-prefixed names
   if (r.remaining >= 3) {
@@ -86,6 +91,11 @@ export function decodeBoardInfo(payload: Uint8Array): BoardInfo {
   }
   if (r.remaining >= 1) info.boardName = r.pascalString()
   if (r.remaining >= 1) info.manufacturerId = r.pascalString()
+  // signature (32 bytes), mcuTypeId:u8, configurationState:u8, then the gyro sample rate
+  if (r.remaining >= SIGNATURE_LENGTH + 4) {
+    r.skip(SIGNATURE_LENGTH + 2)
+    info.gyroSampleRateHz = r.u16()
+  }
   return info
 }
 
@@ -98,7 +108,10 @@ export function encodeBoardInfo(info: BoardInfo): Uint8Array {
     .pascalString(info.targetName)
     .pascalString(info.boardName)
     .pascalString(info.manufacturerId)
-    .zeros(32) // signature
+    .zeros(SIGNATURE_LENGTH)
+    .u8(0) // mcuTypeId
+    .u8(0) // configurationState
+    .u16(info.gyroSampleRateHz)
     .toBytes()
 }
 

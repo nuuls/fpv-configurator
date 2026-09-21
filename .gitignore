@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code worktrees: full checkouts of this repo from other sessions
+.claude/worktrees/

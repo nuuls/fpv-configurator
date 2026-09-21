@@ -7,6 +7,12 @@ export interface BoardAlignment {
   yaw: number
 }
 
+/**
+ * How long to keep still after MSP_ACC_CALIBRATION. The firmware averages 400 accelerometer samples (~0.4 s at
+ * 1 kHz) and doesn't report when it's done; Betaflight Configurator waits 2 s as well.
+ */
+export const ACC_CALIBRATION_MS = 2000
+
 export const ALIGNMENT_STEPS = [0, 45, 90, 135, 180, 225, 270, 315] as const
 
 /** The firmware stores signed degrees in a u16; normalise everything to 0..359. */

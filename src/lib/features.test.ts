@@ -16,7 +16,7 @@ import {
 import { dynIdleSegments, dynIdleZone, readMotors, spinsClockwise, validateMotors } from '@/lib/motors/model'
 import { sendReboot, sendRebootToMassStorage } from '@/lib/msp/api'
 import { MspClient } from '@/lib/msp/client'
-import { readBoardAlignment, saveBoardAlignment } from '@/lib/orientation/io'
+import { calibrateAccelerometer, readBoardAlignment, saveBoardAlignment } from '@/lib/orientation/io'
 import { alignmentOptions, decodeBoardAlignment, encodeBoardAlignment } from '@/lib/orientation/model'
 import { MockTransport } from '@/lib/transport/mock'
 import { previewPids, readTuningSnapshot, saveTuning } from '@/lib/tuning/io'
@@ -80,6 +80,12 @@ describe('orientation', () => {
     expect(await readBoardAlignment(client)).toEqual({ roll: 0, pitch: 0, yaw: 0 })
     await saveBoardAlignment(client, { roll: 180, pitch: 0, yaw: 45 })
     expect(await readBoardAlignment(await rebootAndReconnect(fc, transport, client))).toEqual({ roll: 180, pitch: 0, yaw: 45 })
+  })
+
+  it('calibrates the accelerometer', async () => {
+    const { fc, client } = await connect()
+    await calibrateAccelerometer(client, 0)
+    expect(fc.accCalibrationCount).toBe(1)
   })
 })
 
