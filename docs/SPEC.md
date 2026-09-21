@@ -116,6 +116,15 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
 - ESC
 	- Read out ESC firmware and settings and dislpay it
 	- AM32, Bluejay and BL_heli_s supported
+	- Bluejay
+		- Only support version 21, show error and tell user to update if its older
+		- Editable Timings
+		- Editable Startup speeds (both types)
+		- PWM frequency (read only since it requires flashing)
+			- Show a warning for anything but 24khz that flight performance is greatly reduced
+	- AM32
+		- Only support 2.21, show error otherwise
+		- Include all settings from AM32 configurator
 
 - OSD
 	- Copy the existing betaflight UI but only keep the following elements
@@ -139,6 +148,10 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
 		- Choose manufacturer
 		- Choose vtx
 	- VTX table can be edited manually after loading preset
+
+- Diff checker
+	- Compares all current settings to the betaflight defaults and displays the differences
+	- This is mostly for debugging purposes for now
 
 - Blackbox
 	- Copy betaflight design but remove everything except the following
