@@ -22,6 +22,16 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
 	- Afterwards the type is only remembered in the browser (keyed to the FC) to pick slider ranges and hints
 	- List of types and their defaults: TBD
 
+- Setup
+	- Display basic information about the FC and current firmware
+	- PID loop frequency selector
+	- Pre-flight checklist box that verifies the following setttings
+		- Bi-dir dshot is enabled
+		- Accellerometer is calibrated
+		- Arm angle is set to 180
+		- Beeper is enabled on RX set and RX loss
+		- Airmode is on
+
 - FC Orientation
 	- 3D view
 	- Dropdown based spins in 45 deg steps
