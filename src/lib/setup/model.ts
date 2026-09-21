@@ -10,19 +10,23 @@ const MIN_PID_LOOP_HZ = 3000
 /** `small_angle` inside MSP_ARMING_CONFIG (61): the quad only arms when tilted less than this. 180 = any angle. */
 const ARMING_CONFIG_SMALL_ANGLE_OFFSET = 2
 export const ARM_ANGLE_ANY = 180
-/** `beeper_off_flags` (u32, the first field of MSP_BEEPER_CONFIG): `1 << (beeperMode_e - 1)`, a set bit mutes that beep. */
+/**
+ * `beeper_off_flags` (u32, the first field of MSP_BEEPER_CONFIG): `1 << (beeperMode_e - 1)`, a set bit mutes that beep.
+ * `dshotBeaconOffFlags` (u32 at byte 5, after the beacon tone) uses the same bits; the ESC beacon only knows these two.
+ */
 export const BEEPER_OFF = {
   RX_LOST: 1 << 1,
   RX_SET: 1 << 9,
 } as const
 const BEEPER_OFF_REQUIRED = BEEPER_OFF.RX_LOST | BEEPER_OFF.RX_SET
+const BEEPER_CONFIG_DSHOT_BEACON_OFF_FLAGS_OFFSET = 5
 
 export interface SetupSnapshot {
   /** Raw MSP_ADVANCED_CONFIG payload; written back with only the PID denominator changed. */
   advancedConfig: number[]
   /** Raw MSP_ARMING_CONFIG payload; written back with only `small_angle` changed. */
   armingConfig: number[]
-  /** Raw MSP_BEEPER_CONFIG payload, written back with only two off-flags cleared. null: firmware built without beeper. */
+  /** Raw MSP_BEEPER_CONFIG payload, written back with only the RX off-flags cleared. null: firmware built without beeper. */
   beeperConfig: number[] | null
   /** MSP_FEATURE_CONFIG mask. */
   features: number
@@ -39,15 +43,20 @@ export interface SetupDraft {
   armAngle: number | null
   /** null: no beeper config. */
   beeperOffFlags: number | null
+  /** null: no beeper config, or one that ends before the DShot beacon. */
+  dshotBeaconOffFlags: number | null
   airmode: boolean
 }
 
 export function readSetup(snapshot: SetupSnapshot): SetupDraft {
-  const beeper = snapshot.beeperConfig
+  const beeper = new ByteReader(Uint8Array.from(snapshot.beeperConfig ?? []))
+  const beeperOffFlags = beeper.remaining >= 4 ? beeper.u32() : null
+  if (beeper.remaining >= 1) beeper.u8() // dshotBeaconTone
   return {
     pidDenom: snapshot.advancedConfig[ADVANCED_CONFIG_PID_DENOM_OFFSET] ?? 1,
     armAngle: snapshot.armingConfig[ARMING_CONFIG_SMALL_ANGLE_OFFSET] ?? null,
-    beeperOffFlags: beeper && beeper.length >= 4 ? new ByteReader(Uint8Array.from(beeper)).u32() : null,
+    beeperOffFlags,
+    dshotBeaconOffFlags: beeperOffFlags !== null && beeper.remaining >= 4 ? beeper.u32() : null,
     airmode: (snapshot.features & FEATURE.AIRMODE) !== 0,
   }
 }
@@ -105,7 +114,12 @@ export function applyFix(draft: SetupDraft, id: CheckId): SetupDraft {
     case 'beeper':
       return draft.beeperOffFlags === null
         ? draft
-        : { ...draft, beeperOffFlags: (draft.beeperOffFlags & ~BEEPER_OFF_REQUIRED) >>> 0 }
+        : {
+            ...draft,
+            beeperOffFlags: (draft.beeperOffFlags & ~BEEPER_OFF_REQUIRED) >>> 0,
+            dshotBeaconOffFlags:
+              draft.dshotBeaconOffFlags === null ? null : (draft.dshotBeaconOffFlags & ~BEEPER_OFF_REQUIRED) >>> 0,
+          }
     case 'airmode':
       return { ...draft, airmode: true }
     default:
@@ -119,7 +133,12 @@ export function preflightChecks(snapshot: SetupSnapshot, draft: SetupDraft): Pre
   const muted = (flags: number) =>
     [flags & BEEPER_OFF.RX_SET ? 'RX set' : null, flags & BEEPER_OFF.RX_LOST ? 'RX loss' : null].filter((m) => m !== null)
   const armAngleOk = (d: SetupDraft) => d.armAngle === ARM_ANGLE_ANY
-  const beeperOk = (d: SetupDraft) => d.beeperOffFlags !== null && muted(d.beeperOffFlags).length === 0
+  const beeperMuted = (d: SetupDraft) =>
+    [
+      { name: 'Beeper', off: muted(d.beeperOffFlags ?? 0) },
+      { name: 'DShot beacon', off: muted(d.dshotBeaconOffFlags ?? 0) },
+    ].filter(({ off }) => off.length > 0)
+  const beeperOk = (d: SetupDraft) => d.beeperOffFlags !== null && beeperMuted(d).length === 0
   const here = (ok: (d: SetupDraft) => boolean, available: boolean) => ({
     ok: ok(draft),
     pending: ok(draft) && !ok(saved),
@@ -151,13 +170,15 @@ export function preflightChecks(snapshot: SetupSnapshot, draft: SetupDraft): Pre
     },
     {
       id: 'beeper',
-      label: 'Beeper sounds on RX set and RX loss',
+      label: 'Beeper and DShot beacon sound on RX set and RX loss',
       detail:
         draft.beeperOffFlags === null
           ? 'No beeper support'
           : beeperOk(draft)
             ? 'On'
-            : `Off for ${muted(draft.beeperOffFlags).join(' and ')}`,
+            : beeperMuted(draft)
+                .map(({ name, off }) => `${name} off for ${off.join(' and ')}`)
+                .join(' · '),
       ...here(beeperOk, draft.beeperOffFlags !== null),
     },
     {
@@ -177,9 +198,13 @@ export function encodeSetArmingConfig(snapshot: SetupSnapshot, armAngle: number)
   return payload
 }
 
-export function encodeSetBeeperConfig(beeperConfig: number[], offFlags: number): Uint8Array {
-  // beeper_off_flags:u32, then dshotBeaconTone:u8 and dshotBeaconOffFlags:u32, which stay as they are
-  return Uint8Array.of(...new ByteWriter().u32(offFlags).toBytes(), ...beeperConfig.slice(4))
+export function encodeSetBeeperConfig(beeperConfig: number[], draft: SetupDraft): Uint8Array {
+  // beeper_off_flags:u32, dshotBeaconTone:u8 (stays as it is), dshotBeaconOffFlags:u32
+  const payload = Uint8Array.from(beeperConfig)
+  if (draft.beeperOffFlags !== null) payload.set(new ByteWriter().u32(draft.beeperOffFlags).toBytes())
+  if (draft.dshotBeaconOffFlags !== null)
+    payload.set(new ByteWriter().u32(draft.dshotBeaconOffFlags).toBytes(), BEEPER_CONFIG_DSHOT_BEACON_OFF_FLAGS_OFFSET)
+  return payload
 }
 
 /** Feature mask with only the airmode bit changed. */

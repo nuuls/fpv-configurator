@@ -30,7 +30,7 @@ async function connect(fc: MockFlightController) {
 const allGood = (): SetupSnapshot => ({
   advancedConfig: [1, 1, 0, 6, 0xe0, 0x01],
   armingConfig: [5, 0, 180, 0],
-  beeperConfig: [0, 0, 0, 0, 1, 0x02, 0x02, 0, 0],
+  beeperConfig: [0, 0, 0, 0, 1, 0, 0, 0, 0],
   features: FEATURE.AIRMODE | FEATURE.OSD,
   bidirDshot: true,
   hasAccelerometer: true,
@@ -128,9 +128,29 @@ describe('pre-flight checklist', () => {
     expect(failing(beeper(1 << 3))).toEqual([]) // only "disarming" is muted
     expect(failing(beeper(BEEPER_OFF.RX_SET))).toEqual(['beeper'])
     const both = beeper(BEEPER_OFF.RX_SET | BEEPER_OFF.RX_LOST)
-    expect(preflightChecks(both, readSetup(both))[3]?.detail).toBe('Off for RX set and RX loss')
-    // the DShot beacon flags are not the beeper
-    expect(failing({ ...allGood(), beeperConfig: [0, 0, 0, 0, 1, 0x02, 0x02, 0, 0] })).toEqual([])
+    expect(preflightChecks(both, readSetup(both))[3]?.detail).toBe('Beeper off for RX set and RX loss')
+  })
+
+  it('wants the DShot beacon on for RX set and RX loss too', () => {
+    // Betaflight default: beeper on, beacon off for both
+    const beaconOff = { ...allGood(), beeperConfig: [0, 0, 0, 0, 1, 0x02, 0x02, 0, 0] }
+    expect(failing(beaconOff)).toEqual(['beeper'])
+    expect(preflightChecks(beaconOff, readSetup(beaconOff))[3]).toMatchObject({
+      detail: 'DShot beacon off for RX set and RX loss',
+      fix: 'here',
+    })
+    const mixed = { ...allGood(), beeperConfig: [0, 0x02, 0, 0, 1, 0x02, 0, 0, 0] }
+    expect(preflightChecks(mixed, readSetup(mixed))[3]?.detail).toBe('Beeper off for RX set · DShot beacon off for RX loss')
+    expect(applyFix(readSetup(beaconOff), 'beeper')).toMatchObject({ beeperOffFlags: 0, dshotBeaconOffFlags: 0 })
+  })
+
+  it('judges a beeper config that ends before the DShot beacon by the beeper alone', () => {
+    const short = { ...allGood(), beeperConfig: [0, 0x02, 0, 0] }
+    expect(readSetup(short).dshotBeaconOffFlags).toBeNull()
+    const fixed = applyFix(readSetup(short), 'beeper')
+    expect(fixed).toMatchObject({ beeperOffFlags: 0, dshotBeaconOffFlags: null })
+    expect(failing(short, fixed)).toEqual([])
+    expect([...encodeSetBeeperConfig(short.beeperConfig, fixed)]).toEqual([0, 0, 0, 0])
   })
 
   it('reports a firmware without beeper config instead of offering a fix', () => {
@@ -145,11 +165,11 @@ describe('pre-flight checklist', () => {
   })
 
   it('a fix passes the check, marked as pending until saved', () => {
-    const snapshot = { ...allGood(), armingConfig: [5, 0, 25, 0], beeperConfig: [0x0a, 0x02, 0, 0, 1, 0, 0, 0, 0], features: 0 }
+    const snapshot = { ...allGood(), armingConfig: [5, 0, 25, 0], beeperConfig: [0x0a, 0x02, 0, 0, 1, 0x02, 0x02, 0, 1], features: 0 }
     let draft = readSetup(snapshot)
     for (const id of failing(snapshot)) draft = applyFix(draft, id)
-    // 0x0a = disarming + RX loss muted: only the RX bits are cleared
-    expect(draft).toEqual({ pidDenom: 1, armAngle: 180, beeperOffFlags: 1 << 3, airmode: true })
+    // 0x0a = disarming + RX loss muted: only the RX bits are cleared, in the beeper and in the DShot beacon flags
+    expect(draft).toEqual({ pidDenom: 1, armAngle: 180, beeperOffFlags: 1 << 3, dshotBeaconOffFlags: 1 << 24, airmode: true })
     expect(preflightChecks(snapshot, draft).map((check) => [check.ok, check.pending])).toEqual([
       [true, false],
       [true, false],
@@ -165,10 +185,11 @@ describe('pre-flight checklist', () => {
     expect(applyFix(draft, 'accCalibrated')).toBe(draft)
   })
 
-  it('patches only small_angle, beeper_off_flags and the airmode bit', () => {
+  it('patches only small_angle, the beeper and DShot beacon off-flags and the airmode bit', () => {
     const snapshot = { ...allGood(), armingConfig: [5, 0, 25, 1] }
     expect([...encodeSetArmingConfig(snapshot, 180)]).toEqual([5, 0, 180, 1])
-    expect([...encodeSetBeeperConfig([0x0a, 0x02, 0, 0, 3, 0x02, 0x02, 0, 0], 1 << 3)]).toEqual([0x08, 0, 0, 0, 3, 0x02, 0x02, 0, 0])
+    const beeper = { ...readSetup(allGood()), beeperOffFlags: 1 << 3, dshotBeaconOffFlags: 1 << 24 }
+    expect([...encodeSetBeeperConfig([0x0a, 0x02, 0, 0, 3, 0x02, 0x02, 0, 1], beeper)]).toEqual([0x08, 0, 0, 0, 3, 0, 0, 0, 1])
     expect(withAirmode(FEATURE.OSD, true)).toBe(FEATURE.OSD | FEATURE.AIRMODE)
     expect(withAirmode(0x80000000 | FEATURE.AIRMODE, false)).toBe(0x80000000)
   })
@@ -177,7 +198,7 @@ describe('pre-flight checklist', () => {
     const fc = new MockFlightController()
     const { transport, client } = await connect(fc)
     const snapshot = await readSetupSnapshot(client)
-    // the mock: DShot telemetry off, never calibrated, arm angle 25, RX set beep muted, airmode on
+    // the mock: DShot telemetry off, never calibrated, arm angle 25, RX set beep muted and DShot beacon off, airmode on
     expect(failing(snapshot)).toEqual(['bidirDshot', 'accCalibrated', 'armAngle', 'beeper'])
 
     let draft = readSetup(snapshot)
@@ -191,7 +212,8 @@ describe('pre-flight checklist', () => {
     expect(failing(await readSetupSnapshot((await connect(fc)).client))).toEqual(['bidirDshot'])
     const before = defaultMockConfig()
     expect(fc.savedConfig.armingConfig).toEqual(before.armingConfig.with(2, 180))
-    expect(fc.savedConfig.beeperConfig).toEqual(before.beeperConfig.with(1, 0))
+    expect(before.beeperConfig).toEqual([0x00, 0x02, 0, 0, 1, 0x02, 0x02, 0, 0])
+    expect(fc.savedConfig.beeperConfig).toEqual([0, 0, 0, 0, 1, 0, 0, 0, 0])
     expect(fc.savedConfig.features).toBe(before.features)
     expect(fc.savedConfig.advancedConfig).toEqual(before.advancedConfig)
   })

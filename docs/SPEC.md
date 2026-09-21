@@ -29,7 +29,7 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
 		- Bi-dir dshot is enabled
 		- Accellerometer is calibrated
 		- Arm angle is set to 180
-		- Beeper is enabled on RX set and RX loss
+		- Beeper and DShot beacon are enabled on RX set and RX loss
 		- Airmode is on
 
 - FC Orientation

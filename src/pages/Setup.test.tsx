@@ -15,7 +15,7 @@ describe('Setup tab: pre-flight checklist', () => {
     expect(within(row('Bidirectional DShot is enabled')).getByRole('link', { name: 'Open Motors' })).toBeInTheDocument()
     expect(within(row('Accelerometer is calibrated')).getByRole('link', { name: 'Open Orientation' })).toBeInTheDocument()
     expect(row('Arm angle is 180°')).toHaveTextContent('25°')
-    expect(row(/Beeper/)).toHaveTextContent('Off for RX set')
+    expect(row(/Beeper/)).toHaveTextContent('Beeper off for RX set · DShot beacon off for RX set and RX loss')
     expect(row('Airmode is on')).toHaveTextContent('On')
     expect(within(row('Airmode is on')).queryByRole('button')).toBeNull()
     expect(screen.getByRole('button', { name: 'Save & Reboot' })).toBeDisabled()
@@ -39,6 +39,7 @@ describe('Setup tab: pre-flight checklist', () => {
     expect(row('Arm angle is 180°')).toHaveTextContent('180°')
     expect(row('Arm angle is 180°')).not.toHaveTextContent('not saved yet')
     expect(within(row(/Beeper/)).queryByRole('button')).toBeNull()
+    expect(row(/Beeper/)).toHaveTextContent(/On$/)
   })
 
   it('sees an accelerometer calibrated on the Orientation tab', async () => {

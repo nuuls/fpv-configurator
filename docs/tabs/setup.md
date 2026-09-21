@@ -34,7 +34,7 @@ loop frequency), and a pre-flight checklist that verifies the settings a quad sh
 | Check: bidirectional DShot is enabled | check + link to Motors | `dshot_bidir` · `MSP_MOTOR_CONFIG` byte 8 | pass = on | edited on Motors |
 | Check: accelerometer is calibrated | check + link to Orientation | `MSP_BOARD_INFO` configuration problems, bit 0 | pass = bit clear | calibrated on Orientation; no accelerometer = fails without a link |
 | Check: arm angle is 180° | check + **Fix** | `small_angle` · `MSP_ARMING_CONFIG` byte 2 (read-modify-write) | pass = 180 · Fix sets 180 | needs reboot |
-| Check: beeper sounds on RX set and RX loss | check + **Fix** | `beeper` · `MSP_BEEPER_CONFIG` `beeper_off_flags` bits 9 (RX_SET) and 1 (RX_LOST) | pass = both bits clear · Fix clears both | other beeps and the DShot beacon stay as they are |
+| Check: beeper and DShot beacon sound on RX set and RX loss | check + **Fix** | `beeper`, `beacon` · `MSP_BEEPER_CONFIG` `beeper_off_flags` and `dshotBeaconOffFlags`, bits 9 (RX_SET) and 1 (RX_LOST) of each (read-modify-write) | pass = all four bits clear · Fix clears them | other beeps and the beacon tone stay as they are |
 | Check: airmode is on | check + **Fix** | `feature AIRMODE` · `MSP_FEATURE_CONFIG` bit 22 | pass = set · Fix sets it | needs reboot |
 
 ## Behaviour
@@ -56,6 +56,8 @@ loop frequency), and a pre-flight checklist that verifies the settings a quad sh
 - Save writes only the messages whose setting changed, then `MSP_EEPROM_WRITE`.
 - Firmware built without a beeper (`MSP_BEEPER_CONFIG` answers with an error): the check fails with
   "No beeper support" and no Fix; everything else works.
+- A failing beeper check says what is muted, e.g. "Beeper off for RX set · DShot beacon off for RX set and RX
+  loss". A `MSP_BEEPER_CONFIG` that ends before the beacon fields is judged by the wired beeper alone.
 
 ## Hidden on purpose
 
@@ -63,7 +65,7 @@ loop frequency), and a pre-flight checklist that verifies the settings a quad sh
 - Arming-disable flags, GPS, instruments
 - Attitude (horizon, roll / pitch / heading) and battery readouts (voltage, current, consumed)
 - Free choice of `pid_process_denom` (1–16)
-- Free choice of arm angle, the other beeper conditions, DShot beacon, other features
+- Free choice of arm angle, the other beeper conditions, DShot beacon tone, other features
 
 ## Decisions
 
@@ -74,8 +76,10 @@ loop frequency), and a pre-flight checklist that verifies the settings a quad sh
   that do have a tab are linked instead of duplicated.
 - Fix goes through the normal Save & Reboot instead of writing at once: one way of saving per tab (SPEC §5), and
   airmode and arm angle only take effect after a reboot anyway.
-- "Beeper" is read literally as the wired buzzer (`beeper_off_flags`). The DShot beacon (`dshotBeaconOffFlags`,
-  off by default, and limited to exactly RX set / RX loss) is not checked — see Open questions.
+- "Beeper" covers the wired buzzer (`beeper_off_flags`) and the DShot beacon (`dshotBeaconOffFlags`, off by
+  default, and limited to exactly RX set / RX loss): many quads have no buzzer, and the ESC beacon is the lost-model
+  finder that works on all of them. One check and one Fix for both; the beacon tone (`beeper_dshot_beacon_tone`,
+  1–5) is always a valid tone and stays as it is.
 - "Accelerometer is calibrated" uses the firmware's own verdict (`accHasBeenCalibrated()` via `MSP_BOARD_INFO`),
   not the ACC_CALIBRATION arming flag, which is only raised while something that needs the accelerometer is set up.
 - Airmode counts as on through the feature only; an AIRMODE switch is not a mode this app manages (Modes tab).
@@ -89,10 +93,12 @@ Checkable with **Connect Mock FC**:
 - [x] Mock with a 3.2 kHz gyro reports it; options are 3.2 kHz only (unit test — the app's mock is 8 kHz)
 
 - [x] Checklist: "4 of 5 settings need attention." — bidirectional DShot (→ Open Motors), accelerometer
-      (→ Open Orientation), arm angle 25°, beeper off for RX set; airmode passes
+      (→ Open Orientation), arm angle 25°, beeper off for RX set and DShot beacon off for both; airmode passes
 - [x] Fix arm angle → "180° · not saved yet", Revert brings back 25°; Fix arm angle + beeper → Save & Reboot →
       both pass, "2 of 5 settings need attention."
 - [x] Open Orientation → Calibrate accelerometer → back on Setup the accelerometer check passes
+- [x] Fix beeper clears RX set / RX loss in both off-flag masks and nothing else (unit test); a stock Betaflight
+      config (beeper on, beacon off) fails the check
 - [x] Turning airmode off on the mock and fixing it writes only the feature mask (unit test)
 
 On real hardware:
@@ -100,9 +106,11 @@ On real hardware:
 - [ ] BMI270 board shows only 3.2 kHz
 - [ ] 8 kHz with DSHOT300 + bidirectional DShot comes back as 4 kHz after the reboot
 - [ ] Fresh FC: accelerometer check fails, passes after calibrating; arm angle Fix survives a power cycle
+- [ ] After Fix beeper + Save: `beacon` in the CLI lists RX_LOST and RX_SET, and the ESCs beep with the BEEPER switch
 
 ## Open questions
 
 - [ ] Rest of the tab (drone-type setup step) is still unspecified — see SPEC.md §6
-- [ ] Beeper check: should the DShot beacon count too (quads without a wired buzzer)? Built: wired beeper only
+- [x] Beeper check: should the DShot beacon count too (quads without a wired buzzer)? Yes — checked and fixed
+      together with the wired beeper
 - [ ] Fix buttons go beyond "verifies" in SPEC §2 — keep, or make the checklist read-only?

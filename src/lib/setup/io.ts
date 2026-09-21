@@ -49,8 +49,10 @@ export async function saveSetup(client: MspClient, snapshot: SetupSnapshot, draf
     await client.request(MSP.SET_ADVANCED_CONFIG, encodeSetAdvancedConfig(snapshot, draft))
   if (draft.armAngle !== null && draft.armAngle !== saved.armAngle)
     await client.request(MSP.SET_ARMING_CONFIG, encodeSetArmingConfig(snapshot, draft.armAngle))
-  if (snapshot.beeperConfig && draft.beeperOffFlags !== null && draft.beeperOffFlags !== saved.beeperOffFlags)
-    await client.request(MSP.SET_BEEPER_CONFIG, encodeSetBeeperConfig(snapshot.beeperConfig, draft.beeperOffFlags))
+  const beeperChanged =
+    draft.beeperOffFlags !== saved.beeperOffFlags || draft.dshotBeaconOffFlags !== saved.dshotBeaconOffFlags
+  if (snapshot.beeperConfig && draft.beeperOffFlags !== null && beeperChanged)
+    await client.request(MSP.SET_BEEPER_CONFIG, encodeSetBeeperConfig(snapshot.beeperConfig, draft))
   if (draft.airmode !== saved.airmode) await writeFeatures(client, withAirmode(snapshot.features, draft.airmode))
   await saveToEeprom(client)
 }
