@@ -6,19 +6,23 @@ Route: `/filters` · Page: `src/pages/Filters.tsx` · Logic: `src/lib/filters/`
 
 ## Purpose
 
-The minimal filter stack for a quad with working RPM filtering: two sliders and three numbers, everything else off.
+The minimal filter stack for a quad with working RPM filtering: four sliders and a notch count, everything else off.
 
 ## Layout
 
 ```
 +-------------------------------------------+-------------------------------------------+
-| Gyro lowpass 2 (PT1)        1.0 · 500 Hz  | RPM filter                                |
-| [----------o----------]  0 … 2            |   Min frequency   [ 100 ] Hz              |
+| Gyro lowpass 2 (PT1)        1.0 · 500 Hz  | RPM filter                    Min 100 Hz  |
+| [----------o----------]  0 … 2            | [--------o------------]  30 … 200 Hz      |
 |                                           | Dynamic notch                             |
-| D-term filtering   1.00 · 75–150 / 150 Hz |   Notch count     [ 1 v ]                 |
-| [----------o----------]  0.5 … 1.5        |   Min frequency   [ 100 ] Hz              |
+| D-term filtering   1.00 · 75–150 / 150 Hz |   Notch count   [Off|1|2|3|4|5|6|7]       |
+| [----------o----------]  0.5 … 1.5        |   Min frequency                   100 Hz  |
+|                                           | [-------o-------------]  20 … 250 Hz      |
 +-------------------------------------------+-------------------------------------------+
 ```
+
+Only sliders and button groups — no number inputs or dropdowns. Every filter is one section: name and resulting
+value on one line, a sentence on what it does, then its control.
 
 ## Controls
 
@@ -26,9 +30,9 @@ The minimal filter stack for a quad with working RPM filtering: two sliders and 
 | ------- | ---- | ------------------------ | ---------------- | ----- |
 | Gyro lowpass 2 | slider | `simplified_gyro_filter_multiplier` → `gyro_lpf2_static_hz` = 500 Hz × slider · `MSP_SIMPLIFIED_TUNING` (140/141) + `MSP_FILTER_CONFIG` (92/93) | 0–2.0, step 0.1 · 1.0 | 0 = filter off (`gyro_lpf2_static_hz = 0`). Resulting cutoff shown next to the value |
 | D-term filtering | slider | `simplified_dterm_filter_multiplier` → `dterm_lpf1_dyn_min/max_hz`, `dterm_lpf1_static_hz`, `dterm_lpf2_static_hz` | 0.50–1.50, step 0.05 · 1.0 | Range widens if the FC's value is outside. Resulting cutoffs shown |
-| RPM filter min frequency | number | `rpm_filter_min_hz` · `MSP_FILTER_CONFIG` byte 44 | 30–200 Hz · 100 | |
-| Dynamic notch count | select | `dyn_notch_count` · byte 48 | Off, 1–7 · app recommends 1 (firmware default 3) | |
-| Dynamic notch min frequency | number | `dyn_notch_min_hz` · bytes 41–42 | 20–250 Hz · 100 | Disabled while the count is Off |
+| RPM filter min frequency | slider | `rpm_filter_min_hz` · `MSP_FILTER_CONFIG` byte 44 | 30–200 Hz, step 5 · 100 | |
+| Dynamic notch count | button group | `dyn_notch_count` · byte 48 | Off, 1–7 · app recommends 1 (firmware default 3) | |
+| Dynamic notch min frequency | slider | `dyn_notch_min_hz` · bytes 41–42 | 20–250 Hz, step 5 · 100 | Disabled while the count is Off |
 
 Pinned on every save ("No other filters"): gyro lowpass 1 off (`gyro_lpf1_static_hz`, `gyro_lpf1_dyn_min/max_hz` = 0),
 `gyro_lpf2_type = PT1`, static gyro notches 1 + 2 and the D-term notch off, both filter sliders on
@@ -55,11 +59,11 @@ through untouched; so are yaw lowpass, D-term lowpass types/expo, dynamic notch 
 
 Mock FC (stock Betaflight filters, bidirectional DShot off):
 
-- [x] Two sliders at 1.0, RPM min 100 Hz, notch count 3, notch min 100 Hz; pinned-filters and
+- [x] Filter sliders at 1.0, RPM min 100 Hz, notch count 3, notch min 100 Hz; pinned-filters and
       bidirectional-DShot warnings shown
-- [x] Change slider + numbers → Save (no reboot) → values persist, pinned-filters warning gone
+- [x] Change sliders + notch count → Save (no reboot) → values persist, pinned-filters warning gone
 - [x] Gyro slider at 0 shows "Off" and saves `gyro_lpf2_static_hz = 0`
-- [x] Out-of-range frequency blocks saving with a message
+- [x] Frequency sliders stop at the firmware range; the notch frequency is disabled while the count is Off
 - [x] PID Tuning sliders are unchanged by a Filters save, and the other way round
 
 On real hardware:
@@ -77,6 +81,9 @@ On real hardware:
 - **Slider 0–2**: Betaflight's multiplier range is 0.1–2.0 (CLI rejects < 10), so the step is 0.1 and 0 means "off".
 - **"Notch count (1 default)"**: the tab shows what the FC has and recommends 1; actually applying 1 is left to
   the drone-type "Apply defaults" step (SPEC §2), which doesn't exist yet.
+- **Sliders and button groups only** (user request, 2026-09-21): the frequencies are sliders in 5 Hz steps, the notch
+  count a button group. A frequency the FC holds outside the firmware range is shown as it is with the thumb at the
+  end of the track, and blocks saving with a message until the slider is moved.
 - RPM filter can't be turned off here ("only min frequency"); harmonics 0 is reset to the firmware default 3.
 
 ## Open questions

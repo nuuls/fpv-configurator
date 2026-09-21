@@ -1,11 +1,10 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
+import { ButtonGroup } from '@/components/ButtonGroup'
 import { Notice, LoadingState } from '@/components/Notice'
-import { NumberInput } from '@/components/NumberInput'
 import { SaveBar } from '@/components/SaveBar'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Slider } from '@/components/ui/slider'
 import { useDraft } from '@/hooks/useDraft'
 import { useFcSnapshot } from '@/hooks/useFcSnapshot'
@@ -17,7 +16,6 @@ import {
   dtermCutoffs,
   dtermSliderBounds,
   DYN_NOTCH_COUNT_MAX,
-  DYN_NOTCH_COUNT_RECOMMENDED,
   DYN_NOTCH_MIN_HZ,
   GYRO_SLIDER,
   gyroLpf2Hz,
@@ -28,9 +26,15 @@ import {
   type FiltersSnapshot,
 } from '@/lib/filters/model'
 import type { MspClient } from '@/lib/msp/client'
+import { cn } from '@/lib/utils'
 
 const PATH = '/filters'
-const NUMBER_CLASS = 'h-9 w-24 rounded-md border bg-transparent px-3 disabled:opacity-50 dark:bg-input/30'
+const FILTERING_ENDS = ['More filtering', 'Less filtering'] as const
+const NOTCH_COUNTS = Array.from({ length: DYN_NOTCH_COUNT_MAX + 1 }, (_, count) => ({
+  value: count,
+  label: count === 0 ? 'Off' : String(count),
+}))
+const hzEnds = ({ min, max }: { min: number; max: number }) => [`${min} Hz`, `${max} Hz`] as const
 
 /** Spec: docs/tabs/filters.md */
 export function FiltersPage() {
@@ -95,48 +99,45 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Fil
             <CardDescription>Narrow filters that cut noise out at the frequencies where it sits.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col divide-y">
-            <FilterSection title="RPM filter" description="Removes motor noise, following each motor's speed.">
-              <Field id="rpm-min-hz" label="Min frequency" hint="Below this motor speed the RPM filter fades out.">
-                <NumberInput
-                  id="rpm-min-hz"
-                  aria-label="RPM filter min frequency"
-                  {...RPM_MIN_HZ}
-                  value={draft.rpmMinHz}
-                  onValueChange={(rpmMinHz) => setDraft({ ...draft, rpmMinHz })}
-                  className={NUMBER_CLASS}
-                />
-                <span className="text-muted-foreground">Hz</span>
-              </Field>
+            <FilterSection
+              title="RPM filter"
+              description="Removes motor noise, following each motor's speed. Below the min frequency it fades out."
+              readout={`Min ${draft.rpmMinHz} Hz`}
+            >
+              <FilterSlider
+                label="RPM filter min frequency"
+                ends={hzEnds(RPM_MIN_HZ)}
+                {...RPM_MIN_HZ}
+                value={draft.rpmMinHz}
+                onChange={(rpmMinHz) => setDraft({ ...draft, rpmMinHz })}
+              />
             </FilterSection>
-            <FilterSection title="Dynamic notch" description="Catches the noise that is left, like frame resonance.">
-              <div className="grid gap-5 sm:grid-cols-2">
-                <Field id="dyn-notch-count" label="Notch count" hint="One is enough next to a working RPM filter.">
-                  <NativeSelect
-                    id="dyn-notch-count"
-                    aria-label="Dynamic notch count"
-                    value={draft.dynNotchCount}
-                    onChange={(e) => setDraft({ ...draft, dynNotchCount: Number(e.target.value) })}
-                  >
-                    {Array.from({ length: DYN_NOTCH_COUNT_MAX + 1 }, (_, count) => (
-                      <NativeSelectOption key={count} value={count}>
-                        {count === 0 ? 'Off' : count}
-                        {count === DYN_NOTCH_COUNT_RECOMMENDED ? ' (recommended)' : ''}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                </Field>
-                <Field id="dyn-notch-min-hz" label="Min frequency" hint="The lowest noise frequency it follows.">
-                  <NumberInput
-                    id="dyn-notch-min-hz"
-                    aria-label="Dynamic notch min frequency"
-                    {...DYN_NOTCH_MIN_HZ}
-                    disabled={notchOff}
-                    value={draft.dynNotchMinHz}
-                    onValueChange={(dynNotchMinHz) => setDraft({ ...draft, dynNotchMinHz })}
-                    className={NUMBER_CLASS}
-                  />
-                  <span className="text-muted-foreground">Hz</span>
-                </Field>
+            <FilterSection
+              title="Dynamic notch"
+              description="Catches the noise that is left, like frame resonance. One notch is enough next to a working RPM filter."
+            >
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
+                <span className="font-medium">Notch count</span>
+                <ButtonGroup
+                  label="Dynamic notch count"
+                  options={NOTCH_COUNTS}
+                  value={draft.dynNotchCount}
+                  onChange={(dynNotchCount) => setDraft({ ...draft, dynNotchCount })}
+                />
+              </div>
+              <div className="flex flex-col gap-3">
+                <div className={cn('flex items-baseline justify-between gap-4 text-sm', notchOff && 'opacity-50')}>
+                  <span className="font-medium">Min frequency</span>
+                  <span className="font-mono tabular-nums">{draft.dynNotchMinHz} Hz</span>
+                </div>
+                <FilterSlider
+                  label="Dynamic notch min frequency"
+                  ends={hzEnds(DYN_NOTCH_MIN_HZ)}
+                  {...DYN_NOTCH_MIN_HZ}
+                  disabled={notchOff}
+                  value={draft.dynNotchMinHz}
+                  onChange={(dynNotchMinHz) => setDraft({ ...draft, dynNotchMinHz })}
+                />
               </div>
             </FilterSection>
           </CardContent>
@@ -200,20 +201,11 @@ function FilterSection({ title, description, readout, children }: FilterSectionP
   )
 }
 
-function Field({ id, label, hint, children }: { id: string; label: string; hint: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5 text-sm">
-      <label htmlFor={id} className="font-medium">
-        {label}
-      </label>
-      <div className="flex items-center gap-2">{children}</div>
-      <p className="text-muted-foreground">{hint}</p>
-    </div>
-  )
-}
-
 interface FilterSliderProps {
   label: string
+  /** What the left and right end of the track mean. */
+  ends?: readonly [string, string]
+  disabled?: boolean
   min: number
   max: number
   step: number
@@ -221,18 +213,19 @@ interface FilterSliderProps {
   onChange: (value: number) => void
 }
 
-function FilterSlider({ label, value, onChange, ...range }: FilterSliderProps) {
+function FilterSlider({ label, ends = FILTERING_ENDS, value, onChange, ...range }: FilterSliderProps) {
   return (
     <div>
       <Slider
         aria-label={label}
         {...range}
-        value={[value]}
+        // an FC value outside the range keeps the thumb on the track; the readout shows the real one
+        value={[Math.min(range.max, Math.max(range.min, value))]}
         onValueChange={([next]) => next !== undefined && onChange(next)}
       />
       <div className="mt-2 flex justify-between text-xs text-muted-foreground">
-        <span>More filtering</span>
-        <span>Less filtering</span>
+        <span>{ends[0]}</span>
+        <span>{ends[1]}</span>
       </div>
     </div>
   )

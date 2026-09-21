@@ -80,8 +80,8 @@ const MULTIPLIER_MAX = 200
 
 export const GYRO_SLIDER = { min: 0, max: 200, step: 10 } as const
 export const DTERM_SLIDER = { min: 50, max: 150, step: 5 } as const
-export const RPM_MIN_HZ = { min: 30, max: 200 } as const
-export const DYN_NOTCH_MIN_HZ = { min: 20, max: 250 } as const
+export const RPM_MIN_HZ = { min: 30, max: 200, step: 5 } as const
+export const DYN_NOTCH_MIN_HZ = { min: 20, max: 250, step: 5 } as const
 export const DYN_NOTCH_COUNT_MAX = 7
 /** SPEC §2: one dynamic notch is enough next to a working RPM filter. */
 export const DYN_NOTCH_COUNT_RECOMMENDED = 1
