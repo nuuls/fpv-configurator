@@ -39,7 +39,7 @@ jobs:
       - run: pnpm build
 
       - name: Upload the site
-        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request' && !github.event.repository.private
         uses: actions/upload-pages-artifact@v5
         with:
           path: dist
@@ -47,7 +47,8 @@ jobs:
   deploy:
     name: Deploy to GitHub Pages
     needs: check
-    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    # Skipped while the repository is private: Pages isn't available there.
+    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request' && !github.event.repository.private
     runs-on: ubuntu-latest
     permissions:
       pages: write
