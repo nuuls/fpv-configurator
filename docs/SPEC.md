@@ -58,7 +58,16 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
 				- Automatically lower feed forward to 0.5
 
 - Filters
-	- TBD
+	- Gyro Lowpass 2 PT1
+		- Slider from 0 - 2
+	- RPM filter
+		- Only min frequency
+	- Dynamic notch
+		- Notch count (1 default)
+		- Min frequency
+	- D term filtering
+		- Only slider from 0.5 - 1.5
+	- No other filters
 
 - Rates
 	- Very simple interface, only one profile
@@ -94,10 +103,26 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
 	- Also display reported RPM
 
 - OSD
-	- TBD
+	- Copy the existing betaflight UI but only keep the following elements
+		- Battery average cell voltage
+		- Current amp draw
+		- Used mah
+		- Link quality
+		- Warnings
+		- Disarmed
+		- Timer 2 (armed time)
+		- Custom message 1-4
+		- VTX channel (combined mode)
+		- Altitude
+	- Only allow one OSD profile
+	- Remove everything thats on the right in betaflight
 
 - VTX
-	- TBD
+	- Sidenav name is Analog VTX
+	- Presets can be selected from a dropdown UI, values are hardcoded in the app
+		- Choose manufacturer
+		- Choose vtx
+	- VTX table can be edited manually after loading preset
 
 - Blackbox
 	- Copy betaflight design but remove everything except the following
