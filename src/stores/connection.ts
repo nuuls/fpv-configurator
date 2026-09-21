@@ -1,0 +1,129 @@
+import { create } from 'zustand'
+import { MockFlightController } from '@/lib/mock-fc/mockFc'
+import { readFcInfo, sendReboot, type FcInfo } from '@/lib/msp/api'
+import { MspClient } from '@/lib/msp/client'
+import { MockTransport } from '@/lib/transport/mock'
+import type { Transport } from '@/lib/transport/types'
+import { WebSerialTransport } from '@/lib/transport/webserial'
+
+export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'rebooting'
+export type ConnectionKind = 'serial' | 'mock'
+
+interface ConnectionState {
+  status: ConnectionStatus
+  /** Message from the last failed connection attempt, cleared on the next attempt. */
+  error: string | null
+  /** Non-null exactly while `status === 'connected'`. */
+  client: MspClient | null
+  fcInfo: FcInfo | null
+  transportLabel: string | null
+  connect: (kind: ConnectionKind) => Promise<void>
+  disconnect: () => Promise<void>
+  /** Reboots the FC and reconnects to it without user interaction (SPEC §5 "Reboot"). */
+  reboot: () => Promise<void>
+}
+
+const DISCONNECTED = {
+  status: 'disconnected',
+  client: null,
+  fcInfo: null,
+  transportLabel: null,
+} as const
+
+const REBOOT_TIMEOUT_MS = 10_000
+const REBOOT_RETRY_MS = 250
+
+/** How to get back to the same FC after it rebooted. Resolves null while it isn't back yet. */
+type Reopen = () => Promise<Transport | null>
+
+// Kept outside the store: nothing in the UI needs the raw transport.
+let active: { transport: Transport; reopen: Reopen } | null = null
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+async function openTransport(kind: ConnectionKind): Promise<{ transport: Transport; reopen: Reopen }> {
+  if (kind === 'mock') {
+    const fc = new MockFlightController()
+    return { transport: new MockTransport(fc), reopen: async () => new MockTransport(fc) }
+  }
+  const transport = await WebSerialTransport.request()
+  return { transport, reopen: () => WebSerialTransport.findGranted(transport) }
+}
+
+export const useConnectionStore = create<ConnectionState>()((set, get) => {
+  /** Opens + identifies the FC and makes it the active connection. Closes the transport on failure. */
+  async function attach(transport: Transport, reopen: Reopen): Promise<void> {
+    try {
+      await transport.open()
+      const client = new MspClient(transport)
+      const fcInfo = await readFcInfo(client)
+
+      active = { transport, reopen }
+      transport.onClose(() => {
+        if (active?.transport !== transport) return
+        active = null
+        set({ ...DISCONNECTED })
+      })
+      set({ status: 'connected', client, fcInfo, transportLabel: transport.label })
+    } catch (error) {
+      await transport.close().catch(() => {})
+      throw error
+    }
+  }
+
+  return {
+    ...DISCONNECTED,
+    error: null,
+
+    connect: async (kind) => {
+      if (get().status !== 'disconnected') return
+      set({ status: 'connecting', error: null })
+      try {
+        const { transport, reopen } = await openTransport(kind)
+        await attach(transport, reopen)
+      } catch (error) {
+        set({ ...DISCONNECTED, error: isPickerCancelled(error) ? null : describeError(error) })
+      }
+    },
+
+    disconnect: async () => {
+      // State is reset by the transport's onClose handler.
+      await active?.transport.close()
+    },
+
+    reboot: async () => {
+      const { client, status } = get()
+      if (status !== 'connected' || !client || !active) return
+      const { transport, reopen } = active
+
+      // Detach first so the expected connection drop isn't treated as a disconnect.
+      active = null
+      set({ status: 'rebooting', client: null, error: null })
+      await sendReboot(client).catch(() => {}) // the FC may reset before it gets to answer
+      await transport.close().catch(() => {})
+
+      const deadline = Date.now() + REBOOT_TIMEOUT_MS
+      while (Date.now() < deadline) {
+        await sleep(REBOOT_RETRY_MS)
+        try {
+          const next = await reopen()
+          if (!next) continue
+          await attach(next, reopen)
+          return
+        } catch {
+          // Still booting (port busy, no MSP answer yet): try again.
+        }
+      }
+      set({ ...DISCONNECTED, error: 'The flight controller did not come back after rebooting.' })
+    },
+  }
+})
+
+/** The user dismissing the browser's port picker is not an error worth showing. */
+function isPickerCancelled(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'NotFoundError'
+}
+
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}

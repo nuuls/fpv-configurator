@@ -1,0 +1,129 @@
+# FPV Configurator — Product Spec
+
+Status: placeholder
+
+## 1. Purpose
+
+Extremely simplified and cut down version of the Betaflight, AM32 and ESC-configurator as an all-in-one app.
+It removes 99% of power user features and only keeps the important features. It also lets you choose the type of drone you are
+configuring and chooses defaults based on that. A 5" freestyle drone will have different default than a 65mm whoop.
+
+- **Audience:**
+	- Any pilot who is not a power-user
+- **Goal:**
+	- Easily and quickly configure your FC and ESC with sensible defaults
+	- Save some cross-drone presets in the browser such as rates, OSD setup etc
+
+## 2. Scope
+
+- Drone type
+	- Pick the type of drone (5" freestyle, 65mm whoop, ...) in a setup step
+	- Shows a diff of what will change, then applies the defaults to the FC once ("Apply defaults")
+	- Afterwards the type is only remembered in the browser (keyed to the FC) to pick slider ranges and hints
+	- List of types and their defaults: TBD
+
+- FC Orientation
+	- 3D view
+	- Dropdown based spins in 45 deg steps
+
+- Port assignment
+	- Do it the other way around as in betaflight:
+		- VTX -> Select type (Digital (msp), Analog) -> Select UART port
+		- RX -> Select type (ELRS, CRSF) -> Select port
+		- GPS
+		- Other MSP devices -> Select port
+- PID Tuning
+	- Slider based
+	- Show raw numbers as view-only
+	- Only show the following sliders
+		- Damping
+		- Master multiplier
+	- Dynamic D is locked at 0 (and not visible)
+	- Other sliders are locked at 1 (and not visible)
+
+	- Replace entire smoothing section with:
+		- RC link hz selector
+		- Smoothing presets (hz must be selected)
+			- Direct
+				- RC smoothing disabled
+				- Race preset feed forward settings (automatically adjust to packet rate)
+			- Light smoothing
+				- 25 auto RC smoothing
+				- Race feed forward
+			- Strong smoothing
+				- 30 auto RC smoothing
+				- Higher feed forward smoothing (TBD)
+				- Automatically lower feed forward to 0.5
+
+- Filters
+	- TBD
+
+- Rates
+	- TBD
+
+- Modes
+	- Copy betaflight design but only keep the following modes:
+		- ARM
+		- Angle
+		- Turtle mode
+		- Beeper
+
+- Motors
+	- Copy betaflight design
+
+- OSD
+	- TBD
+
+- VTX
+	- TBD
+
+- Blackbox
+	- Copy betaflight design but remove everything except the following
+		- Select logging device
+		- Blackbox rate
+		- Erase storage
+		- Activate mass storage
+
+**Later** (not v1, but keep the door open):
+
+- ESC configuration (AM32 / BLHeli via 4-way passthrough)
+
+**Never** (deliberately out of scope — do not build, do not suggest):
+
+- Firmware flashing
+- Advanced GPS rescue setup
+- Blackbox analysis
+
+## 3. Supported hardware & firmware
+
+- Firmware: Betaflight 2026.x only. Anything else (older, INAV, ...): connect, show a warning, tabs stay disabled.
+	- 2026.6 = MSP API 1.48 — the version to build against now
+	- Next release (API 1.49, currently `master`) changes how ports are assigned (per-feature `rx_uart`,
+	  `vtx_uart`, ... set through `MSP2_CLI_SETTING`; the serial function-mask messages are removed).
+	  Keep version-specific code behind one interface per feature so a second backend can be added.
+- Browsers: Chromium-based (Web Serial). Others: mock FC only.
+
+## 4. Layout
+
+## 5. Global behaviour
+
+Rules every tab follows. Tab specs only mention deviations.
+
+- **Saving:** one **Save** button per tab. Edits stay local until pressed; Save writes to the FC and persists
+  (`MSP_EEPROM_WRITE`). If any changed setting needs a reboot the button reads **Save & Reboot**. A **Revert**
+  button discards local edits.
+- **Unsaved changes:** changed controls are marked, the tab gets a dot in the sidebar, and leaving the tab or
+  disconnecting asks "Discard changes?".
+- **Reboot:** the app sends `MSP_REBOOT`, shows "Rebooting…", and reconnects by itself to the same port
+  (already-granted Web Serial port, no picker). After 10 s without the FC it falls back to the welcome screen.
+  Each tab spec says which of its settings need a reboot.
+- **Disconnect / errors:** _unplugged mid-session, MSP timeout, FC returns an error_
+- **Safety:** _motors never spin without a props-off confirmation; what else?_
+- **Units & formatting:** _e.g. volts with 2 decimals, degrees, µs_
+
+## 6. Open questions
+
+- [ ] §4 Layout is empty — keep the current header + sidebar tabs? Tab order?
+- [ ] Drone types: which ones, and what does each set?
+- [ ] Browser presets (rates, OSD, ...): localStorage + JSON export/import OK?
+- [ ] Disconnect / errors, Safety, Units in §5 are still unfilled
