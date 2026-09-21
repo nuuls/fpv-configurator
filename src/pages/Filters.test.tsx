@@ -18,10 +18,14 @@ describe('Filters tab', () => {
     expect(screen.getByText('1.0 · 500 Hz')).toBeInTheDocument()
     expect(screen.getByText('1.00 · 75–150 Hz + 150 Hz')).toBeInTheDocument()
     expect(await slider('RPM filter min frequency')).toHaveAttribute('aria-valuenow', '100')
-    expect(notchCount('3')).toHaveAttribute('aria-pressed', 'true')
+    // stock firmware has 3 notches, the app offers 2 at most
+    expect(within(screen.getByRole('group', { name: 'Dynamic notch count' })).getAllByRole('button')).toHaveLength(3)
+    expect(notchCount('2')).toHaveAttribute('aria-pressed', 'true')
     expect(await slider('Dynamic notch min frequency')).toHaveAttribute('aria-valuenow', '100')
 
-    expect(screen.getByText(/Saving changes them: gyro lowpass 1 is turned off\./)).toBeInTheDocument()
+    expect(
+      screen.getByText(/Saving changes them: gyro lowpass 1 is turned off; the dynamic notch count goes from 3 to 2\./),
+    ).toBeInTheDocument()
     expect(screen.getByText(/Bidirectional DShot is off/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
   })
@@ -39,7 +43,7 @@ describe('Filters tab', () => {
     expect(screen.getByText('1.2 · 600 Hz')).toBeInTheDocument()
     expect(screen.getByText('0.95 · 71–142 Hz + 142 Hz')).toBeInTheDocument()
     expect(notchCount('1')).toHaveAttribute('aria-pressed', 'true')
-    expect(notchCount('3')).toHaveAttribute('aria-pressed', 'false')
+    expect(notchCount('2')).toHaveAttribute('aria-pressed', 'false')
     expect(await slider('RPM filter min frequency')).toHaveAttribute('aria-valuenow', '80')
     expect(screen.queryByText(/Saving changes them/)).toBeNull() // the filter stack is now pinned
 

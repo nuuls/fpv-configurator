@@ -15,7 +15,7 @@ The minimal filter stack for a quad with working RPM filtering: four sliders and
 | Gyro lowpass 2 (PT1)        1.0 · 500 Hz  | RPM filter                    Min 100 Hz  |
 | [----------o----------]  0 … 2            | [--------o------------]  30 … 200 Hz      |
 |                                           | Dynamic notch                             |
-| D-term filtering   1.00 · 75–150 / 150 Hz |   Notch count   [Off|1|2|3|4|5|6|7]       |
+| D-term filtering   1.00 · 75–150 / 150 Hz |   Notch count   [Off|1|2]                 |
 | [----------o----------]  0.5 … 1.5        |   Min frequency                   100 Hz  |
 |                                           | [-------o-------------]  20 … 250 Hz      |
 +-------------------------------------------+-------------------------------------------+
@@ -31,7 +31,7 @@ value on one line, a sentence on what it does, then its control.
 | Gyro lowpass 2 | slider | `simplified_gyro_filter_multiplier` → `gyro_lpf2_static_hz` = 500 Hz × slider · `MSP_SIMPLIFIED_TUNING` (140/141) + `MSP_FILTER_CONFIG` (92/93) | 0–2.0, step 0.1 · 1.0 | 0 = filter off (`gyro_lpf2_static_hz = 0`). Resulting cutoff shown next to the value |
 | D-term filtering | slider | `simplified_dterm_filter_multiplier` → `dterm_lpf1_dyn_min/max_hz`, `dterm_lpf1_static_hz`, `dterm_lpf2_static_hz` | 0.50–1.50, step 0.05 · 1.0 | Range widens if the FC's value is outside. Resulting cutoffs shown |
 | RPM filter min frequency | slider | `rpm_filter_min_hz` · `MSP_FILTER_CONFIG` byte 44 | 30–200 Hz, step 5 · 100 | |
-| Dynamic notch count | button group | `dyn_notch_count` · byte 48 | Off, 1–7 · app recommends 1 (firmware default 3) | |
+| Dynamic notch count | button group | `dyn_notch_count` · byte 48 | Off, 1–2 · app recommends 1 (firmware default 3) | The firmware takes up to 7; a higher count on the FC shows as 2 and the pinned-filters warning says saving lowers it |
 | Dynamic notch min frequency | slider | `dyn_notch_min_hz` · bytes 41–42 | 20–250 Hz, step 5 · 100 | Disabled while the count is Off |
 
 Pinned on every save ("No other filters"): gyro lowpass 1 off (`gyro_lpf1_static_hz`, `gyro_lpf1_dyn_min/max_hz` = 0),
@@ -59,8 +59,8 @@ through untouched; so are yaw lowpass, D-term lowpass types/expo, dynamic notch 
 
 Mock FC (stock Betaflight filters, bidirectional DShot off):
 
-- [x] Filter sliders at 1.0, RPM min 100 Hz, notch count 3, notch min 100 Hz; pinned-filters and
-      bidirectional-DShot warnings shown
+- [x] Filter sliders at 1.0, RPM min 100 Hz, notch count 2 (the FC's 3 is more than the app offers), notch min
+      100 Hz; pinned-filters (gyro lowpass 1, notch count 3 → 2) and bidirectional-DShot warnings shown
 - [x] Change sliders + notch count → Save (no reboot) → values persist, pinned-filters warning gone
 - [x] Gyro slider at 0 shows "Off" and saves `gyro_lpf2_static_hz = 0`
 - [x] Frequency sliders stop at the firmware range; the notch frequency is disabled while the count is Off
@@ -84,6 +84,9 @@ On real hardware:
 - **Sliders and button groups only** (user request, 2026-09-21): the frequencies are sliders in 5 Hz steps, the notch
   count a button group. A frequency the FC holds outside the firmware range is shown as it is with the thumb at the
   end of the track, and blocks saving with a message until the slider is moved.
+- **At most 2 dynamic notches** (user request, 2026-09-21): next to a working RPM filter more only adds delay. A
+  count above 2 on the FC (stock: 3) is treated like the other settings the app doesn't offer — shown as 2, listed
+  in the warning, written on the next save — instead of blocking the save.
 - RPM filter can't be turned off here ("only min frequency"); harmonics 0 is reset to the firmware default 3.
 
 ## Open questions

@@ -74,7 +74,7 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
 	- RPM filter
 		- Only min frequency
 	- Dynamic notch
-		- Notch count (1 default)
+		- Notch count (1 default, 2 max)
 		- Min frequency
 	- D term filtering
 		- Only slider from 0.5 - 1.5

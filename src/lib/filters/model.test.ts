@@ -29,7 +29,8 @@ const stock = (): FiltersSnapshot => ({
   simplified: defaultMockConfig().simplifiedTuning,
   bidirDshot: true,
 })
-const STOCK_DRAFT: FiltersDraft = { gyroLpf2: 100, dterm: 100, rpmMinHz: 100, dynNotchCount: 3, dynNotchMinHz: 100 }
+/** Stock firmware has 3 dynamic notches; the app offers 2 at most. */
+const STOCK_DRAFT: FiltersDraft = { gyroLpf2: 100, dterm: 100, rpmMinHz: 100, dynNotchCount: 2, dynNotchMinHz: 100 }
 
 const u16 = (bytes: ArrayLike<number>, offset: number) => (bytes[offset] ?? 0) | ((bytes[offset + 1] ?? 0) << 8)
 const withU16 = (bytes: number[], offset: number, value: number) =>
@@ -112,7 +113,8 @@ describe('filter payloads', () => {
 
 describe('pinned filter settings', () => {
   it('lists what saving changes on a stock quad, and nothing after the save', () => {
-    expect(pinnedChanges(stock())).toEqual(['gyro lowpass 1 is turned off'])
+    expect(pinnedChanges(stock())).toEqual(['gyro lowpass 1 is turned off', 'the dynamic notch count goes from 3 to 2'])
+    expect(saved(stock(), STOCK_DRAFT).filterConfig[48]).toBe(2)
     expect(pinnedChanges(saved(stock(), STOCK_DRAFT))).toEqual([])
     expect(pinnedChanges(saved(stock(), { ...STOCK_DRAFT, gyroLpf2: 0, dterm: 85 }))).toEqual([])
   })
@@ -130,6 +132,7 @@ describe('pinned filter settings', () => {
       'gyro lowpass 2 is set to 350 Hz by the slider',
       'the D-term lowpass filters are set to 90–180 Hz and 180 Hz by the slider',
       'the RPM filter is turned on',
+      'the dynamic notch count goes from 3 to 2',
     ])
     expect(buildFilterConfig(snapshot, readFilters(snapshot))[43]).toBe(3)
     expect(pinnedChanges(saved(snapshot, readFilters(snapshot)))).toEqual([])
@@ -147,7 +150,7 @@ describe('validateFilters', () => {
     expect(validateFilters({ ...STOCK_DRAFT, rpmMinHz: 20 })[0]).toMatch(/RPM filter min frequency must be 30–200/)
     expect(validateFilters({ ...STOCK_DRAFT, dynNotchMinHz: 300 })[0]).toMatch(/Dynamic notch min frequency must be 20–250/)
     expect(validateFilters({ ...STOCK_DRAFT, dynNotchCount: 0, dynNotchMinHz: 300 })).toEqual([]) // notch off
-    expect(validateFilters({ ...STOCK_DRAFT, dynNotchCount: 8 })[0]).toMatch(/count/)
+    expect(validateFilters({ ...STOCK_DRAFT, dynNotchCount: 3 })[0]).toMatch(/Dynamic notch count must be 0–2/)
   })
 })
 

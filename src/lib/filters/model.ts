@@ -82,7 +82,9 @@ export const GYRO_SLIDER = { min: 0, max: 200, step: 10 } as const
 export const DTERM_SLIDER = { min: 50, max: 150, step: 5 } as const
 export const RPM_MIN_HZ = { min: 30, max: 200, step: 5 } as const
 export const DYN_NOTCH_MIN_HZ = { min: 20, max: 250, step: 5 } as const
-export const DYN_NOTCH_COUNT_MAX = 7
+/** Most notches this app offers; the firmware takes up to DYN_NOTCH_COUNT_FIRMWARE_MAX. */
+export const DYN_NOTCH_COUNT_MAX = 2
+const DYN_NOTCH_COUNT_FIRMWARE_MAX = 7
 /** SPEC §2: one dynamic notch is enough next to a working RPM filter. */
 export const DYN_NOTCH_COUNT_RECOMMENDED = 1
 
@@ -159,7 +161,8 @@ export function readFilters({ filterConfig, simplified }: FiltersSnapshot): Filt
       sliderPercent(ST.DTERM_SLIDER_ON_U8, ST.DTERM_MULTIPLIER_U8) ||
       (dtermLpf1 === 0 ? 100 : nearestPercent(dtermLpf1, DTERM_LPF1_DYN_MIN_HZ, DTERM_SLIDER.step)),
     rpmMinHz: u8At(filterConfig, FC.RPM_MIN_HZ_U8),
-    dynNotchCount: u8At(filterConfig, FC.DYN_NOTCH_COUNT_U8),
+    // more than the app offers (stock firmware: 3) reads as the most it does; pinnedChanges says so
+    dynNotchCount: Math.min(DYN_NOTCH_COUNT_MAX, u8At(filterConfig, FC.DYN_NOTCH_COUNT_U8)),
     dynNotchMinHz: u16At(filterConfig, FC.DYN_NOTCH_MIN_HZ),
   }
 }
@@ -263,6 +266,8 @@ export function pinnedChanges(snapshot: FiltersSnapshot): string[] {
   )
     changes.push(`the D-term lowpass filters are set to ${dterm.lpf1MinHz}–${dterm.lpf1MaxHz} Hz and ${dterm.lpf2Hz} Hz by the slider`)
   if (u8At(filterConfig, FC.RPM_HARMONICS_U8) === 0) changes.push('the RPM filter is turned on')
+  if (u8At(filterConfig, FC.DYN_NOTCH_COUNT_U8) > DYN_NOTCH_COUNT_MAX)
+    changes.push(`the dynamic notch count goes from ${u8At(filterConfig, FC.DYN_NOTCH_COUNT_U8)} to ${draft.dynNotchCount}`)
   return changes
 }
 
@@ -350,7 +355,7 @@ export function copySharedCutoffs(
 
 /** True when the firmware would reject this MSP_SET_FILTER_CONFIG payload (msp.c: notch count, RPM Q / fade / weights). */
 export function isFilterConfigRejected(payload: ArrayLike<number>): boolean {
-  if (u8At(payload, FC.DYN_NOTCH_COUNT_U8) > DYN_NOTCH_COUNT_MAX) return true
+  if (u8At(payload, FC.DYN_NOTCH_COUNT_U8) > DYN_NOTCH_COUNT_FIRMWARE_MAX) return true
   if (payload.length < FILTER_CONFIG_LENGTH) return false
   const q = u16At(payload, 51)
   return u16At(payload, 49) > 1000 || q < 250 || q > 3000 || [53, 54, 55].some((offset) => u8At(payload, offset) > 100)
