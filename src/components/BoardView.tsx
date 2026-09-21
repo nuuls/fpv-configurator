@@ -11,6 +11,7 @@ const STYLE: Record<Part, { fill: string; stroke: string }> = {
   'prop-front': { fill: 'color-mix(in oklab, var(--primary) 18%, transparent)', stroke: 'var(--primary)' },
   'prop-rear': { fill: 'color-mix(in oklab, var(--muted-foreground) 15%, transparent)', stroke: 'var(--muted-foreground)' },
   board: { fill: 'var(--card)', stroke: 'var(--primary)' },
+  'board-mark': { fill: 'var(--muted-foreground)', stroke: 'none' },
   arrow: { fill: 'var(--primary)', stroke: 'none' },
 }
 
@@ -23,8 +24,9 @@ interface BoardViewProps {
 
 /**
  * 3D preview: the quad follows the live attitude (roll, pitch and yaw), the flight controller board
- * inside it is rotated by the chosen alignment. Orange props are the front. Rendering is a small
- * software projection (`lib/orientation/view3d`) drawn as SVG.
+ * inside it is rotated by the chosen alignment. Orange props and the arrow are the quad's front, whatever the
+ * alignment; the small grey mark is where the board's own arrow points. Rendering is a small software
+ * projection (`lib/orientation/view3d`) drawn as SVG.
  */
 export function BoardView({ alignment, attitude }: BoardViewProps) {
   const shown = useSmoothed(attitude ?? LEVEL)
@@ -38,8 +40,8 @@ export function BoardView({ alignment, attitude }: BoardViewProps) {
       className="w-full max-w-md"
     >
       {polygons.map(({ part, points, facingCamera }, index) => {
-        // The arrow is printed on the top of the board: invisible from below.
-        if (part === 'arrow' && !facingCamera) return null
+        // The mark is printed on the top of the board, the arrow lies on top of the quad: invisible from below.
+        if ((part === 'arrow' || part === 'board-mark') && !facingCamera) return null
         const underside = part === 'board' && !facingCamera
         return (
           <polygon

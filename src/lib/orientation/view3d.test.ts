@@ -50,9 +50,9 @@ describe('renderQuad', () => {
     if (!polygon) throw new Error('no board')
     return polygon
   }
-  const arrowTip = (alignment: typeof flat) => {
-    const arrow = renderQuad(level, alignment).find((p) => p.part === 'arrow')
-    const [x, y] = (arrow?.points.split(' ')[0] ?? '').split(',').map(Number)
+  const tip = (part: 'arrow' | 'board-mark', alignment: typeof flat) => {
+    const polygon = renderQuad(level, alignment).find((p) => p.part === part)
+    const [x, y] = (polygon?.points.split(' ')[0] ?? '').split(',').map(Number)
     return { x: x ?? NaN, y: y ?? NaN }
   }
 
@@ -68,19 +68,30 @@ describe('renderQuad', () => {
     expect(board({ ...level, roll: 180 }, { ...flat, roll: 180 }).facingCamera).toBe(true)
   })
 
-  it('points the board arrow right for a 90° yaw alignment and back for 180°', () => {
-    expect(arrowTip(flat).x).toBeCloseTo(0, 6)
-    expect(arrowTip({ ...flat, yaw: 90 }).x).toBeGreaterThan(0.1)
-    expect(arrowTip({ ...flat, yaw: 270 }).x).toBeLessThan(-0.1)
-    expect(arrowTip({ ...flat, yaw: 180 }).y).toBeGreaterThan(arrowTip(flat).y)
+  it('keeps the arrow pointing to the front of the quad, whatever the alignment', () => {
+    const forward = renderQuad(level, flat).find((p) => p.part === 'arrow')
+    expect(tip('arrow', flat).x).toBeCloseTo(0, 6)
+    for (const alignment of [{ ...flat, yaw: 90 }, { ...flat, yaw: 180 }, { ...flat, yaw: 315 }, { roll: 180, pitch: 45, yaw: 270 }]) {
+      const arrow = renderQuad(level, alignment).find((p) => p.part === 'arrow')
+      expect(arrow?.points, JSON.stringify(alignment)).toBe(forward?.points)
+      expect(arrow?.facingCamera, JSON.stringify(alignment)).toBe(true)
+    }
   })
 
-  it('paints the arrow on top of the board, whichever way the quad and the board are turned', () => {
+  it('points the board mark right for a 90° yaw alignment and back for 180°', () => {
+    expect(tip('board-mark', flat).x).toBeCloseTo(0, 6)
+    expect(tip('board-mark', { ...flat, yaw: 90 }).x).toBeGreaterThan(0.1)
+    expect(tip('board-mark', { ...flat, yaw: 270 }).x).toBeLessThan(-0.1)
+    expect(tip('board-mark', { ...flat, yaw: 180 }).y).toBeGreaterThan(tip('board-mark', flat).y)
+  })
+
+  it('paints the mark and the arrow on top of the board, whichever way the quad and the board are turned', () => {
     for (let yaw = 0; yaw < 360; yaw += 15) {
       for (const attitude of [{ ...level, yaw }, { roll: 25, pitch: -20, yaw }, { roll: -40, pitch: 35, yaw }]) {
         for (const alignment of [flat, { ...flat, yaw: 90 }, { ...flat, yaw: 180 }, { roll: 0, pitch: 180, yaw: 270 }]) {
           const parts = renderQuad(attitude, alignment).map((p) => p.part)
-          expect(parts.indexOf('arrow'), JSON.stringify({ attitude, alignment })).toBe(parts.indexOf('board') + 1)
+          const at = parts.indexOf('board')
+          expect(parts.slice(at, at + 3), JSON.stringify({ attitude, alignment })).toEqual(['board', 'board-mark', 'arrow'])
         }
       }
     }

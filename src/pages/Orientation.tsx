@@ -103,8 +103,9 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Boa
           <CardHeader>
             <CardTitle>Preview</CardTitle>
             <CardDescription>
-              The board shows your selection; orange props are the front. The quad follows your real one live — after
-              saving, tilt and turn it and check that the model moves the same way.
+              The arrow and the orange props are the front of the quad. The board shows your selection — the small
+              grey mark is where the arrow printed on it points. The quad follows your real one live — after saving,
+              tilt and turn it and check that the model moves the same way.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center gap-3">

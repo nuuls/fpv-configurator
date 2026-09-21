@@ -50,7 +50,7 @@ export function betaflightRotation(roll: number, pitch: number, yaw: number): Ma
 
 // ---- model (body frame, 1 unit ≈ motor distance from centre) ----
 
-export type Part = 'arm' | 'plate' | 'prop-front' | 'prop-rear' | 'board' | 'arrow'
+export type Part = 'arm' | 'plate' | 'prop-front' | 'prop-rear' | 'board' | 'board-mark' | 'arrow'
 
 interface Face {
   part: Part
@@ -61,6 +61,7 @@ interface Face {
 
 const MOTOR = 0.72
 const BOARD_Z = 0.16
+const ARROW_Z = BOARD_Z + 0.002
 
 function bar(from: Vec3, to: Vec3, halfWidth: number): Vec3[] {
   const [dx, dy] = [to[0] - from[0], to[1] - from[1]]
@@ -92,11 +93,13 @@ const MODEL: Face[] = [
   { part: 'prop-rear', onBoard: false, points: ring(-MOTOR, -MOTOR, 0.06, 0.34) },
   { part: 'prop-rear', onBoard: false, points: ring(MOTOR, -MOTOR, 0.06, 0.34) },
   { part: 'board', onBoard: true, points: square(0.24, 0) },
-  // forward-pointing arrow printed on the board
+  // small mark at the edge the board's own printed arrow points to: turns with the alignment
+  { part: 'board-mark', onBoard: true, points: [[0, 0.23, 0.001], [0.05, 0.17, 0.001], [-0.05, 0.17, 0.001]] },
+  // the quad's forward direction, drawn over the board: part of the frame, so it never turns with the alignment
   {
     part: 'arrow',
-    onBoard: true,
-    points: [[0, 0.2, 0.001], [0.13, 0.02, 0.001], [0.05, 0.02, 0.001], [0.05, -0.17, 0.001], [-0.05, -0.17, 0.001], [-0.05, 0.02, 0.001], [-0.13, 0.02, 0.001]],
+    onBoard: false,
+    points: [[0, 0.15, ARROW_Z], [0.12, -0.01, ARROW_Z], [0.045, -0.01, ARROW_Z], [0.045, -0.16, ARROW_Z], [-0.045, -0.16, ARROW_Z], [-0.045, -0.01, ARROW_Z], [-0.12, -0.01, ARROW_Z]],
   },
 ]
 
@@ -148,12 +151,12 @@ export function renderQuad(attitude: { roll: number; pitch: number; yaw: number 
     }
   })
 
-  // The arrow is printed on the board, practically coplanar with it: sorted by its own centroid it would end
-  // up underneath the board whenever its tail is turned away from the camera. It takes the board's depth
-  // instead — the sort is stable and the model lists the board first, so it is painted right after it.
+  // The board mark and the arrow lie (practically) in the board's plane: sorted by their own centroids they
+  // would end up underneath the board whenever they are turned away from the camera. They take the board's
+  // depth instead — the sort is stable and the model lists the board first, so they are painted right after it.
   const boardDepth = polygons.find((p) => p.part === 'board')?.depth
   return polygons
-    .map((p) => (p.part === 'arrow' && boardDepth !== undefined ? { ...p, depth: boardDepth } : p))
+    .map((p) => ((p.part === 'arrow' || p.part === 'board-mark') && boardDepth !== undefined ? { ...p, depth: boardDepth } : p))
     .sort((a, b) => b.depth - a.depth)
 }
 
