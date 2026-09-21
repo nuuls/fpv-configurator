@@ -110,8 +110,8 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Mot
               value={draft.propsOut ? 'out' : 'in'}
               onChange={(e) => setDraft({ ...draft, propsOut: e.target.value === 'out' })}
             >
-              <NativeSelectOption value="in">Props in (default)</NativeSelectOption>
-              <NativeSelectOption value="out">Props out (reversed)</NativeSelectOption>
+              <NativeSelectOption value="out">Props out (default)</NativeSelectOption>
+              <NativeSelectOption value="in">Props in</NativeSelectOption>
             </NativeSelect>
           </CardContent>
         </Card>
@@ -119,6 +119,12 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Mot
         <MotorTest client={client} motorCount={snapshot.motorCount} blocked={dirty || saving} />
       </div>
 
+      {!(draft.bidirDshot && dshot) && (
+        <Notice tone="warning">
+          Bidirectional DShot is off, so the flight controller gets no motor RPM and can&apos;t use RPM filtering.{' '}
+          {dshot ? 'Turn it on unless your ESC firmware doesn’t support it.' : 'It needs a DShot ESC protocol.'}
+        </Notice>
+      )}
       {error && <Notice tone="error">{error}</Notice>}
       <SaveBar
         dirty={dirty}

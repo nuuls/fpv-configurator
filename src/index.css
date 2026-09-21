@@ -25,6 +25,10 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.67 0.16 58);
+  /* chart series (validated for CVD separation against --card, see docs/tabs/rates.md) */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
 }
 
 .dark {
@@ -47,6 +51,9 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.77 0.16 70);
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
 }
 
 @theme inline {

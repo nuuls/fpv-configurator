@@ -152,7 +152,65 @@ describe('PID Tuning tab', () => {
   })
 })
 
+describe('Rates tab', () => {
+  it('shows Actual rates with all axes synced, and one shared curve', async () => {
+    await openTab('Rates')
+    expect(await screen.findByLabelText('Rate type')).toHaveValue('3')
+    expect(screen.getByLabelText('Axes')).toHaveValue('all')
+    expect(screen.getByLabelText('Roll max rate')).toHaveValue(670)
+    expect(screen.getByLabelText('Roll expo')).toHaveValue(0)
+    expect(screen.getByLabelText('Pitch max rate')).toBeDisabled()
+    expect(screen.getByLabelText('Yaw max rate')).toBeDisabled()
+    expect(within(screen.getByRole('list', { name: 'Legend' })).getByText('Roll · Pitch · Yaw')).toBeInTheDocument()
+    expect(screen.getByText('max 670°/s')).toBeInTheDocument()
+  })
+
+  it('syncs edits across axes according to the sync mode and updates the curve', async () => {
+    const user = await openTab('Rates')
+    const rollMax = await screen.findByLabelText('Roll max rate')
+    await user.clear(rollMax)
+    await user.type(rollMax, '800')
+    expect(screen.getByLabelText('Pitch max rate')).toHaveValue(800)
+    expect(screen.getByLabelText('Yaw max rate')).toHaveValue(800)
+    expect(screen.getByText('max 800°/s')).toBeInTheDocument()
+
+    await user.selectOptions(screen.getByLabelText('Axes'), 'roll-pitch')
+    const yawMax = screen.getByLabelText('Yaw max rate')
+    expect(yawMax).toBeEnabled()
+    await user.clear(yawMax)
+    await user.type(yawMax, '500')
+    expect(screen.getByLabelText('Pitch max rate')).toHaveValue(800)
+    const legend = within(screen.getByRole('list', { name: 'Legend' }))
+    expect(legend.getByText('Roll · Pitch')).toBeInTheDocument()
+    expect(legend.getByText('Yaw')).toBeInTheDocument()
+
+    await saveWithoutReboot(user)
+    expect(screen.getByLabelText('Yaw max rate')).toHaveValue(500)
+    expect(screen.getByLabelText('Axes')).toHaveValue('roll-pitch')
+  })
+
+  it('refuses out-of-range values', async () => {
+    const user = await openTab('Rates')
+    const expo = await screen.findByLabelText('Roll expo')
+    await user.clear(expo)
+    await user.type(expo, '1.5')
+    expect(screen.getByText(/Roll expo must be between 0.00 and 1.00/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  })
+})
+
 describe('Motors tab', () => {
+  it('warns while bidirectional DShot is off and offers props out first', async () => {
+    const user = await openTab('Motors')
+    expect(await screen.findByText(/Bidirectional DShot is off/)).toBeInTheDocument()
+    expect(within(screen.getByLabelText('Prop direction')).getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'Props out (default)',
+      'Props in',
+    ])
+    await user.click(screen.getByLabelText('Bidirectional DShot'))
+    expect(screen.queryByText(/Bidirectional DShot is off/)).toBeNull()
+  })
+
   it('saves ESC settings across a reboot', async () => {
     const user = await openTab('Motors')
     expect(await screen.findByLabelText('ESC protocol')).toHaveValue('6')

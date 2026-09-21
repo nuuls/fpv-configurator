@@ -61,7 +61,16 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
 	- TBD
 
 - Rates
-	- TBD
+	- Very simple interface, only one profile
+	- Dropdown for rate type
+		- Actual (default)
+		- ...others (not implemented yet)
+	- 3x3 input matrix
+	- Values can be synced across axis:
+		- Sync all (default)
+		- Sync Picth and Roll
+		- Sync disabled
+	- Graph on the side to show rate curve
 
 - Modes
 	- Copy betaflight design but only keep the following modes:
@@ -72,6 +81,9 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
 
 - Motors
 	- Copy betaflight design
+	- Props out is the default
+	- Bi-directional dshot is enabled by default, mark as warning if its disabled
+
 
 - OSD
 	- TBD

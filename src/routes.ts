@@ -18,8 +18,9 @@ import { ModesPage } from '@/pages/Modes'
 import { MotorsPage } from '@/pages/Motors'
 import { OrientationPage } from '@/pages/Orientation'
 import { PidTuningPage } from '@/pages/PidTuning'
-import { FiltersPage, OsdPage, RatesPage, VtxPage } from '@/pages/placeholders'
+import { FiltersPage, OsdPage, VtxPage } from '@/pages/placeholders'
 import { PortsPage } from '@/pages/Ports'
+import { RatesPage } from '@/pages/Rates'
 import { SetupPage } from '@/pages/Setup'
 
 export interface AppRoute {

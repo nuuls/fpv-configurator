@@ -6,10 +6,6 @@ export function FiltersPage() {
   return <PlaceholderPage title="Filters" description="Gyro and D-term filtering." />
 }
 
-export function RatesPage() {
-  return <PlaceholderPage title="Rates" description="How fast the quad rotates for a given stick movement." />
-}
-
 export function OsdPage() {
   return <PlaceholderPage title="OSD" description="What is shown in your goggles." />
 }

@@ -62,6 +62,8 @@ export interface MockFcConfig {
   /** Raw MSP_ADVANCED_CONFIG payload; byte 3 is the motor protocol. */
   advancedConfig: number[]
   motor: { poles: number; bidirDshot: boolean; mixerMode: number; propsOut: boolean }
+  /** Raw MSP_RC_TUNING payload (24 bytes), see lib/rates/model.ts for the offsets. */
+  rcTuning: number[]
 }
 
 const port = (identifier: number, functionMask = 0): SerialPortConfig => ({
@@ -108,6 +110,8 @@ export function defaultMockConfig(): MockFcConfig {
     // denom 1 · DSHOT300 · pwm rate 480 · idle 550 · ... · debug count 80
     advancedConfig: [1, 1, 0, 6, 0xe0, 0x01, 0x26, 0x02, 0, 0, 0, 0, 48, 125, 0, 0, 0, 1, 0, 80],
     motor: { poles: 14, bidirDshot: false, mixerMode: 3, propsOut: false },
+    // Betaflight defaults: Actual rates, 70 / 670 / 0 on every axis, rate limit 1998, throttle mid 50
+    rcTuning: [7, 0, 67, 67, 67, 0, 50, 0, 0, 0, 0, 7, 7, 0, 0, 100, 0xce, 0x07, 0xce, 0x07, 0xce, 0x07, 3, 0],
   }
 }
 
@@ -299,6 +303,13 @@ export class MockFlightController {
         return EMPTY
       case MSP.CALCULATE_SIMPLIFIED_PID:
         return calculatePids(request)
+
+      case MSP.RC_TUNING:
+        return Uint8Array.from(this.running.rcTuning)
+      case MSP.SET_RC_TUNING:
+        if (request.length < 10) return null
+        this.running.rcTuning = this.running.rcTuning.map((byte, i) => request[i] ?? byte)
+        return EMPTY
 
       case MSP.ADVANCED_CONFIG:
         return Uint8Array.from(this.running.advancedConfig)

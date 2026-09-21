@@ -42,9 +42,9 @@ Mock FC:
 
 On real hardware:
 
-- [ ] With a correct alignment saved: nose down, right side down and turning clockwise each move the model the
-      same way (signs derived from firmware source, **not yet confirmed on a real FC** — the one place to change
-      them is `betaflightRotation()` in `src/lib/orientation/view3d.ts`)
+- [x] With a correct alignment saved: nose down, right side down and turning clockwise each move the model the
+      same way (confirmed by the user on a real FC, 2026-09-21; signs live in `betaflightRotation()` in
+      `src/lib/orientation/view3d.ts`)
 - [ ] Yaw 90° here equals "YAW 90°" in Betaflight Configurator
 
 ## Decisions
