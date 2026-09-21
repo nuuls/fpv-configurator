@@ -167,8 +167,9 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
 
 ## 4. Layout
 
-Header (app name · link to the source code · firmware · connection · Connect / Disconnect) + sidebar tabs +
-page. One sidebar tab per scope item in §2, in this order (single source: `src/routes.ts`):
+Header (app name · link to the source code · alpha warning · firmware · connection · Connect / Disconnect) +
+sidebar tabs + page. The alpha warning is always shown: a big, warning-coloured notice that this is an alpha test
+version and many things are not properly tested yet. One sidebar tab per scope item in §2, in this order (single source: `src/routes.ts`):
 
 Setup · Ports · Orientation · PID Tuning · Filters · Rates · Modes · Motors · ESC · OSD · Analog VTX · Blackbox
 

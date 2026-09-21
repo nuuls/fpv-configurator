@@ -1,4 +1,4 @@
-import { CodeXml, Cpu, Plug, Unplug, Usb } from 'lucide-react'
+import { CodeXml, Cpu, Plug, TriangleAlert, Unplug, Usb } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatFirmware } from '@/lib/format'
@@ -7,6 +7,8 @@ import { useConnectionStore } from '@/stores/connection'
 import { confirmDiscardChanges } from '@/stores/unsaved'
 
 const SOURCE_URL = 'https://github.com/nuuls/fpv-configurator'
+const ALPHA_WARNING =
+  'Test version — many things are not properly tested yet. Use at your own risk.'
 
 export function Header() {
   const status = useConnectionStore((s) => s.status)
@@ -23,7 +25,7 @@ export function Header() {
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b px-4">
-      <div className="flex items-center gap-2 font-semibold">
+      <div className="flex shrink-0 items-center gap-2 font-semibold">
         <Cpu className="size-5 text-primary" />
         FPV Configurator
         {/* AGPL §13: everyone using the app gets offered its source. */}
@@ -39,7 +41,17 @@ export function Header() {
         </a>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div
+        role="alert"
+        title={ALPHA_WARNING}
+        className="flex min-w-0 items-center gap-2 rounded-md bg-warning px-3 py-1.5 text-sm font-semibold text-black"
+      >
+        <TriangleAlert className="size-5 shrink-0" />
+        <span className="shrink-0 text-base font-extrabold tracking-wide uppercase">Alpha</span>
+        <span className="truncate">{ALPHA_WARNING}</span>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-3">
         {status === 'connected' && fcInfo && (
           <>
             <span className="text-sm text-muted-foreground">{formatFirmware(fcInfo)}</span>

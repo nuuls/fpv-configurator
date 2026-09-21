@@ -9,4 +9,9 @@ describe('Header', () => {
     expect(link).toHaveAttribute('href', 'https://github.com/nuuls/fpv-configurator')
     expect(link).toHaveAttribute('target', '_blank')
   })
+
+  it('warns that the app is an alpha version', () => {
+    render(<Header />)
+    expect(screen.getByRole('alert')).toHaveTextContent(/alpha.*not properly tested yet/i)
+  })
 })
