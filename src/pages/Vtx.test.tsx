@@ -74,6 +74,28 @@ describe('Analog VTX tab', () => {
     expect(screen.queryByLabelText('Power level 4 label')).toBeNull()
   })
 
+  it('offers the three low power disarm options and saves the choice, even with an empty table', async () => {
+    const user = await openTab('Analog VTX')
+    const select = await screen.findByLabelText('Low power disarm')
+    expect(select).toHaveDisplayValue('Off')
+    expect(
+      within(select)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['Off', 'On', 'On until first arm'])
+
+    await user.selectOptions(select, 'On until first arm')
+    expect(screen.getByLabelText('Unsaved changes')).toBeInTheDocument()
+    await saveWithoutReboot(user)
+
+    await user.click(screen.getByRole('link', { name: 'Setup' }))
+    await user.click(await screen.findByRole('link', { name: 'Analog VTX' }))
+    expect(await screen.findByLabelText('Low power disarm')).toHaveDisplayValue(
+      'On until first arm',
+    )
+    expect(screen.queryByLabelText('Unsaved changes')).toBeNull()
+  })
+
   it('builds a table by hand, blocks saving while it is invalid, and reverts', async () => {
     const user = await openTab('Analog VTX')
     await user.click(await screen.findByRole('button', { name: 'Add band' }))

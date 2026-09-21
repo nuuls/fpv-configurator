@@ -25,6 +25,13 @@ export const VTX_DEVICE_NAMES: Record<number, string> = {
   5: 'MSP',
 }
 
+/** vtxLowerPowerDisarm_e (io/vtx.h), CLI `vtx_low_power_disarm` = OFF / ON / UNTIL_FIRST_ARM. */
+export const VTX_LOW_POWER_DISARM = [
+  { value: 0, label: 'Off' },
+  { value: 1, label: 'On' },
+  { value: 2, label: 'On until first arm' },
+] as const
+
 export interface VtxConfig {
   deviceType: number
   /** 0 = frequency set directly (`vtx_freq`), otherwise an index into the table. */
@@ -73,6 +80,7 @@ export interface VtxDraft {
   band: number
   channel: number
   power: number
+  lowPowerDisarm: number
   table: VtxTable
 }
 
@@ -233,8 +241,8 @@ const cloneTable = (table: VtxTable): VtxTable => ({
 })
 
 export function readVtx(snapshot: VtxSnapshot): VtxDraft {
-  const { band, channel, power } = snapshot.config
-  return { band, channel, power, table: cloneTable(snapshot.table) }
+  const { band, channel, power, lowPowerDisarm } = snapshot.config
+  return { band, channel, power, lowPowerDisarm, table: cloneTable(snapshot.table) }
 }
 
 export function channelCount(table: VtxTable): number {
@@ -389,12 +397,12 @@ export interface VtxWrites {
 
 /**
  * MSP_SET_VTX_CONFIG first (it sets the table's dimensions and clears it), then every band and power level.
- * Settings this tab doesn't show (pit mode, low power disarm, pit mode frequency) are written back unchanged.
+ * Settings this tab doesn't show (pit mode, pit mode frequency) are written back unchanged.
  */
 export function planVtxWrites(snapshot: VtxSnapshot, draft: VtxDraft): VtxWrites {
   const table = normalizeTable(draft.table)
   const tableChanged = JSON.stringify(table) !== JSON.stringify(normalizeTable(snapshot.table))
-  const { pitMode, lowPowerDisarm, pitModeFrequency, frequency } = snapshot.config
+  const { pitMode, pitModeFrequency, frequency } = snapshot.config
   return {
     config: {
       band: draft.band,
@@ -402,7 +410,7 @@ export function planVtxWrites(snapshot: VtxSnapshot, draft: VtxDraft): VtxWrites
       frequency: draft.band > 0 ? frequencyOf(table, draft.band, draft.channel) : frequency,
       power: draft.power,
       pitMode,
-      lowPowerDisarm,
+      lowPowerDisarm: draft.lowPowerDisarm,
       pitModeFrequency,
       bands: table.bands.length,
       channels: channelCount(table),

@@ -186,14 +186,21 @@ describe('VTX draft logic', () => {
 
   it('leaves the table alone when only the channel or power changed, and keeps hidden settings', () => {
     const snapshot = snapshotOf(unify())
-    const writes = planVtxWrites(snapshot, { ...readVtx(snapshot), band: 4, channel: 2, power: 1 })
+    expect(readVtx(snapshot).lowPowerDisarm).toBe(2)
+    const writes = planVtxWrites(snapshot, {
+      ...readVtx(snapshot),
+      band: 4,
+      channel: 2,
+      power: 1,
+      lowPowerDisarm: 1,
+    })
     expect(writes.config).toEqual({
       band: 4,
       channel: 2,
       frequency: 5760,
       power: 1,
       pitMode: true,
-      lowPowerDisarm: 2,
+      lowPowerDisarm: 1,
       pitModeFrequency: 5584,
       bands: 5,
       channels: 8,
@@ -227,7 +234,7 @@ describe('VTX presets', () => {
     for (const preset of VTX_PRESETS) {
       const { bands, powerLevels } = preset.table
       expect(
-        validateVtx({ band: 0, channel: 0, power: 1, table: preset.table }),
+        validateVtx({ band: 0, channel: 0, power: 1, lowPowerDisarm: 0, table: preset.table }),
         preset.id,
       ).toEqual([])
       expect(bands.length, preset.id).toBeGreaterThan(0)

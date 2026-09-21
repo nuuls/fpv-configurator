@@ -24,6 +24,7 @@ import {
   validateVtx,
   VTX_BAND_NAME_LENGTH,
   VTX_DEVICE_NAMES,
+  VTX_LOW_POWER_DISARM,
   VTX_MAX_BANDS,
   VTX_MAX_FREQUENCY,
   VTX_MAX_POWER_LEVELS,
@@ -173,6 +174,31 @@ function Editor({
                 </NativeSelectOption>
               ))}
             </NativeSelect>
+
+            <label htmlFor="vtx-low-power-disarm" className="self-start pt-2 font-medium">
+              Low power disarm
+            </label>
+            <div className="flex flex-col gap-1.5">
+              <NativeSelect
+                id="vtx-low-power-disarm"
+                value={draft.lowPowerDisarm}
+                onChange={(e) => setDraft({ ...draft, lowPowerDisarm: Number(e.target.value) })}
+              >
+                {!VTX_LOW_POWER_DISARM.some((option) => option.value === draft.lowPowerDisarm) && (
+                  <NativeSelectOption value={draft.lowPowerDisarm}>
+                    Unknown ({draft.lowPowerDisarm})
+                  </NativeSelectOption>
+                )}
+                {VTX_LOW_POWER_DISARM.map((option) => (
+                  <NativeSelectOption key={option.value} value={option.value}>
+                    {option.label}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+              <p className="text-muted-foreground">
+                Transmits at the lowest power level while disarmed, except after a failsafe.
+              </p>
+            </div>
 
             {table.bands.length === 0 && (
               <p className="text-muted-foreground col-span-2">

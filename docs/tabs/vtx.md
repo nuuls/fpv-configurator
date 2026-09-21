@@ -18,6 +18,7 @@ band, channel and power (SPEC §2 "VTX").
 | Band    [RACEBAND (R)     v]     | VTX          [Unify Pro32 HV v]      |
 | Channel [R1 — 5658 MHz    v]     | [Load preset]  Loaded … made for     |
 | Power   [25               v]     |                SmartAudio 2.1 …      |
+| Low power disarm [Off     v]     |                                      |
 +----------------------------------+--------------------------------------+
 | VTX table                                                               |
 | Band       Letter Factory CH1 … CH8                              [bin]  |
@@ -35,6 +36,7 @@ band, channel and power (SPEC §2 "VTX").
 | Band | select | `vtx_band` · `MSP_VTX_CONFIG` / `MSP_SET_VTX_CONFIG` (89) | bands of the table · 4 | `vtx_band = 0` (fixed frequency) on the FC is listed as "Fixed frequency (… MHz)" and kept until a band is picked |
 | Channel | select | `vtx_channel` | channels of the band, "R1 — 5658 MHz" · 1 | Channels with frequency 0 are disabled ("not available") |
 | Power | select | `vtx_power` | labels of the power levels · 1 | |
+| Low power disarm | select | `vtx_low_power_disarm` · same messages | Off (0) / On (1) / On until first arm (2) · Off | Lowest power level while disarmed, except after a failsafe. Works without a table |
 | Manufacturer | select | — (editing aid, not stored) | manufacturers in `presets.ts` | |
 | VTX | select | — | models of that manufacturer, with protocol | |
 | Load preset | button | — | — | Replaces the table in the draft; nothing is written until Save |
@@ -54,7 +56,7 @@ band, channel and power (SPEC §2 "VTX").
 - Removing a band or power level keeps the selection on the same entry (indexes shift).
 - Validation blocks Save: names/labels empty, too long or with spaces; duplicate band letters; frequencies outside
   5000–5999 (0 allowed); selected band/channel missing from a non-empty table; selected power level missing.
-- Pit mode, `vtx_low_power_disarm` and `vtx_pit_mode_freq` are written back unchanged.
+- Pit mode and `vtx_pit_mode_freq` are written back unchanged.
 - Firmware built without `USE_VTX_TABLE`: a notice instead of the editor.
 - Preset values are copied from Betaflight's official presets (`betaflight/firmware-presets`, `presets/4.3/vtx/`).
   Where those offer regional variants, the full table is the default entry and the restricted one is "(EU)".
@@ -62,7 +64,7 @@ band, channel and power (SPEC §2 "VTX").
 
 ## Hidden on purpose
 
-- Pit mode, low power disarm, pit mode frequency, direct frequency entry (`vtx_freq`), the live "current VTX
+- Pit mode, pit mode frequency, direct frequency entry (`vtx_freq`), the live "current VTX
   state" readout, number of channels per band (taken from the table), load/save table as file or clipboard.
 - Digital VTXs (DJI, Walksnail, HDZero) have no presets here — this tab is for analog.
 
@@ -74,6 +76,7 @@ Mock FC (fresh: F1, power 1, empty table, no VTX detected):
 - [x] Manufacturer → only that manufacturer's VTXs; "Load preset" fills bands and power levels, marks the tab unsaved
 - [x] Preset + manual edits (frequency, removed power level) + selection → Save without reboot → shown again
 - [x] A hand-built invalid table blocks Save with a message; Revert restores
+- [x] Low power disarm offers Off / On / On until first arm; the choice is saved without a reboot and shown again
 - [x] Channels a regional table leaves out are disabled; the selection moves to the first available one
 
 On real hardware:
