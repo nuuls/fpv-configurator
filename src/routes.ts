@@ -20,10 +20,10 @@ import { MotorsPage } from '@/pages/Motors'
 import { OrientationPage } from '@/pages/Orientation'
 import { PidTuningPage } from '@/pages/PidTuning'
 import { OsdPage } from '@/pages/Osd'
-import { VtxPage } from '@/pages/placeholders'
 import { PortsPage } from '@/pages/Ports'
 import { RatesPage } from '@/pages/Rates'
 import { SetupPage } from '@/pages/Setup'
+import { VtxPage } from '@/pages/Vtx'
 
 export interface AppRoute {
   path: string
@@ -46,7 +46,7 @@ export const ROUTES: AppRoute[] = [
   { path: '/modes', label: 'Modes', icon: ToggleLeft, component: ModesPage },
   { path: '/motors', label: 'Motors', icon: Fan, component: MotorsPage },
   { path: '/osd', label: 'OSD', icon: MonitorPlay, component: OsdPage },
-  { path: '/vtx', label: 'VTX', icon: Radio, component: VtxPage },
+  { path: '/vtx', label: 'Analog VTX', icon: Radio, component: VtxPage },
   { path: '/blackbox', label: 'Blackbox', icon: HardDrive, component: BlackboxPage },
 ]
 

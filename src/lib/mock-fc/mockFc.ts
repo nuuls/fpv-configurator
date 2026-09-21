@@ -53,6 +53,19 @@ import {
   VIDEO_SYSTEM_NAMES,
 } from '@/lib/osd/model'
 import { PORT_FUNCTION } from '@/lib/ports/model'
+import {
+  decodeSetVtxConfig,
+  decodeVtxBand,
+  decodeVtxPowerLevel,
+  encodeVtxBand,
+  encodeVtxConfig,
+  encodeVtxPowerLevel,
+  VTX_MAX_BANDS,
+  VTX_MAX_CHANNELS,
+  VTX_MAX_POWER_LEVELS,
+  type VtxBand,
+  type VtxPowerLevel,
+} from '@/lib/vtx/model'
 import { ByteReader, ByteWriter } from '@/lib/msp/bytes'
 
 const EMPTY = new Uint8Array(0)
@@ -92,7 +105,26 @@ export interface MockFcConfig {
   rcTuning: number[]
   /** Raw `item_pos` per OSD element and the two timer configs, see lib/osd/model.ts for the bits. */
   osd: { positions: number[]; timers: number[] }
+  vtx: MockVtxConfig
 }
+
+/** Like the firmware: fixed storage for 8 bands and 8 power levels, the counts say how much of it is in use. */
+export interface MockVtxConfig {
+  band: number
+  channel: number
+  power: number
+  frequency: number
+  lowPowerDisarm: number
+  pitModeFrequency: number
+  bandCount: number
+  channelCount: number
+  powerLevelCount: number
+  bands: VtxBand[]
+  powerLevels: VtxPowerLevel[]
+}
+
+const emptyVtxBand = (): VtxBand => ({ name: '', letter: '', isFactory: false, frequencies: new Array<number>(VTX_MAX_CHANNELS).fill(0) })
+const emptyVtxPowerLevel = (): VtxPowerLevel => ({ value: 0, label: '' })
 
 const port = (identifier: number, functionMask = 0): SerialPortConfig => ({
   identifier,
@@ -143,6 +175,20 @@ export function defaultMockConfig(): MockFcConfig {
     // Betaflight defaults: Actual rates, 70 / 670 / 0 on every axis, rate limit 1998, throttle mid 50
     rcTuning: [7, 0, 67, 67, 67, 0, 50, 0, 0, 0, 0, 7, 7, 0, 0, 100, 0xce, 0x07, 0xce, 0x07, 0xce, 0x07, 3, 0],
     osd: defaultOsd(),
+    // Betaflight defaults: F1 (5740 MHz), lowest power, and no VTX table yet
+    vtx: {
+      band: 4,
+      channel: 1,
+      power: 1,
+      frequency: 5740,
+      lowPowerDisarm: 0,
+      pitModeFrequency: 0,
+      bandCount: 0,
+      channelCount: 0,
+      powerLevelCount: 0,
+      bands: Array.from({ length: VTX_MAX_BANDS }, emptyVtxBand),
+      powerLevels: Array.from({ length: VTX_MAX_POWER_LEVELS }, emptyVtxPowerLevel),
+    },
   }
 }
 
@@ -457,6 +503,60 @@ export class MockFlightController {
         this.armingDisabledByMsp = request[0] === 1
         return EMPTY
 
+      case MSP.VTX_CONFIG: {
+        const vtx = this.running.vtx
+        return encodeVtxConfig({
+          deviceType: 0xff, // no VTX connected
+          band: vtx.band,
+          channel: vtx.channel,
+          power: vtx.power,
+          pitMode: false,
+          frequency: vtx.frequency,
+          deviceReady: false,
+          lowPowerDisarm: vtx.lowPowerDisarm,
+          pitModeFrequency: vtx.pitModeFrequency,
+          tableAvailable: true,
+          bands: vtx.bandCount,
+          channels: vtx.channelCount,
+          powerLevels: vtx.powerLevelCount,
+        })
+      }
+      case MSP.SET_VTX_CONFIG:
+        return this.setVtxConfig(request) ? EMPTY : null
+      case MSP.VTXTABLE_BAND: {
+        const index = request[0] ?? 0
+        const band = this.running.vtx.bands[index - 1]
+        if (!band) return null
+        // Fixed-length, space-padded name like the firmware sends it
+        return encodeVtxBand(index, {
+          ...band,
+          name: band.name.padEnd(8),
+          frequencies: band.frequencies.slice(0, this.running.vtx.channelCount),
+        })
+      }
+      case MSP.VTXTABLE_POWERLEVEL: {
+        const index = request[0] ?? 0
+        const level = this.running.vtx.powerLevels[index - 1]
+        return level ? encodeVtxPowerLevel(index, { ...level, label: level.label.padEnd(3) }) : null
+      }
+      case MSP.SET_VTXTABLE_BAND: {
+        const vtx = this.running.vtx
+        const { index, band } = decodeVtxBand(request)
+        if (index < 1 || index > vtx.bandCount) return null
+        const frequencies = Array.from({ length: VTX_MAX_CHANNELS }, (_, i) =>
+          i < vtx.channelCount ? (band.frequencies[i] ?? 0) : 0,
+        )
+        vtx.bands[index - 1] = { ...band, name: band.name.toUpperCase(), letter: band.letter.toUpperCase(), frequencies }
+        if (index === vtx.band) vtx.frequency = frequencies[vtx.channel - 1] ?? 0
+        return EMPTY
+      }
+      case MSP.SET_VTXTABLE_POWERLEVEL: {
+        const { index, level } = decodeVtxPowerLevel(request)
+        if (index < 1 || index > this.running.vtx.powerLevelCount) return null
+        this.running.vtx.powerLevels[index - 1] = { ...level, label: level.label.toUpperCase() }
+        return EMPTY
+      }
+
       case MSP.EEPROM_WRITE:
         this.saved = structuredClone(this.running)
         return EMPTY
@@ -482,6 +582,30 @@ export class MockFlightController {
   private videoSystem(): number {
     const name = this.running.settings['vcd_video_system'] ?? ''
     return Math.max(0, VIDEO_SYSTEM_NAMES.findIndex((n) => n.toUpperCase() === name))
+  }
+
+  /** Like the firmware: selection first, then the table's dimensions and (optionally) a wipe of the table. */
+  private setVtxConfig(request: Uint8Array): boolean {
+    const vtx = this.running.vtx
+    const next = decodeSetVtxConfig(request)
+    const lookedUp = vtx.bands[next.band - 1]?.frequencies[next.channel - 1] ?? 0
+    Object.assign(vtx, {
+      band: next.band,
+      channel: next.channel,
+      frequency: next.band > 0 ? lookedUp : next.frequency,
+      power: next.power,
+      lowPowerDisarm: next.lowPowerDisarm,
+      pitModeFrequency: next.pitModeFrequency,
+    })
+    if (next.bands > VTX_MAX_BANDS || next.channels > VTX_MAX_CHANNELS || next.powerLevels > VTX_MAX_POWER_LEVELS) return false
+    vtx.bandCount = next.bands
+    vtx.channelCount = next.channels
+    vtx.powerLevelCount = next.powerLevels
+    if (next.clearTable) {
+      vtx.bands = Array.from({ length: VTX_MAX_BANDS }, emptyVtxBand)
+      vtx.powerLevels = Array.from({ length: VTX_MAX_POWER_LEVELS }, emptyVtxPowerLevel)
+    }
+    return true
   }
 
   /** Like the firmware: unknown port identifiers fail the whole message. */
