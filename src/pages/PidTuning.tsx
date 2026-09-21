@@ -33,14 +33,14 @@ const SLIDERS = [
     hint: 'D gains. Higher resists overshoot and bounce-back, but makes motors hotter and noisier.',
   },
   {
-    key: 'master',
-    label: 'Master multiplier',
-    hint: 'Scales all gains together. Raise for a heavy or low-powered quad, lower if it oscillates.',
-  },
-  {
     key: 'pitch',
     label: 'Pitch gains',
     hint: 'A second master multiplier for the pitch axis only. Raise if pitch feels looser than roll.',
+  },
+  {
+    key: 'master',
+    label: 'Master multiplier',
+    hint: 'Scales all gains together. Raise for a heavy or low-powered quad, lower if it oscillates.',
   },
 ] as const
 

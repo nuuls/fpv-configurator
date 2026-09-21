@@ -13,8 +13,8 @@ Three sliders and one stick-feel choice. The firmware's own slider math ("simpli
 | Control | Type | Betaflight setting / MSP | Values · default | Notes |
 | ------- | ---- | ------------------------ | ---------------- | ----- |
 | Damping | slider | `simplified_d_gain` · `MSP_SIMPLIFIED_TUNING` (140/141) | 0.50–1.50, step 0.05 · 1.0 | Range widens if the FC's value is outside |
-| Master multiplier | slider | `simplified_master_multiplier` | same | |
 | Pitch gains | slider | `simplified_pitch_pi_gain` + `simplified_roll_pitch_ratio`, both set to the slider value | same | A master multiplier for pitch only, see Decisions |
+| Master multiplier | slider | `simplified_master_multiplier` | same | |
 | Resulting PIDs | view-only table | `MSP_CALCULATE_SIMPLIFIED_PID` (142) | P, I, D, FF per axis | Recalculated by the FC as the sliders move |
 | Stick feel | 3 preset cards | see below | Direct, Light smoothing, Strong smoothing | "Custom" note when the FC matches none |
 

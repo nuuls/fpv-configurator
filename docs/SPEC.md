@@ -47,8 +47,8 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
 	- Show raw numbers as view-only
 	- Only show the following sliders
 		- Damping
-		- Master multiplier
 		- Pitch gains (master multiplier for the pitch axis only)
+		- Master multiplier
 	- Dynamic D is locked at 0 (and not visible)
 	- Other sliders are locked at 1 (and not visible)
 
