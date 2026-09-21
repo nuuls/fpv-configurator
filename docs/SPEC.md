@@ -129,6 +129,7 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
 		- Custom message 1-4
 		- VTX channel (combined mode)
 		- Altitude
+		- GPS elements (satellites, speed, lat/lon, home direction + distance, flight distance, efficiency) — only when a GPS is set up in the Ports tab
 	- Only allow one OSD profile
 	- Remove everything thats on the right in betaflight
 

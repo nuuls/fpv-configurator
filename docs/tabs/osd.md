@@ -28,7 +28,7 @@ Betaflight's OSD tab without its right-hand column: element list on the left, sc
 
 | Control | Type | Betaflight setting / MSP | Values · default | Notes |
 | ------- | ---- | ------------------------ | ---------------- | ----- |
-| Element on/off | toggle × 13 | profile bits 11–13 of `osd_*_pos` · `MSP_OSD_CONFIG` (84) / `MSP_SET_OSD_CONFIG` (85) | firmware: only Warnings on | see element table |
+| Element on/off | toggle × 13 (× 21 with a GPS) | profile bits 11–13 of `osd_*_pos` · `MSP_OSD_CONFIG` (84) / `MSP_SET_OSD_CONFIG` (85) | firmware: only Warnings on | see element table |
 | X / Y | 2 numbers per shown element | bits 0–4 + 10 (x), 5–9 (y) of the same value | 0 … columns−1 / rows−1 | same value the preview edits |
 | Preview | drag & drop, arrow keys on a focused element | — | canvas: the display's size from `MSP_OSD_CANVAS` (189); if that is unset or can't be right: 30×16 (PAL/auto), 30×13 (NTSC), 53×20 (HD) | sample text per element, one character per cell |
 | Hide other elements | button | clears the profile bits of every other element | — | only offered when the FC shows elements this app doesn't manage |
@@ -48,6 +48,20 @@ Elements (firmware index → `osd_item_e`):
 | VTX channel | 10 | `osd_vtx_channel_pos` | `R:1:25` |
 | Altitude | 15 | `osd_altitude_pos` | `12.3m` |
 
+GPS elements — only listed while a GPS is set up in the Ports tab (a UART with the `GPS` function **and** feature
+`GPS`; read with `MSP2_COMMON_SERIAL_CONFIG` + `MSP_FEATURE_CONFIG`, same check as Ports → "GPS: Connected"):
+
+| Element | Index | CLI | Sample |
+| ------- | ----- | --- | ------ |
+| GPS satellites | 14 | `osd_gps_sats_pos` | `SAT14` |
+| GPS speed | 13 | `osd_gps_speed_pos` | `67KPH` |
+| GPS latitude | 24 | `osd_gps_lat_pos` | `N48.2081743` |
+| GPS longitude | 23 | `osd_gps_lon_pos` | `E16.3738189` |
+| Home direction | 30 | `osd_home_dir_pos` | `H^` |
+| Home distance | 31 | `osd_home_dist_pos` | `H120m` |
+| Flight distance | 47 | `osd_flight_dist_pos` | `1.24km` |
+| Efficiency | 58 | `osd_efficiency_pos` | `42mAh/km` |
+
 ## Behaviour
 
 - **Save** (no reboot): one `MSP_SET_OSD_CONFIG` per element whose value changed, then `MSP_EEPROM_WRITE`. The
@@ -64,6 +78,9 @@ Elements (firmware index → `osd_item_e`):
   system "auto" is 13 rows on an MSP displayport or with an NTSC camera, not 16. Only an SD video system with a
   reported canvas wider than 30 columns (HD build without a display) falls back to the video system's size.
 - Dragging keeps the whole sample text on screen; the number fields allow every cell. Out-of-range numbers block Save.
+- **GPS elements** are listed only while a GPS is set up in the Ports tab; without one a short note below the list
+  says so. A GPS element that is switched on while no GPS is set up counts as an "other" element: it shows up in
+  that notice and is only changed by "Hide other elements". They keep their variant bits (coordinate format, …).
 - Elements the firmware doesn't know (shorter `MSP_OSD_CONFIG`, e.g. no custom messages) aren't listed.
 - No OSD in the firmware build → notice instead of the editor. No OSD device detected → warning, still editable.
 
@@ -86,12 +103,15 @@ Mock FC (auto video system → 30 × 16; Warnings and average cell voltage on, p
 - [x] X beyond the last column blocks saving with a message
 - [x] "1 other element (Crosshairs)" notice; Hide + Save clears it on the FC and the notice disappears
 - [x] A digital VTX (Ports tab → HD) gives a 53 × 20 preview
+- [x] No GPS → 13 elements and the note; GPS on UART4 in the Ports tab → 21 elements, GPS satellites switches on
+      at 1, 2 and is saved
 
 On real hardware:
 
 - [ ] Positions match what the goggles show, SD and HD (x ≥ 32 on HD uses the extra bit)
 - [ ] Elements enabled here appear without a reboot
 - [ ] An OSD set up in Betaflight Configurator reads back with the same positions
+- [ ] GPS elements show up in the goggles once the GPS is connected and set up
 
 ## Decisions
 
@@ -100,6 +120,12 @@ On real hardware:
 - Other elements aren't hidden silently: a quad set up elsewhere would lose its OSD on the first save.
 - Timer 2 source is fixed on save rather than exposed: the timers live in the removed right-hand column, and the
   element is specified as "armed time".
+- "The GPS elements" = exactly the eight that the firmware only draws with a GPS sensor (`osdAddActiveElements`:
+  `if (sensors(SENSOR_GPS))`). Not included: the GPS lap timer elements (separate build option and feature),
+  compass bar / heading (work without a GPS) and Altitude, which was already listed (baro or GPS).
+- GPS elements are hidden rather than greyed out without a GPS: the firmware wouldn't draw them anyway, and the list
+  stays short for the many quads without one. Suggested spots: satellites/speed below link quality, home and flight
+  distance below altitude, coordinates bottom centre, efficiency above current draw.
 - Suggested spots: voltage/current bottom left, mAh/VTX bottom right, link quality top left, timer/altitude top
   right, custom messages top centre, Disarmed below centre. Will move to the drone-type defaults once those exist.
 

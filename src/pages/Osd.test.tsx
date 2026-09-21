@@ -74,6 +74,28 @@ describe('OSD tab', () => {
     await waitFor(() => expect(screen.queryByText(/other element/)).toBeNull())
   })
 
+  it('lists the GPS elements only once a GPS is set up in the Ports tab', async () => {
+    const user = await openTab('OSD')
+    expect(await screen.findByText(/GPS elements .* once a GPS is set up in the Ports tab/)).toBeInTheDocument()
+    expect(screen.queryByLabelText('GPS satellites')).toBeNull()
+
+    await user.click(screen.getByRole('link', { name: 'Ports' }))
+    await user.selectOptions(await screen.findByLabelText('GPS'), 'on')
+    await user.selectOptions(screen.getByLabelText('GPS port'), '54')
+    await saveAndReboot(user)
+
+    await user.click(screen.getByRole('link', { name: 'OSD' }))
+    await user.click(await screen.findByLabelText('GPS satellites'))
+    expect(screen.getAllByRole('switch')).toHaveLength(21)
+    expect(screen.queryByText(/once a GPS is set up/)).toBeNull()
+    expect(screen.getByLabelText('GPS satellites X')).toHaveValue(1)
+    expect(screen.getByLabelText('GPS satellites Y')).toHaveValue(2)
+
+    await saveWithoutReboot(user)
+    expect(screen.getByLabelText('GPS satellites')).toBeChecked()
+    expect(within(preview()).getByRole('button', { name: 'GPS satellites, column 1, row 2' })).toHaveTextContent('SAT14')
+  })
+
   it('shows the HD canvas once a digital VTX is set up', async () => {
     const user = await openTab('Ports')
     await user.selectOptions(await screen.findByLabelText('VTX type'), 'msp')

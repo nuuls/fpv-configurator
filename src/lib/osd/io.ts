@@ -1,6 +1,7 @@
-import { saveToEeprom } from '@/lib/msp/api'
+import { readFeatures, readSerialConfig, saveToEeprom } from '@/lib/msp/api'
 import type { MspClient } from '@/lib/msp/client'
 import { MSP } from '@/lib/msp/codes'
+import { configuredGpsPort } from '@/lib/ports/model'
 import {
   canvasFor,
   decodeOsdCanvas,
@@ -16,7 +17,10 @@ export async function readOsdSnapshot(client: MspClient): Promise<OsdSnapshot> {
   const config = decodeOsdConfig(await client.request(MSP.OSD_CONFIG))
   // The size of the display the FC found at boot — also for SD, where "auto" can mean 16 or 13 rows.
   const reported = decodeOsdCanvas(await client.request(MSP.OSD_CANVAS))
-  return { config, canvas: canvasFor(config.videoSystem, reported) }
+  // The GPS elements are only offered with a GPS — the same check the Ports tab shows as "GPS: Connected".
+  const ports = await readSerialConfig(client)
+  const gpsConfigured = configuredGpsPort({ ports, features: await readFeatures(client) }) !== null
+  return { config, canvas: canvasFor(config.videoSystem, reported), gpsConfigured }
 }
 
 /** Writes only what changed, one message per element. Takes effect immediately, no reboot. */

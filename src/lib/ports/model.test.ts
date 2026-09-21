@@ -3,6 +3,7 @@ import { defaultMockConfig } from '@/lib/mock-fc/mockFc'
 import { FEATURE } from '@/lib/msp/messages'
 import {
   PORT_FUNCTION,
+  configuredGpsPort,
   planWrites,
   portName,
   readAssignments,
@@ -82,6 +83,19 @@ describe('readAssignments', () => {
       type: 'other',
       port: UART2,
     })
+  })
+})
+
+describe('configuredGpsPort', () => {
+  it('needs both the GPS port function and the GPS feature', () => {
+    expect(configuredGpsPort(snapshot())).toBeNull()
+    expect(configuredGpsPort(snapshot((s) => void (s.ports[4]!.functionMask = PORT_FUNCTION.GPS)))).toBeNull()
+    expect(configuredGpsPort(snapshot((s) => void (s.features |= FEATURE.GPS)))).toBeNull()
+    const both = snapshot((s) => {
+      s.ports[4]!.functionMask = PORT_FUNCTION.GPS
+      s.features |= FEATURE.GPS
+    })
+    expect(configuredGpsPort(both)).toBe(UART4)
   })
 })
 

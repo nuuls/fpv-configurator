@@ -3,9 +3,11 @@ import { defaultMockConfig, MockFlightController } from '@/lib/mock-fc/mockFc'
 import { sendReboot } from '@/lib/msp/api'
 import { MspClient } from '@/lib/msp/client'
 import { MSP } from '@/lib/msp/codes'
+import { FEATURE } from '@/lib/msp/messages'
+import { PORT_FUNCTION } from '@/lib/ports/model'
 import { MockTransport } from '@/lib/transport/mock'
 import { readOsdSnapshot, saveOsd } from './io'
-import { decodePosition, otherVisibleElements, setElementCell, setElementShown, toDraft, VIDEO_SYSTEM } from './model'
+import { availableElements, decodePosition, otherVisibleElements, setElementCell, setElementShown, toDraft, VIDEO_SYSTEM } from './model'
 
 async function connect(fc = new MockFlightController()) {
   const transport = new MockTransport(fc, 0)
@@ -24,6 +26,22 @@ describe('OSD against the mock FC', () => {
       { index: 21, x: 9, y: 10, shown: true },
     ])
     expect(otherVisibleElements(snapshot)).toEqual([2])
+    expect(snapshot.gpsConfigured).toBe(false)
+    expect(availableElements(snapshot)).toHaveLength(13)
+  })
+
+  it('offers the GPS elements once a GPS is set up, and saves them', async () => {
+    const config = defaultMockConfig()
+    const uart4 = config.ports.find((p) => p.identifier === 54)
+    if (uart4) uart4.functionMask = PORT_FUNCTION.GPS
+    config.features |= FEATURE.GPS
+    const { fc, client } = await connect(new MockFlightController({ config }))
+    const snapshot = await readOsdSnapshot(client)
+    expect(snapshot.gpsConfigured).toBe(true)
+    expect(availableElements(snapshot)).toHaveLength(21)
+
+    await saveOsd(client, snapshot, setElementShown(toDraft(snapshot), 14, true, snapshot.canvas))
+    expect(decodePosition(fc.savedConfig.osd.positions[14] ?? 0)).toEqual({ x: 1, y: 2, profiles: 0b111, variant: 0 })
   })
 
   it('reads the HD canvas when the video system is HD', async () => {

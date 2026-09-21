@@ -118,6 +118,12 @@ export function serialRxProviderName(provider: number): string {
   return SERIALRX_PROVIDER_NAMES[provider] ?? `#${provider}`
 }
 
+/** The UART a GPS is set up on: GPS port function plus the `GPS` feature. Null = no GPS. */
+export function configuredGpsPort({ ports, features }: Pick<PortsSnapshot, 'ports' | 'features'>): number | null {
+  if (!(features & FEATURE.GPS)) return null
+  return ports.find((p) => isSelectablePort(p.identifier) && p.functionMask & PORT_FUNCTION.GPS)?.identifier ?? null
+}
+
 export function readAssignments(snapshot: PortsSnapshot): PortAssignments {
   const ports = snapshot.ports.filter((p) => isSelectablePort(p.identifier))
   const portWith = (mask: number) => ports.find((p) => p.functionMask & mask)?.identifier ?? null
@@ -142,8 +148,7 @@ export function readAssignments(snapshot: PortsSnapshot): PortAssignments {
     vtx = { type, port: vtxPort.identifier }
   }
 
-  const gpsPort = portWith(PORT_FUNCTION.GPS)
-  const gpsEnabled = gpsPort !== null && Boolean(snapshot.features & FEATURE.GPS)
+  const gpsPort = configuredGpsPort(snapshot)
 
   const mspDevices = ports
     .filter((p) => p.functionMask & PORT_FUNCTION.MSP && !(p.functionMask & PORT_FUNCTION.VTX_MSP))
@@ -152,7 +157,7 @@ export function readAssignments(snapshot: PortsSnapshot): PortAssignments {
   return {
     receiver,
     vtx,
-    gps: { enabled: gpsEnabled, port: gpsEnabled ? gpsPort : null },
+    gps: { enabled: gpsPort !== null, port: gpsPort },
     mspDevices,
   }
 }

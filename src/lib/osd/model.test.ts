@@ -30,7 +30,11 @@ const SD = { cols: 30, rows: 16 }
 const HD = { cols: 53, rows: 20 }
 const PILE = encodePosition({ x: 21, y: 10, profiles: 0, variant: 0 })
 
-function snapshotWith(elements: Record<string, number>, overrides: Partial<OsdConfig> = {}): OsdSnapshot {
+function snapshotWith(
+  elements: Record<string, number>,
+  overrides: Partial<OsdConfig> = {},
+  gpsConfigured = false,
+): OsdSnapshot {
   const positions = new Array<number>(88).fill(PILE)
   for (const [name, raw] of Object.entries(elements)) positions[elementIndex(name)] = raw
   const config: OsdConfig = {
@@ -43,14 +47,18 @@ function snapshotWith(elements: Record<string, number>, overrides: Partial<OsdCo
     selectedProfile: 1,
     ...overrides,
   }
-  return { config, canvas: canvasFor(config.videoSystem, { cols: 0, rows: 0 }) }
+  return { config, canvas: canvasFor(config.videoSystem, { cols: 0, rows: 0 }), gpsConfigured }
 }
 
 const shownAt = (x: number, y: number, variant = 0) => encodePosition({ x, y, profiles: 0b111, variant })
 
 describe('OSD elements', () => {
   it('uses the firmware indices of osd_items_e', () => {
-    expect(OSD_ELEMENTS.map((def) => def.index)).toEqual([22, 11, 12, 46, 21, 29, 6, 81, 82, 83, 84, 10, 15])
+    expect(OSD_ELEMENTS.filter((def) => !def.gps).map((def) => def.index)).toEqual([
+      22, 11, 12, 46, 21, 29, 6, 81, 82, 83, 84, 10, 15,
+    ])
+    // GPS_SATS, GPS_SPEED, GPS_LAT, GPS_LON, HOME_DIR, HOME_DIST, FLIGHT_DIST, EFFICIENCY
+    expect(OSD_ELEMENTS.filter((def) => def.gps).map((def) => def.index)).toEqual([14, 13, 24, 23, 30, 31, 47, 58])
     expect(elementName(2)).toBe('Crosshairs')
     expect(elementName(5)).toBe('Timer 1')
     expect(elementName(200)).toBe('Element 200')
@@ -69,6 +77,31 @@ describe('OSD elements', () => {
         }
       }
     }
+  })
+})
+
+describe('GPS elements', () => {
+  const satsShown = { GPS_SATS: encodePosition({ x: 1, y: 2, profiles: 0b001, variant: 0 }) }
+
+  it('are only managed while a GPS is set up', () => {
+    const without = snapshotWith(satsShown)
+    expect(availableElements(without)).toHaveLength(13)
+    expect(toDraft(without).elements.some((el) => el.index === elementIndex('GPS_SATS'))).toBe(false)
+
+    const withGps = snapshotWith(satsShown, {}, true)
+    expect(availableElements(withGps)).toHaveLength(21)
+    expect(toDraft(withGps).elements.find((el) => el.index === elementIndex('GPS_SATS'))).toEqual({
+      index: 14,
+      x: 1,
+      y: 2,
+      shown: true,
+    })
+  })
+
+  it('count as other elements without a GPS, so they are never changed silently', () => {
+    expect(otherVisibleElements(snapshotWith(satsShown))).toEqual([14])
+    expect(otherVisibleElements(snapshotWith(satsShown, {}, true))).toEqual([])
+    expect(planOsdWrites(snapshotWith(satsShown), toDraft(snapshotWith(satsShown)))).toEqual([])
   })
 })
 

@@ -110,6 +110,11 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Osd
                 )
               })}
             </ul>
+            {!snapshot.gpsConfigured && (
+              <p className="mt-4 text-xs text-muted-foreground">
+                GPS elements (satellites, speed, position, home, …) are listed once a GPS is set up in the Ports tab.
+              </p>
+            )}
           </CardContent>
         </Card>
 

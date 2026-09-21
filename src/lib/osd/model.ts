@@ -51,6 +51,8 @@ export interface OsdElementDef {
   /** What the preview draws, one character per cell. */
   sample: string
   hint?: string
+  /** Only drawn by the firmware with a GPS, so only listed when one is set up in the Ports tab. */
+  gps?: boolean
   /** Where the element goes when it is switched on while still on the firmware's default pile. */
   suggest: (canvas: Canvas) => Cell
 }
@@ -67,9 +69,11 @@ const element = (
   hint?: string,
 ): OsdElementDef => ({ index: elementIndex(firmwareName), label, sample, suggest, hint })
 
+const gpsElement = (...args: Parameters<typeof element>): OsdElementDef => ({ ...element(...args), gps: true })
+
 const CUSTOM_MESSAGE_HINT = 'Shows this placeholder until a device (e.g. a Lua script) sends the text.'
 
-/** The elements this app manages, in the order of docs/SPEC.md §2. */
+/** The elements this app manages, in the order of docs/SPEC.md §2; the GPS ones only with a GPS. */
 export const OSD_ELEMENTS: OsdElementDef[] = [
   element('AVG_CELL_VOLTAGE', 'Battery average cell voltage', '3.98V', (c) => ({ x: 1, y: fromBottom(c, 1) })),
   element('CURRENT_DRAW', 'Current draw', '42.0A', (c) => ({ x: 1, y: fromBottom(c, 2) })),
@@ -89,6 +93,15 @@ export const OSD_ELEMENTS: OsdElementDef[] = [
   ),
   element('VTX_CHANNEL', 'VTX channel', 'R:1:25', (c) => ({ x: right(c, 6), y: fromBottom(c, 2) }), 'Band, channel and power.'),
   element('ALTITUDE', 'Altitude', '12.3m', (c) => ({ x: right(c, 5), y: 2 })),
+  // osdAddActiveElements adds exactly these `if (sensors(SENSOR_GPS))`; the lap timer is a separate build option.
+  gpsElement('GPS_SATS', 'GPS satellites', 'SAT14', () => ({ x: 1, y: 2 })),
+  gpsElement('GPS_SPEED', 'GPS speed', '67KPH', () => ({ x: 1, y: 3 })),
+  gpsElement('GPS_LAT', 'GPS latitude', 'N48.2081743', (c) => ({ x: centred(c, 11), y: fromBottom(c, 2) })),
+  gpsElement('GPS_LON', 'GPS longitude', 'E16.3738189', (c) => ({ x: centred(c, 11), y: fromBottom(c, 1) })),
+  gpsElement('HOME_DIR', 'Home direction', 'H^', (c) => ({ x: right(c, 5) - 3, y: 3 }), 'Arrow pointing home.'),
+  gpsElement('HOME_DIST', 'Home distance', 'H120m', (c) => ({ x: right(c, 5), y: 3 })),
+  gpsElement('FLIGHT_DIST', 'Flight distance', '1.24km', (c) => ({ x: right(c, 6), y: 4 })),
+  gpsElement('EFFICIENCY', 'Efficiency', '42mAh/km', (c) => ({ x: 1, y: fromBottom(c, 3) }), 'Battery used per distance.'),
 ]
 
 const VTX_CHANNEL = elementIndex('VTX_CHANNEL')
@@ -263,6 +276,8 @@ export function canvasFor(videoSystem: number, reported: Canvas): Canvas {
 export interface OsdSnapshot {
   config: OsdConfig
   canvas: Canvas
+  /** A GPS is set up in the Ports tab (port function + feature). */
+  gpsConfigured: boolean
 }
 
 export interface ElementDraft extends Cell {
@@ -279,9 +294,11 @@ export interface OsdDraft {
 const selectedProfileBit = (config: OsdConfig) => 1 << (config.selectedProfile - 1)
 const allProfiles = (config: OsdConfig) => (1 << Math.min(config.profileCount, 3)) - 1
 
-/** The managed elements this firmware knows. */
+/** The managed elements this firmware knows; the GPS ones only while a GPS is set up. */
 export function availableElements(snapshot: OsdSnapshot): OsdElementDef[] {
-  return OSD_ELEMENTS.filter((def) => def.index < snapshot.config.positions.length)
+  return OSD_ELEMENTS.filter(
+    (def) => def.index < snapshot.config.positions.length && (!def.gps || snapshot.gpsConfigured),
+  )
 }
 
 export function toDraft(snapshot: OsdSnapshot): OsdDraft {
@@ -296,9 +313,9 @@ export function toDraft(snapshot: OsdSnapshot): OsdDraft {
 }
 
 /** Elements outside this app's list that are switched on in any OSD profile. */
-export function otherVisibleElements({ config }: OsdSnapshot): number[] {
-  const managed = new Set(OSD_ELEMENTS.map((def) => def.index))
-  return config.positions.flatMap((raw, index) => (!managed.has(index) && decodePosition(raw).profiles !== 0 ? [index] : []))
+export function otherVisibleElements(snapshot: OsdSnapshot): number[] {
+  const managed = new Set(availableElements(snapshot).map((def) => def.index))
+  return snapshot.config.positions.flatMap((raw, index) => (!managed.has(index) && decodePosition(raw).profiles !== 0 ? [index] : []))
 }
 
 /**
