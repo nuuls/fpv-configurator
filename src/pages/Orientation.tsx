@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { BoardView } from '@/components/BoardView'
 import { Notice, LoadingState } from '@/components/Notice'
 import { SaveBar } from '@/components/SaveBar'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { useDraft } from '@/hooks/useDraft'
@@ -38,8 +40,14 @@ const toDraft = (alignment: BoardAlignment) => alignment
 function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: BoardAlignment; reload: () => void }) {
   const { draft, setDraft, dirty, revert } = useDraft(snapshot, toDraft)
   const { saving, error, save } = useSave(reload)
-  const attitude = useMspPoll(readAttitude, 50)
+  const attitude = useMspPoll(readAttitude, 40)
   useUnsavedChanges(PATH, dirty)
+
+  // Without a compass the FC's heading starts at an arbitrary value: show yaw relative to where the quad
+  // pointed when the tab was opened (or when "Reset heading" was pressed), nose away from the viewer.
+  const [headingZero, setHeadingZero] = useState<number | null>(null)
+  if (headingZero === null && attitude) setHeadingZero(attitude.yaw)
+  const relative = attitude && { ...attitude, yaw: attitude.yaw - (headingZero ?? attitude.yaw) }
 
   return (
     <>
@@ -79,12 +87,22 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Boa
           <CardHeader>
             <CardTitle>Preview</CardTitle>
             <CardDescription>
-              The board shows your selection. The frame follows the quad live — after saving, tilt the quad and check
-              that the model moves the same way.
+              The board shows your selection; orange props are the front. The quad follows your real one live — after
+              saving, tilt and turn it and check that the model moves the same way.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex justify-center">
-            <BoardView alignment={draft} attitude={attitude} />
+          <CardContent className="flex flex-col items-center gap-3">
+            <BoardView alignment={draft} attitude={relative} />
+            <div className="flex w-full items-center justify-between gap-4 text-sm">
+              <span className="font-mono text-muted-foreground tabular-nums">
+                {attitude
+                  ? `roll ${attitude.roll.toFixed(0)}°  pitch ${attitude.pitch.toFixed(0)}°  heading ${attitude.yaw.toFixed(0)}°`
+                  : 'waiting for attitude…'}
+              </span>
+              <Button variant="outline" size="sm" disabled={!attitude} onClick={() => setHeadingZero(attitude?.yaw ?? null)}>
+                Reset heading
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

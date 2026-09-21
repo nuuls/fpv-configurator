@@ -1,76 +1,85 @@
-import type { CSSProperties } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Attitude } from '@/lib/msp/messages'
 import type { BoardAlignment } from '@/lib/orientation/model'
+import { angleDelta, renderQuad, type Part } from '@/lib/orientation/view3d'
 
-// Sign conventions in one place: flip these if the model moves opposite to the real quad.
-const ROLL_SIGN = 1 // positive roll = right side down
-const PITCH_SIGN = -1 // positive pitch = nose up
-const YAW_SIGN = 1 // positive yaw = clockwise seen from above
+const LEVEL: Attitude = { roll: 0, pitch: 0, yaw: 0 }
 
-const rotation = (roll: number, pitch: number, yaw: number) =>
-  `rotateZ(${YAW_SIGN * yaw}deg) rotateX(${PITCH_SIGN * pitch}deg) rotateY(${ROLL_SIGN * roll}deg)`
+const STYLE: Record<Part, { fill: string; stroke: string }> = {
+  arm: { fill: 'var(--muted-foreground)', stroke: 'none' },
+  plate: { fill: 'var(--muted)', stroke: 'var(--muted-foreground)' },
+  'prop-front': { fill: 'color-mix(in oklab, var(--primary) 18%, transparent)', stroke: 'var(--primary)' },
+  'prop-rear': { fill: 'color-mix(in oklab, var(--muted-foreground) 15%, transparent)', stroke: 'var(--muted-foreground)' },
+  board: { fill: 'var(--card)', stroke: 'var(--primary)' },
+  arrow: { fill: 'var(--primary)', stroke: 'none' },
+}
 
-const preserve3d: CSSProperties = { transformStyle: 'preserve-3d' }
-const ARM: CSSProperties = { position: 'absolute', left: '50%', top: '50%', width: 210, height: 14, marginLeft: -105, marginTop: -7 }
+interface BoardViewProps {
+  /** How the board is mounted (the user's current selection). */
+  alignment: BoardAlignment
+  /** Live attitude from the FC, yaw already relative to the viewer. null = not available yet. */
+  attitude: Attitude | null
+}
 
 /**
- * Dependency-free 3D view (CSS transforms): a quad frame that follows the live attitude, with the
- * flight controller board inside it rotated by the chosen board alignment. Nose points "up" the screen.
+ * 3D preview: the quad follows the live attitude (roll, pitch and yaw), the flight controller board
+ * inside it is rotated by the chosen alignment. Orange props are the front. Rendering is a small
+ * software projection (`lib/orientation/view3d`) drawn as SVG.
  */
-export function BoardView({ alignment, attitude }: { alignment: BoardAlignment; attitude: Attitude | null }) {
-  const live = attitude ?? { roll: 0, pitch: 0, yaw: 0 }
+export function BoardView({ alignment, attitude }: BoardViewProps) {
+  const shown = useSmoothed(attitude ?? LEVEL)
+  const polygons = renderQuad(shown, alignment)
 
   return (
-    <div
+    <svg
       role="img"
       aria-label={`Flight controller rotated yaw ${alignment.yaw}°, roll ${alignment.roll}°, pitch ${alignment.pitch}°`}
-      style={{ perspective: 900, width: 280, height: 240 }}
-      className="flex items-center justify-center"
+      viewBox="-1.45 -1.2 2.9 2.4"
+      className="w-full max-w-md"
     >
-      {/* camera: looking down at the quad from behind */}
-      <div style={{ ...preserve3d, transform: 'rotateX(55deg)' }}>
-        {/* heading is left out on purpose: the nose always points away from the viewer */}
-        <div style={{ ...preserve3d, transform: rotation(live.roll, live.pitch, 0), width: 220, height: 220, position: 'relative' }}>
-          <div className="rounded-full bg-muted-foreground/50" style={{ ...ARM, transform: 'rotateZ(45deg)' }} />
-          <div className="rounded-full bg-muted-foreground/50" style={{ ...ARM, transform: 'rotateZ(-45deg)' }} />
-          {[
-            [18, 18],
-            [162, 18],
-            [18, 162],
-            [162, 162],
-          ].map(([left, top], i) => (
-            <div
-              key={i}
-              className={i < 2 ? 'border-primary/80' : 'border-muted-foreground/60'}
-              style={{ position: 'absolute', left, top, width: 40, height: 40, borderRadius: '50%', borderWidth: 3 }}
-            />
-          ))}
-
-          {/* the flight controller, lifted off the frame so tilts stay visible */}
-          <div
-            style={{
-              ...preserve3d,
-              position: 'absolute',
-              left: 75,
-              top: 75,
-              width: 70,
-              height: 70,
-              transform: `translateZ(18px) ${rotation(alignment.roll, alignment.pitch, alignment.yaw)}`,
-            }}
-          >
-            <div className="flex size-full items-start justify-center rounded-md border-2 border-primary bg-card text-primary shadow-lg">
-              <svg viewBox="0 0 24 24" width="34" height="34" fill="currentColor" aria-hidden="true">
-                <path d="M12 2 5 12h4.5v10h5V12H19z" />
-              </svg>
-            </div>
-            {/* underside, visible when mounted upside down */}
-            <div
-              className="absolute inset-0 rounded-md border-2 border-muted-foreground bg-muted"
-              style={{ transform: 'translateZ(-3px)', backfaceVisibility: 'hidden', rotate: 'y 180deg' }}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
+      {polygons.map(({ part, points, facingCamera }, index) => {
+        // The arrow is printed on the top of the board: invisible from below.
+        if (part === 'arrow' && !facingCamera) return null
+        const underside = part === 'board' && !facingCamera
+        return (
+          <polygon
+            key={index}
+            points={points}
+            fill={underside ? 'var(--muted)' : STYLE[part].fill}
+            stroke={underside ? 'var(--muted-foreground)' : STYLE[part].stroke}
+            strokeWidth={0.015}
+            strokeLinejoin="round"
+          />
+        )
+      })}
+    </svg>
   )
+}
+
+/** Eases towards the latest sample every animation frame, so 20 Hz telemetry doesn't look choppy. */
+function useSmoothed(target: Attitude): Attitude {
+  const [shown, setShown] = useState(target)
+  const latest = useRef(target)
+  useEffect(() => {
+    latest.current = target
+  }, [target])
+
+  useEffect(() => {
+    if (typeof requestAnimationFrame !== 'function') return
+    let frame = requestAnimationFrame(function step() {
+      setShown((current) => {
+        const next = {
+          roll: current.roll + angleDelta(current.roll, latest.current.roll) * 0.35,
+          pitch: current.pitch + angleDelta(current.pitch, latest.current.pitch) * 0.35,
+          yaw: current.yaw + angleDelta(current.yaw, latest.current.yaw) * 0.35,
+        }
+        const settled = Math.abs(next.roll - current.roll) + Math.abs(next.pitch - current.pitch) + Math.abs(next.yaw - current.yaw) < 0.01
+        return settled ? current : next
+      })
+      frame = requestAnimationFrame(step)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [])
+
+  return shown
 }

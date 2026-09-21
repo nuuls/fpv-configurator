@@ -219,7 +219,7 @@ export class MockFlightController {
         return encodeAttitude({
           roll: 25 * Math.sin(t * 0.9),
           pitch: 12 * Math.sin(t * 0.6 + 1),
-          yaw: Math.round((t * 10) % 360),
+          yaw: Math.round((360 + 50 * Math.sin(t * 0.4)) % 360), // sways across the 0/360 wrap
         })
       case MSP.ANALOG:
         return encodeAnalog({

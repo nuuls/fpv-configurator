@@ -2,9 +2,10 @@ const SIZE = 120
 const RADIUS = SIZE / 2
 const PIXELS_PER_DEGREE = 1.2
 
-/** Minimal artificial horizon. Angles in degrees; positive roll = right wing down, positive pitch = nose up. */
+/** Minimal artificial horizon. Betaflight angles in degrees: positive roll = right side down, positive pitch = nose DOWN. */
 export function AttitudeIndicator({ roll, pitch }: { roll: number; pitch: number }) {
-  const pitchOffset = Math.max(-RADIUS, Math.min(RADIUS, pitch * PIXELS_PER_DEGREE))
+  // Nose down (positive pitch) → more ground in view → the horizon moves up the screen.
+  const pitchOffset = Math.max(-RADIUS, Math.min(RADIUS, -pitch * PIXELS_PER_DEGREE))
 
   return (
     <svg
