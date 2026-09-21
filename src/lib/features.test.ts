@@ -172,14 +172,14 @@ describe('pid tuning', () => {
   it('pins the hidden sliders when saving and leaves filter sliders alone', () => {
     const snapshot = withFf(100)
     snapshot.simplified[20] = 77 // a filter slider byte
-    const payload = buildSimplifiedTuning(snapshot, { master: 120, damping: 90, smoothing: 'strong' })
-    expect([...payload.subarray(0, 9)]).toEqual([2, 120, 100, 100, 90, 100, 0, 50, 100])
+    const payload = buildSimplifiedTuning(snapshot, { master: 120, damping: 90, pitch: 110, smoothing: 'strong' })
+    expect([...payload.subarray(0, 9)]).toEqual([2, 120, 110, 100, 90, 100, 0, 50, 110]) // pitch → bytes 2 and 8
     expect(payload[20]).toBe(77)
     expect(payload).toHaveLength(snapshot.simplified.length)
   })
 
   it('keeps a custom feedforward gain unless a preset is picked', () => {
-    expect(buildSimplifiedTuning(withFf(80), { master: 100, damping: 100, smoothing: 'custom' })[7]).toBe(80)
+    expect(buildSimplifiedTuning(withFf(80), { master: 100, damping: 100, pitch: 100, smoothing: 'custom' })[7]).toBe(80)
   })
 
   it('flags default Betaflight tuning as having hidden values (Dynamic D is on)', () => {
@@ -187,20 +187,32 @@ describe('pid tuning', () => {
     expect(hasHiddenTuning({ ...base, simplified: [...buildSimplifiedTuning(base, readTuning(base))] })).toBe(false)
   })
 
+  it('reads Pitch gains from the pitch P/I/FF slider and flags a different pitch D slider as hidden', () => {
+    const pinned = [...buildSimplifiedTuning(base, { ...readTuning(base), pitch: 120 })]
+    expect(readTuning({ ...base, simplified: pinned }).pitch).toBe(120)
+    expect(hasHiddenTuning({ ...base, simplified: pinned })).toBe(false)
+
+    const split = pinned.map((v, i) => (i === 2 ? 90 : v)) // pitch D slider set on its own in Configurator
+    expect(readTuning({ ...base, simplified: split }).pitch).toBe(120)
+    expect(hasHiddenTuning({ ...base, simplified: split })).toBe(true)
+  })
+
   it('only writes smoothing settings when the preset changes', () => {
-    expect(smoothingWrites(withFf(50), { master: 100, damping: 100, smoothing: 'strong' })).toEqual([])
-    expect(smoothingWrites(base, { master: 100, damping: 100, smoothing: 'custom' })).toEqual([])
-    expect(smoothingWrites(base, { master: 100, damping: 100, smoothing: 'direct' })[0]).toEqual({ name: 'rc_smoothing', value: 'OFF' })
+    expect(smoothingWrites(withFf(50), { master: 100, damping: 100, pitch: 100, smoothing: 'strong' })).toEqual([])
+    expect(smoothingWrites(base, { master: 100, damping: 100, pitch: 100, smoothing: 'custom' })).toEqual([])
+    expect(smoothingWrites(base, { master: 100, damping: 100, pitch: 100, smoothing: 'direct' })[0]).toEqual({ name: 'rc_smoothing', value: 'OFF' })
   })
 
   it('previews and saves against the FC', async () => {
     const { fc, transport, client } = await connect()
     const snapshot = await readTuningSnapshot(client)
-    const draft = { master: 120, damping: 100, smoothing: 'light' as const }
+    const draft = { master: 120, damping: 100, pitch: 110, smoothing: 'light' as const }
 
     const pids = await previewPids(client, snapshot, draft)
     expect(pids).toHaveLength(3)
     expect(pids[0]).toMatchObject({ p: 54, d: 36, dMax: 36 }) // 45 × 1.2, Dynamic D off
+    expect(pids[1]).toEqual({ p: 62, i: 111, d: 45, dMax: 45, f: 165 }) // pitch defaults 47/84/34/125 × 1.2 × 1.1
+    expect(pids[2]).toMatchObject({ p: 54, f: 144 }) // yaw: master only
 
     expect(await saveTuning(client, snapshot, draft)).toBe(true) // smoothing changed → reboot
     const after = await readTuningSnapshot(await rebootAndReconnect(fc, transport, client))

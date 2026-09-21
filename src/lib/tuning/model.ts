@@ -1,7 +1,7 @@
 /**
  * Slider-based PID tuning and RC smoothing presets — docs/tabs/pid-tuning.md.
  * The firmware computes the PIDs from the sliders (Betaflight "simplified tuning"); this app only
- * exposes two of them and pins the rest.
+ * exposes three (master, damping, and the two pitch sliders moved as one) and pins the rest.
  */
 import { ByteReader } from '@/lib/msp/bytes'
 import type { SettingWrite } from '@/lib/ports/model'
@@ -10,12 +10,14 @@ import type { SettingWrite } from '@/lib/ports/model'
 const OFFSET = {
   MODE: 0,
   MASTER: 1,
+  /** `simplified_roll_pitch_ratio`: multiplies D and D max on pitch only ("Pitch damping"). */
   ROLL_PITCH_RATIO: 2,
   I_GAIN: 3,
   D_GAIN: 4,
   PI_GAIN: 5,
   D_MAX_GAIN: 6,
   FEEDFORWARD_GAIN: 7,
+  /** `simplified_pitch_pi_gain`: multiplies P, I and FF on pitch only ("Pitch tracking"). */
   PITCH_PI_GAIN: 8,
 } as const
 const PID_SLIDER_BYTES = 9 + 8 // sliders + two reserved u32
@@ -25,11 +27,9 @@ const PIDS_MODE_RPY = 2
 /** Sliders the user never sees and the value they are pinned to (SPEC §2 "PID Tuning"). */
 const LOCKED: [offset: number, value: number][] = [
   [OFFSET.MODE, PIDS_MODE_RPY],
-  [OFFSET.ROLL_PITCH_RATIO, 100],
   [OFFSET.I_GAIN, 100],
   [OFFSET.PI_GAIN, 100],
   [OFFSET.D_MAX_GAIN, 0],
-  [OFFSET.PITCH_PI_GAIN, 100],
 ]
 
 export const SLIDER_STEP = 5
@@ -90,6 +90,8 @@ export interface TuningDraft {
   /** Percent, 100 = 1.0 */
   master: number
   damping: number
+  /** Pitch gains: written to both pitch sliders, so it scales every pitch gain like the master does. */
+  pitch: number
   smoothing: SmoothingPreset | 'custom'
 }
 
@@ -138,13 +140,17 @@ export function readTuning(snapshot: TuningSnapshot): TuningDraft {
   return {
     master: snapshot.simplified[OFFSET.MASTER] ?? 100,
     damping: snapshot.simplified[OFFSET.D_GAIN] ?? 100,
+    pitch: snapshot.simplified[OFFSET.PITCH_PI_GAIN] ?? 100,
     smoothing: detectSmoothing(snapshot),
   }
 }
 
 /** True when the FC has slider values this app pins (or sliders off): saving will reset them. */
 export function hasHiddenTuning(snapshot: TuningSnapshot): boolean {
-  return LOCKED.some(([offset, value]) => snapshot.simplified[offset] !== value)
+  const { simplified } = snapshot
+  // The Pitch gains slider shows the pitch P/I/FF slider; a different pitch D slider gets overwritten with it.
+  if (simplified[OFFSET.ROLL_PITCH_RATIO] !== simplified[OFFSET.PITCH_PI_GAIN]) return true
+  return LOCKED.some(([offset, value]) => simplified[offset] !== value)
 }
 
 /** Slider range, widened if the FC's current value lies outside the normal one. */
@@ -158,6 +164,8 @@ export function buildSimplifiedTuning(snapshot: TuningSnapshot, draft: TuningDra
   for (const [offset, value] of LOCKED) payload[offset] = value
   payload[OFFSET.MASTER] = draft.master
   payload[OFFSET.D_GAIN] = draft.damping
+  payload[OFFSET.ROLL_PITCH_RATIO] = draft.pitch
+  payload[OFFSET.PITCH_PI_GAIN] = draft.pitch
   if (draft.smoothing !== 'custom') payload[OFFSET.FEEDFORWARD_GAIN] = SMOOTHING_PRESETS[draft.smoothing].feedforwardGain
   return payload
 }

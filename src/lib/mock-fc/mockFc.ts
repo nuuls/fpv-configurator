@@ -683,18 +683,22 @@ export class MockFlightController {
 
 /** Rough stand-in for the firmware's slider math; enough for the preview to react sensibly. */
 function calculatePids(sliders: Uint8Array): Uint8Array {
-  const [, master = 100, , iGain = 100, dGain = 100, piGain = 100, dMaxGain = 100, ffGain = 100] = sliders
+  const [, master = 100, pitchDGain = 100, iGain = 100, dGain = 100, piGain = 100, dMaxGain = 100, ffGain = 100] = sliders
+  const pitchPiGain = sliders[8] ?? 100
   const scale = (base: number, ...percents: number[]) =>
     Math.min(250, Math.round(percents.reduce((value, percent) => (value * percent) / 100, base)))
 
   const w = new ByteWriter()
-  for (const [p, i, d, dMax, f] of BASE_PIDS) {
-    const dTerm = scale(d, master, dGain)
-    w.u8(scale(p, master, piGain))
-      .u8(scale(i, master, piGain, iGain))
+  for (const [axis, [p, i, d, dMax, f]] of BASE_PIDS.entries()) {
+    // simplified_tuning.c: the two pitch sliders multiply the pitch axis only — PI gain P/I/F, the ratio D/D max
+    const pitchPi = axis === 1 ? pitchPiGain : 100
+    const pitchD = axis === 1 ? pitchDGain : 100
+    const dTerm = scale(d, master, dGain, pitchD)
+    w.u8(scale(p, master, piGain, pitchPi))
+      .u8(scale(i, master, piGain, iGain, pitchPi))
       .u8(dTerm)
-      .u8(dMaxGain === 0 ? dTerm : scale(dMax, master, dGain))
-      .u16(scale(f, master, ffGain))
+      .u8(dMaxGain === 0 ? dTerm : scale(dMax, master, dGain, pitchD))
+      .u16(scale(f, master, ffGain, pitchPi))
   }
   return w.toBytes()
 }

@@ -1,5 +1,5 @@
 /** Acceptance checks for the Setup, Blackbox, Orientation, Modes, PID Tuning and Motors tabs (docs/tabs/*.md). */
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { nudge, openTab, resetAppAfterEach, saveAndReboot, saveWithoutReboot } from '@/test/app'
 
@@ -124,15 +124,29 @@ describe('Modes tab', () => {
 })
 
 describe('PID Tuning tab', () => {
-  it('shows two sliders, a live PID preview and warns about hidden tuning', async () => {
+  it('shows three sliders, a live PID preview and warns about hidden tuning', async () => {
     const user = await openTab('PID Tuning')
-    expect(await screen.findAllByRole('slider')).toHaveLength(2)
+    expect(await screen.findAllByRole('slider')).toHaveLength(3)
     expect(screen.getByText(/Saving resets those/)).toBeInTheDocument()
     expect(await screen.findAllByRole('cell', { name: '45' })).toHaveLength(2) // roll + yaw P at 1.0
 
     await nudge(user, within(screen.getByLabelText('Master multiplier')).getByRole('slider'), '{ArrowRight}{ArrowRight}')
     expect(screen.getByText('1.10')).toBeInTheDocument()
     expect(await screen.findAllByRole('cell', { name: '50' })).toHaveLength(2) // 45 × 1.1
+  })
+
+  it('Pitch gains scales the pitch row only and persists', async () => {
+    const user = await openTab('PID Tuning')
+    const pitchRow = () => within(screen.getByRole('row', { name: /^Pitch/ })).getAllByRole('cell')
+    await waitFor(() => expect(pitchRow().map((cell) => cell.textContent)).toEqual(['47', '84', '34', '125']))
+
+    await nudge(user, within(screen.getByLabelText('Pitch gains')).getByRole('slider'), '{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}')
+    expect(screen.getByText('1.20')).toBeInTheDocument()
+    await waitFor(() => expect(pitchRow().map((cell) => cell.textContent)).toEqual(['56', '101', '41', '150'])) // × 1.2
+    expect(screen.getAllByRole('cell', { name: '45' })).toHaveLength(2) // roll + yaw P untouched
+
+    await saveWithoutReboot(user)
+    expect(screen.getByText('1.20')).toBeInTheDocument()
   })
 
   it('saves sliders without a reboot and a smoothing preset with one', async () => {

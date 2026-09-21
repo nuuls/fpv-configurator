@@ -37,6 +37,11 @@ const SLIDERS = [
     label: 'Master multiplier',
     hint: 'Scales all gains together. Raise for a heavy or low-powered quad, lower if it oscillates.',
   },
+  {
+    key: 'pitch',
+    label: 'Pitch gains',
+    hint: 'A second master multiplier for the pitch axis only. Raise if pitch feels looser than roll.',
+  },
 ] as const
 
 /** Spec: docs/tabs/pid-tuning.md */
@@ -44,7 +49,7 @@ export function PidTuningPage() {
   const { client, snapshot, error, reload } = useFcSnapshot(readTuningSnapshot)
   return (
     <>
-      <PageHeader title="PID Tuning" description="Two sliders and a stick-feel preset. The rest is handled for you." />
+      <PageHeader title="PID Tuning" description="Three sliders and a stick-feel preset. The rest is handled for you." />
       {client && snapshot ? <Editor client={client} snapshot={snapshot} reload={reload} /> : <LoadingState error={error} />}
     </>
   )
@@ -178,12 +183,12 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Tun
 /** Asks the FC for the PIDs the draft would produce, a moment after the sliders stop moving. */
 function usePidPreview(client: MspClient, snapshot: TuningSnapshot, draft: TuningDraft): AxisPids[] | null {
   const [pids, setPids] = useState<AxisPids[] | null>(null)
-  const { master, damping, smoothing } = draft
+  const { master, damping, pitch, smoothing } = draft
 
   useEffect(() => {
     let cancelled = false
     const timer = setTimeout(() => {
-      previewPids(client, snapshot, { master, damping, smoothing }).then(
+      previewPids(client, snapshot, { master, damping, pitch, smoothing }).then(
         (result) => !cancelled && setPids(result),
         () => {}, // keep the last preview; connection problems surface elsewhere
       )
@@ -192,7 +197,7 @@ function usePidPreview(client: MspClient, snapshot: TuningSnapshot, draft: Tunin
       cancelled = true
       clearTimeout(timer)
     }
-  }, [client, snapshot, master, damping, smoothing])
+  }, [client, snapshot, master, damping, pitch, smoothing])
 
   return pids
 }
