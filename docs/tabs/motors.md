@@ -18,9 +18,9 @@ Set up the ESC link and check that every motor spins the right way.
 | Prop direction | select | `yaw_motors_reversed` · `MSP_MIXER_CONFIG` (42/43) | **Props out**, Props in | |
 | Dynamic idle | slider with zone band | `dyn_idle_min_rpm` (×100 rpm) · read `MSP_PID_ADVANCED` (94) byte 49, written by name via `MSP2_CLI_SETTING` | 12–40 · FC value | Zones per drone type, see below. Disabled without bidirectional DShot (it needs RPM data). FC value 0 is shown as "Off" |
 | Motor test enable | switch | `MSP_SET_ARMING_DISABLED` (99) | off | "I have removed all propellers" |
-| Motor 1–4 | vertical sliders on a 2D quad seen from above | `MSP_SET_MOTOR` (214) | 1000–1300 | Each motor sits where it is on the quad (4 front-left, 2 front-right, 3 rear-left, 1 rear-right), with the expected spin direction (CW/CCW, from the saved prop direction); the pod turns red and its arrow spins while driven |
+| Motor 1–4 | vertical sliders on a 2D quad seen from above | `MSP_SET_MOTOR` (214) | 1000–1300 | Each motor sits where it is on the quad (4 front-left, 2 front-right, 3 rear-left, 1 rear-right). Minimal text: the prop disc's rim carries arrows for the expected spin direction (from the saved prop direction) and rotates that way, in red, while the motor is driven; the motor number is a small badge; the arrow on the body marks the front |
 | All motors | slider | same | 1000–1300 | |
-| Reported RPM | readout per motor | `MSP_MOTOR_TELEMETRY` (139) @ 10 Hz | rpm | "— rpm" plus a hint while bidirectional DShot is off |
+| Reported RPM | the single readout inside each prop disc | `MSP_MOTOR_TELEMETRY` (139) @ 10 Hz | rpm | Without bidirectional DShot the disc shows the output value instead, plus one hint line under the drawing. The output value is otherwise in the hover title and the "All motors" readout |
 
 Dynamic idle zones (`DYN_IDLE_ZONES` in `src/lib/motors/model.ts`). Status is always icon + text, never colour alone:
 

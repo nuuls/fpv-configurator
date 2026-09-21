@@ -246,8 +246,13 @@ describe('Motors tab', () => {
   it('shows the quad from above with spin directions and live RPM once bidirectional DShot is on', async () => {
     const user = await openTab('Motors')
     expect(await screen.findByText('RPM readout needs bidirectional DShot.')).toBeInTheDocument()
-    expect(screen.getAllByText('— rpm')).toHaveLength(4)
-    expect(screen.getAllByText('CW')).toHaveLength(2) // props in on the mock: motors 1 and 4
+    // props in on the mock: motors 1 and 4 turn clockwise, 2 and 3 counter-clockwise
+    expect(screen.getAllByRole('img', { name: /spins clockwise/ }).map((ring) => ring.getAttribute('aria-label'))).toEqual([
+      'Motor 4 spins clockwise',
+      'Motor 1 spins clockwise',
+    ])
+    expect(screen.getAllByRole('img', { name: /spins counter-clockwise/ })).toHaveLength(2)
+    expect(screen.queryByText(/rpm$/)).toBeNull()
 
     await user.click(screen.getByLabelText('Bidirectional DShot'))
     await saveAndReboot(user)

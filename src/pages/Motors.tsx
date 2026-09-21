@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CircleCheck, OctagonAlert, RotateCcw, RotateCw, TriangleAlert } from 'lucide-react'
+import { CircleCheck, OctagonAlert, TriangleAlert } from 'lucide-react'
 import { Notice, LoadingState } from '@/components/Notice'
 import { SaveBar } from '@/components/SaveBar'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -44,11 +44,11 @@ import { cn } from '@/lib/utils'
 const PATH = '/motors'
 
 /** Betaflight Quad X as seen from above, nose up: 4 front-left, 2 front-right, 3 rear-left, 1 rear-right. */
-const QUAD_POSITIONS: { motor: number; className: string }[] = [
-  { motor: 4, className: 'left-0 top-0' },
-  { motor: 2, className: 'right-0 top-0' },
-  { motor: 3, className: 'left-0 bottom-0' },
-  { motor: 1, className: 'right-0 bottom-0' },
+const QUAD_POSITIONS: { motor: number; className: string; badge: string }[] = [
+  { motor: 4, className: 'left-0 top-0', badge: 'left-[8%] top-[8%]' },
+  { motor: 2, className: 'right-0 top-0', badge: 'right-[8%] top-[8%]' },
+  { motor: 3, className: 'left-0 bottom-0', badge: 'left-[8%] bottom-[8%]' },
+  { motor: 1, className: 'right-0 bottom-0', badge: 'right-[8%] bottom-[8%]' },
 ]
 
 /** Until drone types exist (SPEC §2), every quad is treated as a 5". */
@@ -277,42 +277,35 @@ function MotorTest({ client, snapshot, blocked }: { client: MspClient; snapshot:
 
         {count === 4 ? (
           <div className="relative mx-auto aspect-square w-full max-w-sm">
-            {/* frame seen from above, nose up */}
+            {/* frame seen from above; the arrow on the body points to the front */}
             <svg viewBox="0 0 100 100" className="absolute inset-0 size-full text-muted-foreground" aria-hidden="true">
-              <path d="M22 22 78 78M78 22 22 78" stroke="currentColor" strokeWidth={4} strokeLinecap="round" opacity={0.5} />
-              <rect x={40} y={38} width={20} height={24} rx={3} fill="var(--card)" stroke="currentColor" strokeWidth={1.5} />
-              <path d="m50 41 4 6h-8z" fill="var(--primary)" />
-              <text x={50} y={33} textAnchor="middle" fontSize={3.2} letterSpacing={0.4} fill="currentColor">
-                FRONT
-              </text>
+              <path d="M20 20 80 80M80 20 20 80" stroke="currentColor" strokeWidth={5} strokeLinecap="round" opacity={0.45} />
+              <rect x={41} y={37} width={18} height={26} rx={3} fill="var(--card)" stroke="currentColor" strokeWidth={1.5} />
+              <path d="m50 40 5 8h-3v9h-4v-9h-3z" fill="var(--primary)" />
             </svg>
 
-            {QUAD_POSITIONS.map(({ motor, className }) => {
-              const spinning = (values[motor - 1] ?? MOTOR_STOP) > MOTOR_STOP && active
+            {QUAD_POSITIONS.map(({ motor, className, badge }) => {
+              const output = values[motor - 1] ?? MOTOR_STOP
+              const spinning = output > MOTOR_STOP && active
               const clockwise = spinsClockwise(motor, snapshot.propsOut)
-              const Spin = clockwise ? RotateCw : RotateCcw
               return (
                 <div
                   key={motor}
-                  className={cn(
-                    'absolute flex aspect-square w-[44%] flex-col items-center justify-center gap-1 rounded-full border-2 bg-card',
-                    className,
-                    spinning ? 'border-destructive' : 'border-border',
-                  )}
+                  title={`Motor ${motor} · output ${output}`}
+                  className={cn('absolute flex aspect-square w-[40%] flex-col items-center justify-center gap-1.5', className)}
                 >
-                  <div className="flex items-center gap-1.5 text-xs font-medium">
-                    Motor {motor}
-                    <span
-                      className="flex items-center gap-0.5 text-muted-foreground"
-                      title={`Should spin ${clockwise ? 'clockwise' : 'counter-clockwise'} seen from above`}
-                    >
-                      <Spin className={cn('size-3.5', spinning && 'animate-spin', spinning && !clockwise && '[animation-direction:reverse]')} />
-                      {clockwise ? 'CW' : 'CCW'}
-                    </span>
-                  </div>
+                  <SpinRing motor={motor} clockwise={clockwise} spinning={spinning} />
+                  <span
+                    className={cn(
+                      'absolute flex size-5 items-center justify-center rounded-full text-xs font-semibold',
+                      badge,
+                      spinning ? 'bg-destructive text-white' : 'bg-muted text-foreground',
+                    )}
+                  >
+                    {motor}
+                  </span>
                   {motorSlider(motor, true)}
-                  <div className="font-mono text-xs tabular-nums">{values[motor - 1] ?? MOTOR_STOP}</div>
-                  <div className="font-mono text-xs text-muted-foreground tabular-nums">{rpmText(motor)}</div>
+                  <div className="relative font-mono text-xs tabular-nums">{hasRpm ? `${telemetry?.[motor - 1]?.rpm ?? 0} rpm` : output}</div>
                 </div>
               )
             })}
@@ -419,5 +412,56 @@ function DynamicIdle({ value, enabled, onChange }: { value: number; enabled: boo
           : 'Needs bidirectional DShot: the flight controller has to know the motor RPM.'}
       </p>
     </div>
+  )
+}
+
+/** Two arrows at `degrees` apart on a circle of radius R around (50, 50), pointing clockwise. */
+const RING_RADIUS = 46
+const RING_ARCS = [-150, 30].map((startDegrees) => {
+  const point = (degrees: number, radius = RING_RADIUS) => {
+    const a = (degrees * Math.PI) / 180
+    return [50 + radius * Math.cos(a), 50 + radius * Math.sin(a)] as const
+  }
+  const endDegrees = startDegrees + 95
+  const [sx, sy] = point(startDegrees)
+  const [ex, ey] = point(endDegrees)
+  // arrowhead: tip a little further along the circle, base straddling the rim
+  const [tx, ty] = point(endDegrees + 9)
+  const [ax, ay] = point(endDegrees, RING_RADIUS - 4.5)
+  const [bx, by] = point(endDegrees, RING_RADIUS + 4.5)
+  return {
+    arc: `M${sx} ${sy}A${RING_RADIUS} ${RING_RADIUS} 0 0 1 ${ex} ${ey}`,
+    head: `${tx},${ty} ${ax},${ay} ${bx},${by}`,
+  }
+})
+
+/**
+ * The prop disc. Its rim carries the arrows for the direction the motor should spin (seen from above)
+ * and turns that way while the motor is driven — no labels needed.
+ */
+function SpinRing({ motor, clockwise, spinning }: { motor: number; clockwise: boolean; spinning: boolean }) {
+  return (
+    <svg
+      role="img"
+      aria-label={`Motor ${motor} spins ${clockwise ? 'clockwise' : 'counter-clockwise'}`}
+      viewBox="0 0 100 100"
+      className={cn(
+        'absolute inset-0 size-full',
+        spinning ? 'text-destructive' : 'text-muted-foreground',
+        spinning && 'animate-spin [animation-duration:1.2s]',
+        spinning && !clockwise && '[animation-direction:reverse]',
+      )}
+    >
+      <circle cx={50} cy={50} r={RING_RADIUS} fill="var(--card)" stroke="var(--border)" strokeWidth={2} />
+      {/* drawn clockwise; mirrored for counter-clockwise motors */}
+      <g transform={clockwise ? undefined : 'translate(100 0) scale(-1 1)'}>
+        {RING_ARCS.map(({ arc, head }) => (
+          <g key={arc}>
+            <path d={arc} fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" />
+            <polygon points={head} fill="currentColor" />
+          </g>
+        ))}
+      </g>
+    </svg>
   )
 }
