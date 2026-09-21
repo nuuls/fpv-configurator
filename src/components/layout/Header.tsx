@@ -1,10 +1,12 @@
-import { Cpu, Plug, Unplug, Usb } from 'lucide-react'
+import { CodeXml, Cpu, Plug, Unplug, Usb } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatFirmware } from '@/lib/format'
 import { WebSerialTransport } from '@/lib/transport/webserial'
 import { useConnectionStore } from '@/stores/connection'
 import { confirmDiscardChanges } from '@/stores/unsaved'
+
+const SOURCE_URL = 'https://github.com/nuuls/fpv-configurator'
 
 export function Header() {
   const status = useConnectionStore((s) => s.status)
@@ -24,6 +26,17 @@ export function Header() {
       <div className="flex items-center gap-2 font-semibold">
         <Cpu className="size-5 text-primary" />
         FPV Configurator
+        {/* AGPL §13: everyone using the app gets offered its source. */}
+        <a
+          href={SOURCE_URL}
+          target="_blank"
+          rel="noreferrer"
+          title="Source code — free software under the GNU AGPL 3.0 or later"
+          className="ml-2 flex items-center gap-1 text-xs font-normal text-muted-foreground hover:text-foreground"
+        >
+          <CodeXml className="size-3.5" />
+          Source
+        </a>
       </div>
 
       <div className="flex items-center gap-3">

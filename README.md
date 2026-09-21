@@ -68,7 +68,9 @@ WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FI
 Why AGPL: it is the one license under which code from **all** of the projects above can be combined. AGPL-3.0 code
 (ESC Configurator) can only be re-used in an AGPL-3.0 work, and section 13 of both licenses explicitly allows
 combining GPL-3.0 code with it. Parts taken from a GPL-3.0 project stay available under GPL-3.0; the app as a whole
-is AGPL-3.0. When copying code, keep the original copyright notice and name the source in a comment.
+is AGPL-3.0. When copying code, keep the original copyright notice and name the source in a comment. The AGPL also
+wants everyone using the app to be offered its source: that is the **Source** link in the header — point it at your
+repository if you host a modified version.
 
 Code can **not** be taken from projects without a license (e.g. `am32-firmware/am32-configurator` at the time of
 writing) or with an incompatible one — use those as a reference for behaviour only.
