@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Notice, LoadingState } from '@/components/Notice'
+import { NumberInput } from '@/components/NumberInput'
 import { RateCurveChart } from '@/components/RateCurveChart'
 import { SaveBar } from '@/components/SaveBar'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -129,18 +130,17 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Rat
                         const scale = field === 'expo' ? 100 : 1
                         return (
                           <td key={field}>
-                            <input
-                              type="number"
+                            <NumberInput
                               aria-label={`${axisName} ${FIELD_LABELS[field].toLowerCase()}`}
                               min={min / scale}
                               max={max / scale}
                               step={step / scale}
                               disabled={followers.includes(axis)}
                               value={(draft.axes[axis]?.[field] ?? 0) / scale}
-                              onChange={(e) =>
+                              onValueChange={(value) =>
                                 setDraft({
                                   ...draft,
-                                  axes: editAxis(draft.axes, sync, axis, field, Math.round(Number(e.target.value) * scale)),
+                                  axes: editAxis(draft.axes, sync, axis, field, Math.round(value * scale)),
                                 })
                               }
                               className="h-9 w-full min-w-20 rounded-md border bg-transparent px-3 tabular-nums disabled:opacity-50 dark:bg-input/30"

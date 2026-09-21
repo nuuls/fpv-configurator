@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { CircleCheck, OctagonAlert, TriangleAlert } from 'lucide-react'
 import { Notice, LoadingState } from '@/components/Notice'
+import { NumberInput } from '@/components/NumberInput'
 import { SaveBar } from '@/components/SaveBar'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -115,14 +116,13 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Mot
               Motor poles
             </label>
             <div className="flex items-center gap-3">
-              <input
+              <NumberInput
                 id="motor-poles"
-                type="number"
                 min={4}
                 max={40}
                 step={2}
                 value={draft.poles}
-                onChange={(e) => setDraft({ ...draft, poles: Number(e.target.value) })}
+                onValueChange={(poles) => setDraft({ ...draft, poles })}
                 className="h-9 w-20 rounded-md border bg-transparent px-3 dark:bg-input/30"
               />
               <span className="text-muted-foreground">Magnets on the motor bell. 14 for most 5&quot;, 12 for most whoops.</span>

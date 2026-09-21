@@ -189,6 +189,21 @@ describe('Rates tab', () => {
     expect(screen.getByLabelText('Axes')).toHaveValue('roll-pitch')
   })
 
+  it('lets a field be cleared and retyped, keeping the last value if it is left empty', async () => {
+    const user = await openTab('Rates')
+    const rollMax = await screen.findByLabelText('Roll max rate')
+    await user.clear(rollMax)
+    expect(rollMax).toHaveValue(null) // no 0 sneaking in
+    expect(screen.getByLabelText('Pitch max rate')).toHaveValue(670)
+    await user.type(rollMax, '5')
+    expect(rollMax).toHaveValue(5)
+    expect(screen.getByLabelText('Pitch max rate')).toHaveValue(5)
+
+    await user.clear(rollMax)
+    await user.tab()
+    expect(rollMax).toHaveValue(5)
+  })
+
   it('refuses out-of-range values', async () => {
     const user = await openTab('Rates')
     const expo = await screen.findByLabelText('Roll expo')
