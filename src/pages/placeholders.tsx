@@ -6,10 +6,6 @@ export function FiltersPage() {
   return <PlaceholderPage title="Filters" description="Gyro and D-term filtering." />
 }
 
-export function OsdPage() {
-  return <PlaceholderPage title="OSD" description="What is shown in your goggles." />
-}
-
 export function VtxPage() {
   return <PlaceholderPage title="VTX" description="Video transmitter band, channel and power." />
 }

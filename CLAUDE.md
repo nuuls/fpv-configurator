@@ -73,7 +73,7 @@ src/
       messages.ts          typed payload decoders/encoders, one pair per message
       client.ts            MspClient: serialized request/response with timeouts
       api.ts               high-level typed reads/writes (request + decode) — what the UI calls
-    ports/ blackbox/ orientation/ modes/ tuning/ motors/ rates/ setup/
+    ports/ blackbox/ orientation/ modes/ tuning/ motors/ rates/ setup/ osd/
                            one folder per feature: model.ts (types, payload codecs, pure logic) + io.ts
                            (read snapshot / save via MspClient). Core messages stay in msp/messages.ts.
     transport/             byte pipes: types.ts (interface), webserial.ts, mock.ts
@@ -142,6 +142,9 @@ Firmware facts that are easy to get wrong (verified against Betaflight 2026.6.2 
 - Motor outputs set with `MSP_SET_MOTOR` persist until changed or reboot — always stop them on every exit path.
 - `MSP2_CLI_SETTING` can **write** any CLI variable (`name = value`) but reads always fail in 2026.6.
   Read values through the classic messages instead.
+- OSD element position (u16): x bits 0–4 plus bit 10 (HD, x ≥ 32), y bits 5–9, visible-in-profile bits 11–13,
+  variant bits 14–15. `MSP_SET_OSD_CONFIG` first byte: element index, `-2` = timer, `-1` = general settings.
+  The custom message elements (81–84) have no CLI setting and their text can't be read back.
 - API 1.49 (`master`) removes the serial function-mask messages in favour of `rx_uart`/`vtx_uart`/… settings.
 
 ## Adding a feature (e.g. a new tab backed by a new MSP message)

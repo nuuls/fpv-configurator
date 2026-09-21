@@ -1,0 +1,103 @@
+# OSD
+
+Status: ready
+_Implemented; mock acceptance passes (`src/pages/Osd.test.tsx`, `src/lib/osd/model.test.ts`, `src/lib/osd/io.test.ts`). Set to `built` once the hardware checks pass._
+Route: `/osd` · Page: `src/pages/Osd.tsx` · Logic: `src/lib/osd/` · Preview: `src/components/OsdPreview.tsx`
+
+## Purpose
+
+Choose which of a handful of elements show up in the goggles, and where.
+
+## Layout
+
+Betaflight's OSD tab without its right-hand column: element list on the left, screen preview next to it.
+
+```
++------------------------------------+-----------------------------------------+
+| Elements                  X    Y   | Preview          30 × 16 characters     |
+| (o) Battery avg cell     [1] [14]  | +-------------------------------------+ |
+| ( ) Current draw                   | | 2:100                       02:43   | |
+| ( ) Used mAh                       | |                                     | |
+| (o) Warnings            [9] [10]   | |          LOW BATTERY                | |
+| ...                                | | 3.98V                               | |
++------------------------------------+ +-------------------------------------+ |
+                                     +-----------------------------------------+
+```
+
+## Controls
+
+| Control | Type | Betaflight setting / MSP | Values · default | Notes |
+| ------- | ---- | ------------------------ | ---------------- | ----- |
+| Element on/off | toggle × 13 | profile bits 11–13 of `osd_*_pos` · `MSP_OSD_CONFIG` (84) / `MSP_SET_OSD_CONFIG` (85) | firmware: only Warnings on | see element table |
+| X / Y | 2 numbers per shown element | bits 0–4 + 10 (x), 5–9 (y) of the same value | 0 … columns−1 / rows−1 | same value the preview edits |
+| Preview | drag & drop, arrow keys on a focused element | — | canvas: 30×16 (PAL/auto), 30×13 (NTSC), HD from `MSP_OSD_CANVAS` (189), 53×20 if unset | sample text per element, one character per cell |
+| Hide other elements | button | clears the profile bits of every other element | — | only offered when the FC shows elements this app doesn't manage |
+
+Elements (firmware index → `osd_item_e`):
+
+| Element | Index | CLI | Sample |
+| ------- | ----- | --- | ------ |
+| Battery average cell voltage | 22 | `osd_avg_cell_voltage_pos` | `3.98V` |
+| Current draw | 11 | `osd_current_pos` | `42.0A` |
+| Used mAh | 12 | `osd_mah_drawn_pos` | `690mAh` |
+| Link quality | 46 | `osd_link_quality_pos` | `2:100` |
+| Warnings | 21 | `osd_warnings_pos` | `LOW BATTERY` |
+| Disarmed | 29 | `osd_disarmed_pos` | `DISARMED` |
+| Timer 2 (armed time) | 6 | `osd_tim_2_pos`, `osd_tim2` | `02:43` |
+| Custom message 1–4 | 81–84 (`OSD_CUSTOM_MSG0`…`3`) | — (no CLI setting in 2026.6, MSP only) | `CUSTOM_MSG1` … |
+| VTX channel | 10 | `osd_vtx_channel_pos` | `R:1:25` |
+| Altitude | 15 | `osd_altitude_pos` | `12.3m` |
+
+## Behaviour
+
+- **Save** (no reboot): one `MSP_SET_OSD_CONFIG` per element whose value changed, then `MSP_EEPROM_WRITE`. The
+  general settings (`addr = -1`: video system, units, alarms, warnings) are never written.
+- **One profile:** "on" = visible in the FC's selected OSD profile. Writing an element sets it on (or off) in
+  *all* profiles, so switching profiles elsewhere changes nothing for these elements.
+- **VTX channel** is always written as variant 0 (`band:channel:power`, "combined"); other elements keep their variant bits.
+- **Timer 2:** if it is on and `osd_tim2` doesn't count armed time (source "on" / "on or armed" / "launch"),
+  Save sets its source to total armed time (Betaflight's default), keeping precision and alarm.
+- Switching on an element that still sits on the firmware's default pile (all elements start on one spot near
+  the centre) moves it to a suggested free spot for the canvas; an element that was placed before keeps its place.
+- Dragging keeps the whole sample text on screen; the number fields allow every cell. Out-of-range numbers block Save.
+- Elements the firmware doesn't know (shorter `MSP_OSD_CONFIG`, e.g. no custom messages) aren't listed.
+- No OSD in the firmware build → notice instead of the editor. No OSD device detected → warning, still editable.
+
+## Hidden on purpose
+
+- Everything in Betaflight's right-hand column: OSD profile selection and preview profile, video format, units,
+  timers, alarms, warning selection, post-flight statistics, font manager, logo upload.
+- All other elements (~75). They are left untouched unless the user presses "Hide other elements".
+- Element variants, position presets, the text of the custom messages (it can't be read back over MSP; it is sent
+  by whatever device uses it, e.g. a Lua script — until then the OSD shows `CUSTOM_MSG1`).
+
+## Acceptance
+
+Mock FC (auto video system → 30 × 16; Warnings and average cell voltage on, plus Crosshairs which isn't managed):
+
+- [x] 13 elements listed; Warnings and cell voltage on with X/Y fields, the rest off; preview shows both samples
+- [x] Switching on Timer 2 places it top right (not on the pile); Save without reboot; it is still on after a reload
+- [x] Arrow keys move the focused preview element, the X/Y fields follow; Revert puts it back
+- [x] X beyond the last column blocks saving with a message
+- [x] "1 other element (Crosshairs)" notice; Hide + Save clears it on the FC and the notice disappears
+- [x] A digital VTX (Ports tab → HD) gives a 53 × 20 preview
+
+On real hardware:
+
+- [ ] Positions match what the goggles show, SD and HD (x ≥ 32 on HD uses the extra bit)
+- [ ] Elements enabled here appear without a reboot
+- [ ] An OSD set up in Betaflight Configurator reads back with the same positions
+
+## Decisions
+
+- X/Y number fields and arrow keys in addition to Betaflight's drag & drop: precise, accessible, testable.
+- Sample texts are plain characters instead of the OSD font's symbols — no font upload or rendering needed.
+- Other elements aren't hidden silently: a quad set up elsewhere would lose its OSD on the first save.
+- Timer 2 source is fixed on save rather than exposed: the timers live in the removed right-hand column, and the
+  element is specified as "armed time".
+- Suggested spots: voltage/current bottom left, mAh/VTX bottom right, link quality top left, timer/altitude top
+  right, custom messages top centre, Disarmed below centre. Will move to the drone-type defaults once those exist.
+
+## Open questions
+
+None.

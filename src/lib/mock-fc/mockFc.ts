@@ -35,6 +35,16 @@ import {
   MOTOR_STOP,
 } from '@/lib/motors/model'
 import { decodeBoardAlignment, encodeBoardAlignment, type BoardAlignment } from '@/lib/orientation/model'
+import {
+  decodeSetOsdConfig,
+  elementIndex,
+  encodeOsdCanvas,
+  encodeOsdConfig,
+  encodePosition,
+  FIRMWARE_ELEMENT_COUNT,
+  VIDEO_SYSTEM,
+  VIDEO_SYSTEM_NAMES,
+} from '@/lib/osd/model'
 import { PORT_FUNCTION } from '@/lib/ports/model'
 import { ByteReader, ByteWriter } from '@/lib/msp/bytes'
 
@@ -71,6 +81,8 @@ export interface MockFcConfig {
   motor: { poles: number; bidirDshot: boolean; mixerMode: number; propsOut: boolean }
   /** Raw MSP_RC_TUNING payload (24 bytes), see lib/rates/model.ts for the offsets. */
   rcTuning: number[]
+  /** Raw `item_pos` per OSD element and the two timer configs, see lib/osd/model.ts for the bits. */
+  osd: { positions: number[]; timers: number[] }
 }
 
 const port = (identifier: number, functionMask = 0): SerialPortConfig => ({
@@ -120,7 +132,22 @@ export function defaultMockConfig(): MockFcConfig {
     motor: { poles: 14, bidirDshot: false, mixerMode: 3, propsOut: false },
     // Betaflight defaults: Actual rates, 70 / 670 / 0 on every axis, rate limit 1998, throttle mid 50
     rcTuning: [7, 0, 67, 67, 67, 0, 50, 0, 0, 0, 0, 7, 7, 0, 0, 100, 0xce, 0x07, 0xce, 0x07, 0xce, 0x07, 3, 0],
+    osd: defaultOsd(),
   }
+}
+
+/**
+ * Firmware defaults (everything off, piled up at `OSD_POS(21, 10)`) plus a minimal setup: Warnings, average cell
+ * voltage, and Crosshairs — an element the app doesn't manage. Timers: on time and total armed time, alarm 10.
+ */
+function defaultOsd(): MockFcConfig['osd'] {
+  const hidden = { profiles: 0, variant: 0 }
+  const shown = { profiles: 0b111, variant: 0 }
+  const positions = new Array<number>(FIRMWARE_ELEMENT_COUNT).fill(encodePosition({ x: 21, y: 10, ...hidden }))
+  positions[elementIndex('WARNINGS')] = encodePosition({ x: 9, y: 10, ...shown })
+  positions[elementIndex('AVG_CELL_VOLTAGE')] = encodePosition({ x: 1, y: 14, ...shown })
+  positions[elementIndex('CROSSHAIRS')] = encodePosition({ x: 13, y: 6, ...shown })
+  return { positions, timers: [0x0a00, 0x0a01] }
 }
 
 export interface MockFcOptions {
@@ -307,6 +334,33 @@ export class MockFlightController {
       case MSP.SDCARD_SUMMARY:
         return encodeSdcardSummary({ supported: false, state: 0, freeKb: 0, totalKb: 0 })
 
+      case MSP.OSD_CONFIG:
+        return encodeOsdConfig({
+          supported: true,
+          deviceDetected: true,
+          videoSystem: this.videoSystem(),
+          ...this.running.osd,
+          profileCount: 3,
+          selectedProfile: 1,
+        })
+      case MSP.SET_OSD_CONFIG: {
+        // Elements and timers only; the general settings (addr -1) aren't simulated.
+        const write = decodeSetOsdConfig(request)
+        if (!write) return null
+        const { positions, timers } = this.running.osd
+        if ('timer' in write) {
+          if (write.timer >= timers.length) return null
+          timers[write.timer] = write.config
+        } else {
+          if (write.element >= positions.length) return null
+          positions[write.element] = write.position
+        }
+        return EMPTY
+      }
+      case MSP.OSD_CANVAS:
+        // `osd_canvas_width/height`: the HD default until goggles announce something else, else SD PAL.
+        return encodeOsdCanvas(this.videoSystem() === VIDEO_SYSTEM.HD ? { cols: 53, rows: 20 } : { cols: 30, rows: 16 })
+
       case MSP.MODE_RANGES:
         return encodeModeRanges(this.running.modeSlots)
       case MSP.SET_MODE_RANGE: {
@@ -403,6 +457,12 @@ export class MockFlightController {
     const name = this.running.settings['serialrx_provider']
     const entry = Object.entries(SERIALRX_PROVIDER_NAMES).find(([, n]) => n === name)
     return entry ? Number(entry[0]) : SERIALRX_CRSF
+  }
+
+  /** `vcd_video_system` as its enum value (AUTO, PAL, NTSC, HD). */
+  private videoSystem(): number {
+    const name = this.running.settings['vcd_video_system'] ?? ''
+    return Math.max(0, VIDEO_SYSTEM_NAMES.findIndex((n) => n.toUpperCase() === name))
   }
 
   /** Like the firmware: unknown port identifiers fail the whole message. */
