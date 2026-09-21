@@ -113,6 +113,10 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
 	- Motor spin tester menu should be visual where you can drag the slider on each motor on a 2d quad
 	- Also display reported RPM
 
+- ESC
+	- Read out ESC firmware and settings and dislpay it
+	- AM32, Bluejay and BL_heli_s supported
+
 - OSD
 	- Copy the existing betaflight UI but only keep the following elements
 		- Battery average cell voltage
