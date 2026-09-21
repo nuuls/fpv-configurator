@@ -6,7 +6,8 @@ import { openTab, resetAppAfterEach } from '@/test/app'
 
 resetAppAfterEach()
 
-const card = (number: number) => screen.findByRole('group', { name: `ESC ${number}` })
+/** Reading waits more than a second for the ESCs to reach their bootloader, also with the mock's ESCs. */
+const card = (number: number) => screen.findByRole('group', { name: `ESC ${number}` }, { timeout: 5000 })
 
 /** The value next to a setting's label inside one ESC card. */
 function setting(esc: HTMLElement, label: string): HTMLElement {

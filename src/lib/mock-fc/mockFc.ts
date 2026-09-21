@@ -536,7 +536,7 @@ export class MockFlightController {
         // the reply on the port speaks 4-way until cmd_InterfaceExit (see `receive`).
         if (request.length > 0 && request[0] !== 0xff) return Uint8Array.of(0)
         this.motors = new Array<number>(8).fill(MOTOR_STOP)
-        this.fourWay = new MockFourWayInterface(this.escs)
+        this.fourWay = new MockFourWayInterface(this.escs, this.now)
         return Uint8Array.of(this.escs.length)
 
       case MSP.VTX_CONFIG: {

@@ -16,7 +16,14 @@ export interface MockEsc {
   flash: Record<number, number[]>
   /** false = no answer on the signal wire (no battery, broken wire). */
   powered: boolean
+  /**
+   * How long the signal wire has to be high before the bootloader answers: a running ESC first has to notice
+   * that the signal is gone, finish its startup beeps and jump into the bootloader. Default `MOCK_ESC_BOOT_MS`.
+   */
+  bootMs?: number
 }
+
+export const MOCK_ESC_BOOT_MS = 700
 
 const ascii = (text: string, length: number, fill = 0x20) =>
   Array.from({ length }, (_, i) => (i < text.length ? text.charCodeAt(i) : fill))
@@ -126,12 +133,17 @@ export class MockFourWayInterface {
   refusedCommands: number[] = []
 
   private readonly escs: MockEsc[]
+  private readonly now: () => number
+  /** Per ESC: since when its signal wire is high without a break (`esc4wayInit`, then every cmd_DeviceReset). */
+  private readonly highSince: number[]
   private readonly parser: FourWayParser
   private selected: MockEsc | null = null
   private outbox: Uint8Array[] = []
 
-  constructor(escs: MockEsc[]) {
+  constructor(escs: MockEsc[], now: () => number = Date.now) {
     this.escs = escs
+    this.now = now
+    this.highSince = escs.map(() => now())
     this.parser = new FourWayParser('request', (frame, crcOk) => this.handleFrame(frame, crcOk))
   }
 
@@ -162,15 +174,20 @@ export class MockFourWayInterface {
         case FOURWAY_CMD.INTERFACE_EXIT:
           this.exited = true
           break
-        case FOURWAY_CMD.DEVICE_RESET:
-          if ((request.params[0] ?? 0) >= this.escs.length) ack = FOURWAY_ACK.INVALID_CHANNEL
+        case FOURWAY_CMD.DEVICE_RESET: {
+          const index = request.params[0] ?? 0
+          if (index >= this.escs.length) ack = FOURWAY_ACK.INVALID_CHANNEL
+          else this.highSince[index] = this.now() // its firmware starts again
           this.selected = null
           break
+        }
         case FOURWAY_CMD.DEVICE_INIT_FLASH: {
           this.selected = null
-          const esc = this.escs[request.params[0] ?? 0]
+          const index = request.params[0] ?? 0
+          const esc = this.escs[index]
+          const booted = esc && this.now() - (this.highSince[index] ?? 0) >= (esc.bootMs ?? MOCK_ESC_BOOT_MS)
           if (!esc) ack = FOURWAY_ACK.INVALID_CHANNEL
-          else if (!esc.powered) ack = FOURWAY_ACK.GENERAL_ERROR
+          else if (!esc.powered || !booted) ack = FOURWAY_ACK.GENERAL_ERROR
           else {
             this.selected = esc
             params = [esc.signature & 0xff, esc.signature >> 8, esc.bootByte, esc.interfaceMode]

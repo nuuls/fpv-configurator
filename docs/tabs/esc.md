@@ -50,6 +50,10 @@ sinusoidal startup, protocol, temperature and current limit, low voltage cutoff,
 
 - Reading takes over the MSP link: other MSP requests (header, polls) wait until the ESCs are done. The FC stops the
   motor outputs while the 4-way interface is active and re-enables them on `cmd_InterfaceExit` — no reboot.
+- The FC pulls the signal wires high when the passthrough starts; a running ESC needs a few hundred ms (more with a
+  startup tune) to notice and jump into its bootloader, and the FC gives up on a silent bootloader within ~50 ms. So
+  the app waits 1.2 s before the first `cmd_DeviceInitFlash` and asks each ESC up to 5 times, 250 ms apart (timing as
+  in ESC Configurator). Without a battery the result therefore takes about 6 s.
 - Every ESC is reset (`cmd_DeviceReset`) right after it was read so it leaves its bootloader, and
   `cmd_InterfaceExit` is sent on every exit path, also after an error. If the FC doesn't leave the 4-way interface the
   page says so and asks to replug it.
@@ -73,7 +77,7 @@ sinusoidal startup, protocol, temperature and current limit, low voltage cutoff,
 ## Acceptance
 
 Mock FC (4 ESCs: two Bluejay 0.21.0 — the second one reversed and with another PWM frequency —, a BLHeli_S 16.7 and
-an AM32 2.18):
+an AM32 2.18; like real ones they only answer once the signal wire was high for 0.7 s):
 
 - [x] Nothing is read before "Read ESCs" is pressed
 - [x] Read ESCs → four cards with firmware, version, hardware and settings; ESC 2 shows "Reversed"
@@ -86,7 +90,7 @@ On real hardware:
 
 - [ ] Bluejay, BLHeli_S and AM32 ESCs: firmware, version and settings match ESC Configurator / the AM32 configurator
 - [ ] Motors spin from the Motors tab after reading, without replugging
-- [ ] Without a battery the page reports that no ESC answered within a few seconds
+- [ ] Without a battery the page reports that no ESC answered within about 6 seconds
 
 ## Decisions
 

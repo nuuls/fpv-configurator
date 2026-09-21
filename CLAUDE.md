@@ -165,6 +165,9 @@ Firmware facts that are easy to get wrong (verified against Betaflight 2026.6.2 
   port stops speaking MSP until `cmd_InterfaceExit`, then the FC re-enables the motor outputs by itself (no
   reboot). Run such sessions through `MspClient.exclusive` (see `lib/esc/io.ts`) so polls wait instead of
   corrupting them. `lib/esc` is read-only on purpose — flashing is under **Never**.
+- ESCs don't sit in their bootloader when the 4-way interface starts: they jump into it once the signal wire was
+  high for a few hundred ms (longer with a startup tune), and the FC's `cmd_DeviceInitFlash` gives up within ~50 ms.
+  Wait (1.2 s) before the first one and retry with pauses — an immediate attempt always fails on real ESCs.
 - API 1.49 (`master`) removes the serial function-mask messages in favour of `rx_uart`/`vtx_uart`/… settings.
 
 ## Adding a feature (e.g. a new tab backed by a new MSP message)

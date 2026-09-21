@@ -47,7 +47,7 @@ export function EscPage() {
             {reading
               ? state.count > 0
                 ? `Reading ESC ${state.index + 1} of ${state.count}…`
-                : 'Starting the ESC passthrough…'
+                : 'Waiting for the ESCs to start their bootloader…'
               : 'Plug in the flight battery first — the ESCs need power. Take the props off: the ESCs restart while they are being read.'}
           </p>
         </CardContent>

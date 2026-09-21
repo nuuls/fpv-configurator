@@ -20,8 +20,24 @@ export class PassthroughStuckError extends Error {
   }
 }
 
-const INIT_ATTEMPTS = 2
+/**
+ * `esc4wayInit` pulls the signal wires high; a running ESC only jumps into its bootloader once it has noticed
+ * that, which takes a few hundred ms — longer while it plays a startup tune. The FC gives up on a bootloader
+ * that doesn't answer within ~50 ms, so wait first and retry with pauses (timing as in ESC Configurator).
+ */
+const ESC_BOOT_DELAY_MS = 1200
+const INIT_ATTEMPTS = 5
+const INIT_RETRY_DELAY_MS = 250
 const EXIT_ATTEMPTS = 2
+
+export interface ReadEscsOptions {
+  /** Response timeout of a 4-way request. */
+  timeoutMs?: number
+  /** Replaces the real waiting in tests. */
+  sleep?: (ms: number) => Promise<void>
+}
+
+const realSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 /**
  * Reads every ESC through the FC's BLHeli 4-way passthrough; one report per motor output, in motor order.
@@ -31,17 +47,19 @@ const EXIT_ATTEMPTS = 2
 export function readEscs(
   client: MspClient,
   onProgress?: (index: number, count: number) => void,
-  timeoutMs?: number,
+  options: ReadEscsOptions = {},
 ): Promise<EscReport[]> {
+  const sleep = options.sleep ?? realSleep
   return client.exclusive(async (link) => {
     // No payload = MSP_PASSTHROUGH_ESC_4WAY. The reply is the ESC count — and the last MSP frame until the exit.
     const count = (await link.request(MSP.SET_PASSTHROUGH))[0] ?? 0
-    const fourWay = new FourWayClient(link, timeoutMs)
+    const fourWay = new FourWayClient(link, options.timeoutMs)
     try {
       const reports: EscReport[] = []
+      if (count > 0) await sleep(ESC_BOOT_DELAY_MS)
       for (let index = 0; index < count; index++) {
         onProgress?.(index, count)
-        reports.push(await readEsc(fourWay, index))
+        reports.push(await readEsc(fourWay, index, sleep))
       }
       return reports
     } finally {
@@ -67,9 +85,9 @@ async function leavePassthrough(fourWay: FourWayClient): Promise<void> {
 }
 
 /** Timeouts (the FC itself stopped answering) propagate; an ESC that doesn't answer becomes a 'missing' report. */
-async function readEsc(fourWay: FourWayClient, index: number): Promise<EscReport> {
+async function readEsc(fourWay: FourWayClient, index: number, sleep: (ms: number) => Promise<void>): Promise<EscReport> {
   try {
-    const info = decodeDeviceInfo(await connect(fourWay, index))
+    const info = decodeDeviceInfo(await connect(fourWay, index, sleep))
     try {
       const plan = readPlan(info)
       if (!plan) return describeUnsupported(info)
@@ -95,13 +113,14 @@ async function readEsc(fourWay: FourWayClient, index: number): Promise<EscReport
   }
 }
 
-async function connect(fourWay: FourWayClient, index: number): Promise<Uint8Array> {
+async function connect(fourWay: FourWayClient, index: number, sleep: (ms: number) => Promise<void>): Promise<Uint8Array> {
   for (let attempt = 1; ; attempt++) {
     try {
       return (await fourWay.request(FOURWAY_CMD.DEVICE_INIT_FLASH, [index])).params
     } catch (cause) {
       if (!(cause instanceof FourWayAckError) || attempt >= INIT_ATTEMPTS) throw cause
     }
+    await sleep(INIT_RETRY_DELAY_MS)
   }
 }
 
