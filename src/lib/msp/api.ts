@@ -8,6 +8,7 @@ import {
   encodeCliSettingWrite,
   encodeFeatureMask,
   encodeReboot,
+  REBOOT_MODE,
   encodeSerialConfig,
   type SerialPortConfig,
   decodeAnalog,
@@ -87,4 +88,13 @@ export async function saveToEeprom(client: MspClient): Promise<void> {
 /** Asks the FC to reboot. The connection drops right after; use the connection store's `reboot()`. */
 export async function sendReboot(client: MspClient): Promise<void> {
   await client.request(MSP.REBOOT, encodeReboot())
+}
+
+/**
+ * Reboots the FC into USB mass-storage mode so its logs show up as a drive. It stays in that mode
+ * (no MSP) until it is power-cycled. Rejects if the storage isn't ready.
+ */
+export async function sendRebootToMassStorage(client: MspClient): Promise<void> {
+  const response = await client.request(MSP.REBOOT, encodeReboot(REBOOT_MODE.MASS_STORAGE))
+  if (response[1] !== 1) throw new Error('The log storage is not ready')
 }

@@ -42,6 +42,8 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
 	- Other sliders are locked at 1 (and not visible)
 
 	- Replace entire smoothing section with:
+		- _Built without the Hz selector — Betaflight 2026.6 detects the link rate itself, see
+		  `docs/tabs/pid-tuning.md` → Decisions._
 		- RC link hz selector
 		- Smoothing presets (hz must be selected)
 			- Direct
@@ -105,6 +107,14 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
 
 ## 4. Layout
 
+Header (app name · firmware · connection · Connect / Disconnect) + sidebar tabs + page. One sidebar tab per
+scope item in §2, in this order (single source: `src/routes.ts`):
+
+Setup · Ports · Orientation · PID Tuning · Filters · Rates · Modes · Motors · OSD · VTX · Blackbox
+
+Tabs still marked TBD in §2 (Filters, Rates, OSD, VTX) show a "not specified yet" placeholder.
+_Assumed — change freely; the drone-type setup step has no place in the layout yet._
+
 ## 5. Global behaviour
 
 Rules every tab follows. Tab specs only mention deviations.
@@ -123,7 +133,8 @@ Rules every tab follows. Tab specs only mention deviations.
 
 ## 6. Open questions
 
-- [ ] §4 Layout is empty — keep the current header + sidebar tabs? Tab order?
+- [ ] §4 Layout was filled in with what got built — confirm or change
+- [ ] Strong smoothing: value for "higher feed forward smoothing" (80 used as a placeholder)
 - [ ] Drone types: which ones, and what does each set?
 - [ ] Browser presets (rates, OSD, ...): localStorage + JSON export/import OK?
 - [ ] Disconnect / errors, Safety, Units in §5 are still unfilled

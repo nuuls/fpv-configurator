@@ -8,9 +8,9 @@ export function PlaceholderPage({ title, description }: { title: string; descrip
       <PageHeader title={title} description={description} />
       <Card className="border-dashed">
         <CardHeader>
-          <CardTitle>Not implemented yet</CardTitle>
+          <CardTitle>Not specified yet</CardTitle>
           <CardDescription>
-            See CLAUDE.md → &quot;Adding a feature&quot; for the steps: MSP code → decoder + test → mock FC response → UI.
+            This tab is still marked TBD in docs/SPEC.md. Describe what it should do in docs/tabs/ and it can be built.
           </CardDescription>
         </CardHeader>
       </Card>

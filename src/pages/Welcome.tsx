@@ -7,6 +7,7 @@ import { useConnectionStore } from '@/stores/connection'
 /** Shown in place of every tab while no flight controller is connected. */
 export function WelcomePage() {
   const error = useConnectionStore((s) => s.error)
+  const notice = useConnectionStore((s) => s.notice)
   const serialSupported = WebSerialTransport.isSupported()
 
   return (
@@ -28,6 +29,8 @@ export function WelcomePage() {
           </CardContent>
         )}
       </Card>
+
+      {notice && <Notice>{notice}</Notice>}
 
       {error && (
         <div role="alert">

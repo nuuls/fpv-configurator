@@ -1,0 +1,184 @@
+/** Acceptance checks for the Blackbox, Orientation, Modes, PID Tuning and Motors tabs (docs/tabs/*.md). */
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent, { type UserEvent } from '@testing-library/user-event'
+import { afterEach, describe, expect, it } from 'vitest'
+import App from '@/App'
+import { useConnectionStore } from '@/stores/connection'
+
+afterEach(async () => {
+  await useConnectionStore.getState().disconnect()
+  window.location.hash = ''
+})
+
+async function openTab(name: string): Promise<UserEvent> {
+  const user = userEvent.setup()
+  render(<App />)
+  await user.click(screen.getByRole('button', { name: 'Connect Mock FC' }))
+  await user.click(await screen.findByRole('link', { name }))
+  await screen.findByRole('heading', { name })
+  return user
+}
+
+const afterReboot = { timeout: 3000 }
+
+/** Clicks Save & Reboot and waits until the app has reconnected and the tab is showing again. */
+async function saveAndReboot(user: UserEvent) {
+  await user.click(screen.getByRole('button', { name: 'Save & Reboot' }))
+  await screen.findByText('Rebooting flight controller…')
+  await waitFor(() => expect(screen.queryByText('Rebooting flight controller…')).toBeNull(), afterReboot)
+}
+
+/** Clicks Save and waits until the tab has re-read the FC (nothing left to revert). */
+async function saveWithoutReboot(user: UserEvent) {
+  await user.click(screen.getByRole('button', { name: 'Save' }))
+  // "Save" (not "Saving…") and disabled = written, re-read from the FC, and nothing left to save
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled())
+  expect(screen.queryByText('Rebooting flight controller…')).toBeNull()
+}
+
+/** Radix sliders are driven with the keyboard in jsdom. */
+async function nudge(user: UserEvent, thumb: HTMLElement, keys: string) {
+  thumb.focus()
+  await user.keyboard(keys)
+}
+
+describe('sidebar', () => {
+  it('mirrors the scope in docs/SPEC.md', async () => {
+    await openTab('Setup')
+    const tabs = within(screen.getByRole('navigation', { name: 'Tabs' })).getAllByRole('link')
+    expect(tabs.map((tab) => tab.textContent)).toEqual([
+      'Setup', 'Ports', 'Orientation', 'PID Tuning', 'Filters', 'Rates', 'Modes', 'Motors', 'OSD', 'VTX', 'Blackbox',
+    ])
+  })
+})
+
+describe('Blackbox tab', () => {
+  it('shows storage, saves the logging rate across a reboot', async () => {
+    const user = await openTab('Blackbox')
+    expect(await screen.findByText(/Onboard flash: 3\.3 MB of 16\.0 MB used/)).toBeInTheDocument()
+    expect(screen.getByLabelText('Log to')).toHaveValue('1')
+    expect(within(screen.getByLabelText('Log to')).queryByRole('option', { name: /SD card|Serial/ })).toBeNull()
+
+    await user.selectOptions(screen.getByLabelText('Logging rate'), '1/8 (1 kHz)')
+    await saveAndReboot(user)
+    expect(await screen.findByLabelText('Logging rate')).toHaveValue('3')
+  })
+
+  it('erases the flash after confirmation', async () => {
+    const user = await openTab('Blackbox')
+    await user.click(await screen.findByRole('button', { name: 'Erase storage' }))
+    await user.click(await screen.findByRole('button', { name: 'Erase' }))
+    expect(await screen.findByText(/Onboard flash: 0 kB of/, {}, afterReboot)).toBeInTheDocument()
+  })
+
+  it('restarts as a USB drive and explains how to get back', async () => {
+    const user = await openTab('Blackbox')
+    await user.click(await screen.findByRole('button', { name: 'Activate mass storage' }))
+    await user.click(await screen.findByRole('button', { name: 'Restart as USB drive' }))
+    expect(await screen.findByText(/restarted as a USB drive/)).toBeInTheDocument()
+  })
+})
+
+describe('Orientation tab', () => {
+  it('offers 45° steps and saves across a reboot', async () => {
+    const user = await openTab('Orientation')
+    const yaw = await screen.findByLabelText('Yaw')
+    expect(within(yaw).getAllByRole('option').map((o) => o.textContent)).toEqual(
+      ['0°', '45°', '90°', '135°', '180°', '225°', '270°', '315°'],
+    )
+    await user.selectOptions(yaw, '90')
+    await user.selectOptions(screen.getByLabelText('Roll'), '180')
+    expect(screen.getByRole('img', { name: /yaw 90°, roll 180°/ })).toBeInTheDocument()
+
+    await saveAndReboot(user)
+    expect(await screen.findByLabelText('Yaw')).toHaveValue('90')
+    expect(screen.getByLabelText('Roll')).toHaveValue('180')
+  })
+})
+
+describe('Modes tab', () => {
+  it('shows only the four supported modes and mentions the ones it leaves alone', async () => {
+    await openTab('Modes')
+    expect(await screen.findByText('Arm')).toBeInTheDocument()
+    for (const label of ['Angle', 'Turtle mode', 'Beeper']) expect(screen.getByText(label)).toBeInTheDocument()
+    expect(screen.queryByText(/Horizon|Failsafe|Air ?mode/i)).toBeNull()
+    expect(screen.getByText(/1 other mode range is set up/)).toBeInTheDocument()
+    expect(screen.getByText('1700 – 2100')).toBeInTheDocument()
+  })
+
+  it('adds and edits a range, and saves without rebooting', async () => {
+    const user = await openTab('Modes')
+    await user.click(await screen.findByRole('button', { name: 'Add Angle range' }))
+    await user.selectOptions(screen.getByLabelText('Angle range 1 channel'), 'AUX 2')
+    const [start] = within(screen.getByLabelText('Angle range 1')).getAllByRole('slider')
+    await nudge(user, start!, '{ArrowLeft}{ArrowLeft}')
+    expect(screen.getByText('1650 – 2100')).toBeInTheDocument()
+
+    await saveWithoutReboot(user)
+    expect(screen.getByLabelText('Angle range 1 channel')).toHaveValue('1')
+    expect(screen.getByText('1650 – 2100')).toBeInTheDocument()
+  })
+
+  it('removes a range', async () => {
+    const user = await openTab('Modes')
+    await user.click(await screen.findByRole('button', { name: 'Remove Arm range 1' }))
+    expect(screen.queryByText('1700 – 2100')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  })
+})
+
+describe('PID Tuning tab', () => {
+  it('shows two sliders, a live PID preview and warns about hidden tuning', async () => {
+    const user = await openTab('PID Tuning')
+    expect(await screen.findAllByRole('slider')).toHaveLength(2)
+    expect(screen.getByText(/Saving resets those/)).toBeInTheDocument()
+    expect(await screen.findAllByRole('cell', { name: '45' })).toHaveLength(2) // roll + yaw P at 1.0
+
+    await nudge(user, within(screen.getByLabelText('Master multiplier')).getByRole('slider'), '{ArrowRight}{ArrowRight}')
+    expect(screen.getByText('1.10')).toBeInTheDocument()
+    expect(await screen.findAllByRole('cell', { name: '50' })).toHaveLength(2) // 45 × 1.1
+  })
+
+  it('saves sliders without a reboot and a smoothing preset with one', async () => {
+    const user = await openTab('PID Tuning')
+    await nudge(user, within(await screen.findByLabelText('Damping')).getByRole('slider'), '{ArrowLeft}')
+    await saveWithoutReboot(user)
+    expect(screen.getByText('0.95')).toBeInTheDocument()
+    expect(screen.queryByText(/Saving resets those/)).toBeNull() // hidden values are now pinned
+
+    await user.click(screen.getByRole('button', { name: /^Light smoothing/ }))
+    await saveAndReboot(user)
+    expect(await screen.findByRole('button', { name: /^Light smoothing/, pressed: true })).toBeInTheDocument()
+  })
+})
+
+describe('Motors tab', () => {
+  it('saves ESC settings across a reboot', async () => {
+    const user = await openTab('Motors')
+    expect(await screen.findByLabelText('ESC protocol')).toHaveValue('6')
+    await user.selectOptions(screen.getByLabelText('ESC protocol'), 'DSHOT600')
+    await user.click(screen.getByLabelText('Bidirectional DShot'))
+    await user.selectOptions(screen.getByLabelText('Prop direction'), 'out')
+
+    await saveAndReboot(user)
+    expect(await screen.findByLabelText('ESC protocol')).toHaveValue('7')
+    expect(screen.getByLabelText('Bidirectional DShot')).toBeChecked()
+    expect(screen.getByLabelText('Prop direction')).toHaveValue('out')
+  })
+
+  it('keeps motor control locked until props are confirmed off, and while there are unsaved edits', async () => {
+    const user = await openTab('Motors')
+    const motor1 = within(await screen.findByLabelText('Motor 1')).getByRole('slider')
+    expect(motor1).toHaveAttribute('data-disabled')
+
+    await user.click(screen.getByLabelText(/I have removed all propellers/))
+    expect(within(screen.getByLabelText('Motor 1')).getByRole('slider')).not.toHaveAttribute('data-disabled')
+    await nudge(user, within(screen.getByLabelText('Motor 1')).getByRole('slider'), '{ArrowRight}{ArrowRight}')
+    expect(screen.getAllByText('1010')).toHaveLength(2) // motor 1 and the "all motors" readout
+
+    await user.selectOptions(screen.getByLabelText('Prop direction'), 'out') // unsaved edit → locks the test
+    expect(screen.getByLabelText(/I have removed all propellers/)).not.toBeChecked()
+    expect(within(screen.getByLabelText('Motor 1')).getByRole('slider')).toHaveAttribute('data-disabled')
+    expect(screen.queryByText('1010')).toBeNull()
+  })
+})

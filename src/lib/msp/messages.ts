@@ -309,7 +309,7 @@ export function decodeCliSetting(payload: Uint8Array): { name: string; value: st
 
 // ---- MSP_REBOOT (68) ----
 
-export const REBOOT_MODE = { FIRMWARE: 0 } as const
+export const REBOOT_MODE = { FIRMWARE: 0, MASS_STORAGE: 2 } as const
 
 export function encodeReboot(mode: number = REBOOT_MODE.FIRMWARE): Uint8Array {
   return Uint8Array.of(mode)

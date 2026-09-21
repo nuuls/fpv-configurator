@@ -1,6 +1,6 @@
 # Setup
 
-Status: placeholder
+Status: draft
 Route: `/setup` · Page: `src/pages/Setup.tsx`
 
 ## Purpose

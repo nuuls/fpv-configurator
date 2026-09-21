@@ -44,7 +44,9 @@ src/
       messages.ts          typed payload decoders/encoders, one pair per message
       client.ts            MspClient: serialized request/response with timeouts
       api.ts               high-level typed reads/writes (request + decode) — what the UI calls
-    ports/                 device-first port assignment: model.ts (pure logic), io.ts (read/apply)
+    ports/ blackbox/ orientation/ modes/ tuning/ motors/
+                           one folder per feature: model.ts (types, payload codecs, pure logic) + io.ts
+                           (read snapshot / save via MspClient). Core messages stay in msp/messages.ts.
     transport/             byte pipes: types.ts (interface), webserial.ts, mock.ts
     mock-fc/mockFc.ts      simulated Betaflight 2026.6 FC: running vs. saved config, EEPROM write, reboot
   stores/
@@ -52,10 +54,14 @@ src/
     unsaved.ts             which tabs have unsaved edits; confirmDiscardChanges()
     confirm.ts             confirm({...}) → Promise<boolean>, rendered by ConfirmDialogHost
   hooks/
-    useMspPoll.ts          poll an api.ts read while connected + mounted
+    useMspPoll.ts          poll a read while connected + mounted (live data)
+    useFcSnapshot.ts       read a tab's config once per connection (+ reload)
+    useDraft.ts            editable copy of a snapshot: draft, dirty, revert
+    useSave.ts             run a save action, then reboot or reload; keeps the error
     useUnsavedChanges.ts   mark a tab dirty + ask before navigating away
   routes.ts                tab list — single source for router AND sidebar
   components/layout/       AppShell, Header (connect buttons), Sidebar, PageHeader
+  components/              SaveBar, Notice/LoadingState, ConfirmDialogHost, BoardView, AttitudeIndicator
   components/ui/           shadcn components (generated; excluded from lint; they import `cn` from the
                            `cn` package, app code uses `@/lib/utils`)
   pages/                   one file per tab
@@ -78,17 +84,31 @@ Data flow: `page → useMspPoll / store → api.ts → MspClient → Transport �
 - Writes that change FC settings must be explicit user actions; persisting needs `MSP_EEPROM_WRITE`.
   Never send motor-spinning commands without a clear on-screen safety confirmation.
 
-## Editable tabs (SPEC §5) — copy `src/pages/Ports.tsx`
+## Editable tabs (SPEC §5) — copy `src/pages/Orientation.tsx` (smallest) or `Modes.tsx`
 
-Read a snapshot from the FC → keep a local draft → `useUnsavedChanges(path, dirty)` → **Save** writes,
-calls `saveToEeprom`, then `useConnectionStore.reboot()` if needed (the page unmounts and reloads after the
-automatic reconnect). Keep the read → draft → write-plan logic as pure functions in `lib/<feature>/` with
-unit tests; ask with `confirm()` before destructive writes.
+```tsx
+const { client, snapshot, error, reload } = useFcSnapshot(readXSnapshot)   // lib/<feature>/io.ts
+// in an <Editor> rendered once snapshot exists:
+const { draft, setDraft, dirty, revert } = useDraft(snapshot, toDraft)      // toDraft: pure, in model.ts
+const { saving, error, save } = useSave(reload)
+useUnsavedChanges(PATH, dirty)
+<SaveBar dirty saving reboot={needsReboot} problem={validate(draft)[0]} onRevert={revert}
+         onSave={() => void save(async () => { await saveX(client, snapshot, draft); return needsReboot })} />
+```
+
+`saveX` writes, then calls `saveToEeprom`. Keep snapshot → draft → payload logic as pure functions in
+`lib/<feature>/model.ts` with unit tests; ask with `confirm()` before destructive actions. For messages with
+many fields we don't edit, keep the raw payload in the snapshot and patch bytes (read-modify-write) instead
+of decoding everything — see `lib/tuning` and `lib/motors`.
+
+UI tests: wait for the reboot/reload to finish before asserting (`saveAndReboot` / `saveWithoutReboot` helpers
+in `src/pages/tabs.test.tsx`) — elements of the pre-save page are still mounted right after the click.
 
 Firmware facts that are easy to get wrong (verified against Betaflight 2026.6.2 source):
 
 - Version is calendar based: `MSP_FC_VERSION` = (year-2000, month, patch) + version string.
 - Port identifiers: USB VCP 20, UART1 = 51. Never modify the USB VCP port config.
+- Motor outputs set with `MSP_SET_MOTOR` persist until changed or reboot — always stop them on every exit path.
 - `MSP2_CLI_SETTING` can **write** any CLI variable (`name = value`) but reads always fail in 2026.6.
   Read values through the classic messages instead.
 - API 1.49 (`master`) removes the serial function-mask messages in favour of `rx_uart`/`vtx_uart`/… settings.
@@ -97,8 +117,9 @@ Firmware facts that are easy to get wrong (verified against Betaflight 2026.6.2 
 
 0. Check the tab's spec in `docs/tabs/` is `Status: ready` — it lists the controls and MSP messages needed.
 1. Add the command number to `lib/msp/codes.ts`.
-2. Add `decodeX` (+ `encodeX`) and the result type to `lib/msp/messages.ts`; add tests to `messages.test.ts`.
-3. Add a `readX` / `writeX` helper to `lib/msp/api.ts`.
+2. Add `decodeX` / `encodeX` and types to `lib/<feature>/model.ts` (core/shared messages: `lib/msp/messages.ts`),
+   with tests.
+3. Add `readXSnapshot` / `saveX` to `lib/<feature>/io.ts`.
 4. Make the mock FC answer it: new `case` in `MockFlightController.respond()`.
 5. Build the page in `src/pages/`, using `useMspPoll(readX, intervalMs)` for live data or a one-shot call
    through `useConnectionStore((s) => s.client)`. Register new tabs in `src/routes.ts`.

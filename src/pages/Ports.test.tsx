@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import App from '@/App'
@@ -50,8 +50,9 @@ describe('Ports tab', () => {
 
     await user.click(screen.getByRole('button', { name: 'Save & Reboot' }))
     expect(await screen.findByText('Rebooting flight controller…')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('Rebooting flight controller…')).toBeNull(), { timeout: 3000 })
 
-    expect(await screen.findByLabelText('VTX type', {}, { timeout: 3000 })).toHaveValue('msp')
+    expect(await screen.findByLabelText('VTX type')).toHaveValue('msp')
     expect(screen.getByLabelText('VTX port')).toHaveValue('51')
     expect(screen.getByLabelText('Receiver port')).toHaveValue('52')
     expect(screen.queryByLabelText('Unsaved changes')).toBeNull()
