@@ -75,6 +75,17 @@ describe('renderQuad', () => {
     expect(arrowTip({ ...flat, yaw: 180 }).y).toBeGreaterThan(arrowTip(flat).y)
   })
 
+  it('paints the arrow on top of the board, whichever way the quad and the board are turned', () => {
+    for (let yaw = 0; yaw < 360; yaw += 15) {
+      for (const attitude of [{ ...level, yaw }, { roll: 25, pitch: -20, yaw }, { roll: -40, pitch: 35, yaw }]) {
+        for (const alignment of [flat, { ...flat, yaw: 90 }, { ...flat, yaw: 180 }, { roll: 0, pitch: 180, yaw: 270 }]) {
+          const parts = renderQuad(attitude, alignment).map((p) => p.part)
+          expect(parts.indexOf('arrow'), JSON.stringify({ attitude, alignment })).toBe(parts.indexOf('board') + 1)
+        }
+      }
+    }
+  })
+
   it('moves the whole quad with live yaw', () => {
     const tipX = (yaw: number) => {
       const arrow = renderQuad({ ...level, yaw }, flat).find((p) => p.part === 'arrow')

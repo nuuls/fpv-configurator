@@ -129,7 +129,7 @@ export function renderQuad(attitude: { roll: number; pitch: number; yaw: number 
   const frame = betaflightRotation(attitude.roll, attitude.pitch, attitude.yaw)
   const board = betaflightRotation(alignment.roll, alignment.pitch, alignment.yaw)
 
-  return MODEL.map(({ part, onBoard, points }) => {
+  const polygons = MODEL.map(({ part, onBoard, points }) => {
     const projected = points.map((p) => {
       const inFrame: Vec3 = onBoard ? lift(rotate(board, p)) : p
       return project(rotate(frame, inFrame))
@@ -146,7 +146,15 @@ export function renderQuad(attitude: { roll: number; pitch: number; yaw: number 
       facingCamera: area > 0,
       depth: projected.reduce((sum, p) => sum + p.depth, 0) / projected.length,
     }
-  }).sort((a, b) => b.depth - a.depth)
+  })
+
+  // The arrow is printed on the board, practically coplanar with it: sorted by its own centroid it would end
+  // up underneath the board whenever its tail is turned away from the camera. It takes the board's depth
+  // instead — the sort is stable and the model lists the board first, so it is painted right after it.
+  const boardDepth = polygons.find((p) => p.part === 'board')?.depth
+  return polygons
+    .map((p) => (p.part === 'arrow' && boardDepth !== undefined ? { ...p, depth: boardDepth } : p))
+    .sort((a, b) => b.depth - a.depth)
 }
 
 /** The board sits on standoffs above the frame, whichever way it is rotated. */
