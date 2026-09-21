@@ -5,11 +5,11 @@ import { openTab, resetAppAfterEach, saveAndReboot } from '@/test/app'
 
 resetAppAfterEach()
 
-const rows = (section: string) =>
+/** The `-` / `+` markers are decoration; to a screen reader a line says "default: …" or "current: …". */
+const lines = (section: string) =>
   within(screen.getByRole('group', { name: section }))
-    .getAllByRole('row')
-    .map((row) => within(row).queryAllByRole('cell').map((cell) => cell.textContent))
-    .filter((cells) => cells.length > 0) // the header row has none
+    .getAllByRole('listitem')
+    .map((line) => line.textContent)
 
 describe('Diff Checker tab', () => {
   it("hides the mock FC's setup: features, serial ports and modes are no tuning", async () => {
@@ -28,7 +28,8 @@ describe('Diff Checker tab', () => {
     await user.click(screen.getByRole('link', { name: 'Diff Checker' }))
     // yaw_motors_reversed is setup, not tuning
     expect(await screen.findByText(/^1 tuning difference · 7 other hidden/)).toBeInTheDocument()
-    expect(rows('master')).toEqual([['dshot_bidir', 'ON', 'OFF']])
+    expect(lines('master')).toEqual(['-default: set dshot_bidir = OFF', '+current: set dshot_bidir = ON'])
+    expect(within(screen.getByRole('group', { name: 'master' })).getByText('1 difference')).toBeInTheDocument()
     expect(screen.queryByRole('group', { name: 'feature' })).toBeNull()
 
     await user.click(screen.getByRole('button', { name: 'Read again' }))

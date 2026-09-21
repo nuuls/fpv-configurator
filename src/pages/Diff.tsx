@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Notice } from '@/components/Notice'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { describeError } from '@/hooks/useFcSnapshot'
 import { readDiff } from '@/lib/diff/io'
 import { countDifferences, tuningOnly, type DiffEntry, type DiffReport, type DiffSection } from '@/lib/diff/model'
 import type { MspClient } from '@/lib/msp/client'
+import { cn } from '@/lib/utils'
 import { useConnectionStore } from '@/stores/connection'
 
 type ReadState = { phase: 'reading' } | { phase: 'done'; report: DiffReport } | { phase: 'failed'; message: string }
@@ -82,6 +82,12 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
+/** The two sides of a difference, coloured as `git diff` does: what it was (the default) and what it is now. */
+const SIDES = {
+  default: { marker: '-', label: 'default', line: 'bg-destructive/10', gutter: 'text-destructive', value: 'bg-destructive/25' },
+  current: { marker: '+', label: 'current', line: 'bg-success/10', gutter: 'text-success', value: 'bg-success/25' },
+} as const
+
 function DiffReportView({ report }: { report: DiffReport }) {
   return (
     <>
@@ -93,64 +99,70 @@ function DiffReportView({ report }: { report: DiffReport }) {
       {report.sections.length === 0 && report.errors.length === 0 && (
         <Notice>No tuning differences — PIDs, rates and filters are at their defaults.</Notice>
       )}
-      <div className="mt-4 grid gap-4">
+      {report.sections.length > 0 && (
+        <p className="mt-4 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-muted-foreground">
+          <span>
+            <span className={cn('mr-1.5 rounded-sm px-1.5', SIDES.default.value, SIDES.default.gutter)}>-</span>Betaflight default
+          </span>
+          <span>
+            <span className={cn('mr-1.5 rounded-sm px-1.5', SIDES.current.value, SIDES.current.gutter)}>+</span>this flight controller
+          </span>
+        </p>
+      )}
+      <div className="mt-2 grid gap-4">
         {report.sections.map((section, index) => (
-          <SectionCard key={index} section={section} />
+          <SectionDiff key={index} section={section} />
         ))}
       </div>
     </>
   )
 }
 
-function SectionCard({ section }: { section: DiffSection }) {
+/** A section reads like a file in `git diff`: its CLI heading, then a `-` default and a `+` current line per difference. */
+function SectionDiff({ section }: { section: DiffSection }) {
+  const count = section.entries.filter((entry) => entry.kind === 'setting' || !entry.isDefault).length
   return (
-    <Card role="group" aria-label={section.title}>
-      <CardHeader>
-        <CardTitle className="font-mono text-base">{section.title}</CardTitle>
-      </CardHeader>
-      <CardContent className="overflow-x-auto text-sm">
-        <table className="w-full font-mono">
-          {section.entries.some((entry) => entry.kind === 'setting') && (
-            <thead className="font-sans text-left text-muted-foreground">
-              <tr className="border-b">
-                <th className="py-1.5 pr-4 font-normal">Setting</th>
-                <th className="py-1.5 pr-4 font-normal">Current</th>
-                <th className="py-1.5 font-normal">Default</th>
-              </tr>
-            </thead>
-          )}
-          <tbody className="divide-y">
-            {section.entries.map((entry, index) => (
-              <EntryRow key={index} entry={entry} />
-            ))}
-          </tbody>
-        </table>
-      </CardContent>
-    </Card>
+    <section role="group" aria-label={section.title} className="overflow-hidden rounded-lg border bg-card font-mono text-sm">
+      <header className="flex items-baseline justify-between gap-4 border-b bg-muted/50 px-3 py-2">
+        <h2 className="font-medium">{section.title}</h2>
+        <span className="font-sans text-xs text-muted-foreground">{count === 1 ? '1 difference' : `${count} differences`}</span>
+      </header>
+      <ul>
+        {section.entries.map((entry, index) => (
+          <EntryLines key={index} entry={entry} />
+        ))}
+      </ul>
+    </section>
   )
 }
 
-function EntryRow({ entry }: { entry: DiffEntry }) {
+function EntryLines({ entry }: { entry: DiffEntry }) {
   if (entry.kind === 'setting') {
+    const command = `set ${entry.name} = `
     return (
-      <tr>
-        <td className="py-1.5 pr-4">{entry.name}</td>
-        <td className="py-1.5 pr-4 font-medium">{entry.value}</td>
-        <td className="py-1.5 text-muted-foreground">{entry.defaultValue ?? '—'}</td>
-      </tr>
+      <>
+        {entry.defaultValue !== null && <DiffLine side="default" command={command} value={entry.defaultValue} />}
+        <DiffLine side="current" command={command} value={entry.value} />
+      </>
     )
   }
-  // Commands other than `set` (feature, serial, aux, …) stay the lines the CLI printed, defaults included.
+  // Commands other than `set` (feature, serial, aux, …) stay the lines the CLI printed.
+  return <DiffLine side={entry.isDefault ? 'default' : 'current'} command={entry.line} />
+}
+
+/** `value` is what differs between the two lines of a setting; it gets the stronger highlight. */
+function DiffLine({ side, command, value }: { side: keyof typeof SIDES; command: string; value?: string }) {
+  const style = SIDES[side]
   return (
-    <tr className={entry.isDefault ? 'text-muted-foreground' : undefined}>
-      <td colSpan={3} className="py-1.5">
-        <span className={entry.isDefault ? undefined : 'font-medium'}>{entry.line}</span>
-        {entry.isDefault && (
-          <Badge variant="outline" className="ml-2 py-0 font-sans">
-            default
-          </Badge>
-        )}
-      </td>
-    </tr>
+    <li className={cn('flex px-3 py-0.5', style.line)}>
+      <span aria-hidden className={cn('w-5 shrink-0 select-none', style.gutter)}>
+        {style.marker}
+      </span>
+      <span className="sr-only">{style.label}: </span>
+      <code className="min-w-0 break-all whitespace-pre-wrap">
+        {command}
+        {value !== undefined && <span className={cn('rounded-sm px-0.5', style.value)}>{value}</span>}
+      </code>
+    </li>
   )
 }
