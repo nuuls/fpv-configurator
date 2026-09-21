@@ -5,8 +5,15 @@ import { BLACKBOX_DEVICE, formatBytes, sampleRateLabel } from '@/lib/blackbox/mo
 import { defaultMockConfig, MockFlightController } from '@/lib/mock-fc/mockFc'
 import { readModesSnapshot, saveModes } from '@/lib/modes/io'
 import { isRangeActive, planModeWrites, readModes, validateModes, type ModesSnapshot } from '@/lib/modes/model'
-import { readMotorsSnapshot, saveMotors, setArmingDisabled, setMotorOutputs, stopMotors } from '@/lib/motors/io'
-import { readMotors, validateMotors } from '@/lib/motors/model'
+import {
+  readMotorsSnapshot,
+  readMotorTelemetry,
+  saveMotors,
+  setArmingDisabled,
+  setMotorOutputs,
+  stopMotors,
+} from '@/lib/motors/io'
+import { dynIdleSegments, dynIdleZone, readMotors, spinsClockwise, validateMotors } from '@/lib/motors/model'
 import { sendReboot, sendRebootToMassStorage } from '@/lib/msp/api'
 import { MspClient } from '@/lib/msp/client'
 import { readBoardAlignment, saveBoardAlignment } from '@/lib/orientation/io'
@@ -205,7 +212,7 @@ describe('pid tuning', () => {
 
 describe('motors', () => {
   it('validates motor poles', () => {
-    const draft = { protocol: 6, bidirDshot: false, poles: 14, propsOut: false }
+    const draft = { protocol: 6, bidirDshot: false, poles: 14, propsOut: false, dynIdle: 20 }
     expect(validateMotors(draft)).toEqual([])
     expect(validateMotors({ ...draft, poles: 13 })).toHaveLength(1)
     expect(validateMotors({ ...draft, poles: 2 })).toHaveLength(1)
@@ -214,20 +221,68 @@ describe('motors', () => {
   it('reads and saves persistently, changing only the protocol byte of the advanced config', async () => {
     const { fc, transport, client } = await connect()
     const snapshot = await readMotorsSnapshot(client)
-    expect(readMotors(snapshot)).toEqual({ protocol: 6, bidirDshot: false, poles: 14, propsOut: false })
+    expect(readMotors(snapshot)).toEqual({ protocol: 6, bidirDshot: false, poles: 14, propsOut: false, dynIdle: 0 })
     expect(snapshot.motorCount).toBe(4)
 
-    await saveMotors(client, snapshot, { protocol: 7, bidirDshot: true, poles: 12, propsOut: true })
+    await saveMotors(client, snapshot, { protocol: 7, bidirDshot: true, poles: 12, propsOut: true, dynIdle: 0 })
     const after = await readMotorsSnapshot(await rebootAndReconnect(fc, transport, client))
-    expect(readMotors(after)).toEqual({ protocol: 7, bidirDshot: true, poles: 12, propsOut: true })
+    expect(readMotors(after)).toEqual({ protocol: 7, bidirDshot: true, poles: 12, propsOut: true, dynIdle: 0 })
     expect(after.advancedConfig.filter((_, i) => i !== 3)).toEqual(snapshot.advancedConfig.filter((_, i) => i !== 3))
   })
 
   it('never enables bidirectional DShot on a non-DShot protocol', async () => {
     const { client } = await connect()
     const snapshot = await readMotorsSnapshot(client)
-    await saveMotors(client, snapshot, { protocol: 3, bidirDshot: true, poles: 14, propsOut: false })
+    await saveMotors(client, snapshot, { protocol: 3, bidirDshot: true, poles: 14, propsOut: false, dynIdle: 0 })
     expect((await readMotorsSnapshot(client)).bidirDshot).toBe(false)
+  })
+
+  it('classifies dynamic idle for a 5" and builds contiguous track segments', () => {
+    expect([12, 14, 15, 17, 18, 25, 26, 28, 29, 40].map((v) => dynIdleZone(v, 'five-inch'))).toEqual([
+      'danger', 'danger', 'warning', 'warning', 'good', 'good', 'warning', 'warning', 'danger', 'danger',
+    ])
+    expect(dynIdleSegments('five-inch')).toEqual([
+      { from: 12, to: 14, zone: 'danger' },
+      { from: 15, to: 17, zone: 'warning' },
+      { from: 18, to: 25, zone: 'good' },
+      { from: 26, to: 28, zone: 'warning' },
+      { from: 29, to: 40, zone: 'danger' },
+    ])
+  })
+
+  it('accepts an untouched "off" idle from the FC but not an edited out-of-range one', async () => {
+    const { client } = await connect()
+    const snapshot = await readMotorsSnapshot(client)
+    expect(snapshot.dynIdle).toBe(0)
+    expect(validateMotors(readMotors(snapshot), snapshot)).toEqual([])
+    expect(validateMotors({ ...readMotors(snapshot), dynIdle: 11 }, snapshot)).toHaveLength(1)
+    expect(validateMotors({ ...readMotors(snapshot), dynIdle: 20 }, snapshot)).toEqual([])
+  })
+
+  it('saves dynamic idle persistently', async () => {
+    const { fc, transport, client } = await connect()
+    const snapshot = await readMotorsSnapshot(client)
+    await saveMotors(client, snapshot, { ...readMotors(snapshot), dynIdle: 22 })
+    expect((await readMotorsSnapshot(await rebootAndReconnect(fc, transport, client))).dynIdle).toBe(22)
+  })
+
+  it('reports RPM only with bidirectional DShot', async () => {
+    const { fc, transport, client } = await connect()
+    await setMotorOutputs(client, [1100, 1000, 1000, 1000])
+    expect((await readMotorTelemetry(client)).map((m) => m.rpm)).toEqual([0, 0, 0, 0])
+
+    const snapshot = await readMotorsSnapshot(client)
+    await saveMotors(client, snapshot, { ...readMotors(snapshot), bidirDshot: true })
+    const again = await rebootAndReconnect(fc, transport, client)
+    await setMotorOutputs(again, [1100, 1000, 1000, 1000])
+    const telemetry = await readMotorTelemetry(again)
+    expect(telemetry.map((m) => m.rpm)).toEqual([4500, 0, 0, 0])
+    expect(telemetry[0]?.invalidPercent).toBe(0)
+  })
+
+  it('knows the expected spin directions', () => {
+    expect([1, 2, 3, 4].map((m) => spinsClockwise(m, false))).toEqual([true, false, false, true])
+    expect([1, 2, 3, 4].map((m) => spinsClockwise(m, true))).toEqual([false, true, true, false])
   })
 
   it('drives and stops motors; a reboot always stops them', async () => {

@@ -83,7 +83,15 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
 	- Copy betaflight design
 	- Props out is the default
 	- Bi-directional dshot is enabled by default, mark as warning if its disabled
-
+	- Dynamic idle input
+		- Slider ranging from 12-40
+		- Add green, warning and danger zone according to type of drone
+		- Currently only 5" with the following
+			- Green 18-25
+			- 3 point warning zone
+			- Rest danger zone
+	- Motor spin tester menu should be visual where you can drag the slider on each motor on a 2d quad
+	- Also display reported RPM
 
 - OSD
 	- TBD

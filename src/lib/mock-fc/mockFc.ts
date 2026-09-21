@@ -26,7 +26,14 @@ import {
   type BlackboxConfig,
 } from '@/lib/blackbox/model'
 import { decodeSetModeRange, encodeModeRanges, encodeRc, type ModeSlot } from '@/lib/modes/model'
-import { decodeSetMotor, decodeSetMotorConfig, encodeMixerConfig, encodeMotorConfig, MOTOR_STOP } from '@/lib/motors/model'
+import {
+  decodeSetMotor,
+  decodeSetMotorConfig,
+  encodeMixerConfig,
+  encodeMotorConfig,
+  encodeMotorTelemetry,
+  MOTOR_STOP,
+} from '@/lib/motors/model'
 import { decodeBoardAlignment, encodeBoardAlignment, type BoardAlignment } from '@/lib/orientation/model'
 import { PORT_FUNCTION } from '@/lib/ports/model'
 import { ByteReader, ByteWriter } from '@/lib/msp/bytes'
@@ -96,6 +103,7 @@ export function defaultMockConfig(): MockFcConfig {
       rc_smoothing_auto_factor: '30',
       rc_smoothing_auto_factor_throttle: '30',
       feedforward_smooth_factor: '65',
+      dyn_idle_min_rpm: '0', // Betaflight default: dynamic idle off
     },
     boardAlignment: { roll: 0, pitch: 0, yaw: 0 },
     blackbox: { supported: true, device: BLACKBOX_DEVICE.FLASH, sampleRate: 1, fieldsDisabledMask: 0 },
@@ -323,6 +331,7 @@ export class MockFlightController {
           maxThrottle: 2000,
           minCommand: 1000,
           ...this.running.motor,
+          dynIdle: 0,
         })
       case MSP.SET_MOTOR_CONFIG:
         this.running.motor = { ...this.running.motor, ...decodeSetMotorConfig(request) }
@@ -334,6 +343,22 @@ export class MockFlightController {
         return EMPTY
       case MSP.MOTOR:
         return encodeRc(this.motors)
+      case MSP.MOTOR_TELEMETRY: {
+        // RPM is only reported with bidirectional DShot; roughly 30 rpm per throttle step above idle.
+        const bidir = this.running.motor.bidirDshot
+        return encodeMotorTelemetry(
+          this.motors.slice(0, 4).map((output) => ({
+            rpm: bidir && output > MOTOR_STOP ? 1500 + (output - MOTOR_STOP) * 30 : 0,
+            invalidPercent: bidir ? 0 : 100,
+          })),
+        )
+      }
+      case MSP.PID_ADVANCED: {
+        // Only dyn_idle_min_rpm (byte 49) is meaningful in the mock.
+        const payload = new Uint8Array(61)
+        payload[49] = Number(this.running.settings['dyn_idle_min_rpm'])
+        return payload
+      }
       case MSP.SET_MOTOR:
         this.motors = decodeSetMotor(request).slice(0, 8)
         return EMPTY

@@ -224,6 +224,39 @@ describe('Motors tab', () => {
     expect(screen.getByLabelText('Prop direction')).toHaveValue('out')
   })
 
+  it('rates dynamic idle against the 5" zones and saves it', async () => {
+    const user = await openTab('Motors')
+    const idle = () => within(screen.getByRole('group', { name: 'Dynamic idle' })).getByRole('slider')
+    expect(await screen.findByText(/Off — drag the slider/)).toBeInTheDocument()
+    expect(idle()).toHaveAttribute('data-disabled') // needs bidirectional DShot first
+
+    await user.click(screen.getByLabelText('Bidirectional DShot'))
+    await nudge(user, idle(), '{ArrowRight}') // 12 → 13
+    expect(screen.getByText(/Too low: motors can stall/)).toBeInTheDocument()
+    await nudge(user, idle(), '{ArrowRight}{ArrowRight}{ArrowRight}') // 16
+    expect(screen.getByText(/A bit low for a 5"/)).toBeInTheDocument()
+    await nudge(user, idle(), '{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}') // 20
+    expect(screen.getByText('Good for a 5"')).toBeInTheDocument()
+    expect(screen.getByText('20 (2000 rpm)')).toBeInTheDocument()
+
+    await saveAndReboot(user)
+    expect(await screen.findByText('20 (2000 rpm)')).toBeInTheDocument()
+  })
+
+  it('shows the quad from above with spin directions and live RPM once bidirectional DShot is on', async () => {
+    const user = await openTab('Motors')
+    expect(await screen.findByText('RPM readout needs bidirectional DShot.')).toBeInTheDocument()
+    expect(screen.getAllByText('— rpm')).toHaveLength(4)
+    expect(screen.getAllByText('CW')).toHaveLength(2) // props in on the mock: motors 1 and 4
+
+    await user.click(screen.getByLabelText('Bidirectional DShot'))
+    await saveAndReboot(user)
+    await user.click(await screen.findByLabelText(/I have removed all propellers/))
+    await nudge(user, within(screen.getByLabelText('Motor 1')).getByRole('slider'), '{ArrowUp}{ArrowUp}')
+    expect(await screen.findByText('1800 rpm')).toBeInTheDocument() // mock: 1500 + 10 × 30
+    expect(screen.getAllByText('0 rpm')).toHaveLength(3)
+  })
+
   it('keeps motor control locked until props are confirmed off, and while there are unsaved edits', async () => {
     const user = await openTab('Motors')
     const motor1 = within(await screen.findByLabelText('Motor 1')).getByRole('slider')

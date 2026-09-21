@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { CircleCheck, OctagonAlert, RotateCcw, RotateCw, TriangleAlert } from 'lucide-react'
 import { Notice, LoadingState } from '@/components/Notice'
 import { SaveBar } from '@/components/SaveBar'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -8,25 +9,50 @@ import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { useDraft } from '@/hooks/useDraft'
 import { useFcSnapshot } from '@/hooks/useFcSnapshot'
+import { useMspPoll } from '@/hooks/useMspPoll'
 import { useSave } from '@/hooks/useSave'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
-import { readMotorsSnapshot, saveMotors, setArmingDisabled, setMotorOutputs, stopMotors } from '@/lib/motors/io'
 import {
+  readMotorsSnapshot,
+  readMotorTelemetry,
+  saveMotors,
+  setArmingDisabled,
+  setMotorOutputs,
+  stopMotors,
+} from '@/lib/motors/io'
+import {
+  DYN_IDLE_MAX,
+  DYN_IDLE_MIN,
+  DYN_IDLE_ZONES,
+  dynIdleSegments,
+  dynIdleZone,
   isDshot,
   MOTOR_PROTOCOL_NAMES,
   MOTOR_STOP,
   MOTOR_TEST_MAX,
   readMotors,
   SELECTABLE_PROTOCOLS,
+  spinsClockwise,
   validateMotors,
+  type DroneType,
+  type IdleZone,
   type MotorsSnapshot,
 } from '@/lib/motors/model'
 import type { MspClient } from '@/lib/msp/client'
+import { cn } from '@/lib/utils'
 
 const PATH = '/motors'
 
-/** Betaflight Quad X numbering as seen from above, nose up: 4 front-left, 2 front-right, 3 rear-left, 1 rear-right. */
-const QUAD_LAYOUT = [4, 2, 3, 1]
+/** Betaflight Quad X as seen from above, nose up: 4 front-left, 2 front-right, 3 rear-left, 1 rear-right. */
+const QUAD_POSITIONS: { motor: number; className: string }[] = [
+  { motor: 4, className: 'left-0 top-0' },
+  { motor: 2, className: 'right-0 top-0' },
+  { motor: 3, className: 'left-0 bottom-0' },
+  { motor: 1, className: 'right-0 bottom-0' },
+]
+
+/** Until drone types exist (SPEC §2), every quad is treated as a 5". */
+const DRONE_TYPE: DroneType = 'five-inch'
 
 /** Spec: docs/tabs/motors.md */
 export function MotorsPage() {
@@ -113,10 +139,19 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Mot
               <NativeSelectOption value="out">Props out (default)</NativeSelectOption>
               <NativeSelectOption value="in">Props in</NativeSelectOption>
             </NativeSelect>
+
+            <span id="dyn-idle-label" className="self-start pt-1 font-medium">
+              Dynamic idle
+            </span>
+            <DynamicIdle
+              value={draft.dynIdle}
+              enabled={draft.bidirDshot && dshot}
+              onChange={(dynIdle) => setDraft({ ...draft, dynIdle })}
+            />
           </CardContent>
         </Card>
 
-        <MotorTest client={client} motorCount={snapshot.motorCount} blocked={dirty || saving} />
+        <MotorTest client={client} snapshot={snapshot} blocked={dirty || saving} />
       </div>
 
       {!(draft.bidirDshot && dshot) && (
@@ -129,7 +164,7 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Mot
       <SaveBar
         dirty={dirty}
         saving={saving}
-        problem={validateMotors(draft)[0]}
+        problem={validateMotors(draft, snapshot)[0]}
         reboot
         onRevert={revert}
         onSave={() =>
@@ -148,8 +183,10 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Mot
  * the radio is blocked meanwhile, throttle is capped, and everything stops when the switch goes
  * off, the tab is left, or the page is closed.
  */
-function MotorTest({ client, motorCount, blocked }: { client: MspClient; motorCount: number; blocked: boolean }) {
-  const count = Math.min(Math.max(motorCount, 1), 8)
+function MotorTest({ client, snapshot, blocked }: { client: MspClient; snapshot: MotorsSnapshot; blocked: boolean }) {
+  const count = Math.min(Math.max(snapshot.motorCount, 1), 8)
+  const telemetry = useMspPoll(readMotorTelemetry, 100)
+  const hasRpm = snapshot.bidirDshot
   const [enabled, setEnabled] = useState(false)
   const [values, setValues] = useState<number[]>(() => new Array<number>(count).fill(MOTOR_STOP))
   const [error, setError] = useState<string | null>(null)
@@ -207,8 +244,21 @@ function MotorTest({ client, motorCount, blocked }: { client: MspClient; motorCo
     setEnabled(on)
   }
 
-  const order = count === 4 ? QUAD_LAYOUT : Array.from({ length: count }, (_, i) => i + 1)
   const master = Math.max(...values)
+  const motorSlider = (motor: number, vertical: boolean) => (
+    <Slider
+      aria-label={`Motor ${motor}`}
+      orientation={vertical ? 'vertical' : 'horizontal'}
+      className={vertical ? 'data-[orientation=vertical]:h-20 data-[orientation=vertical]:min-h-0' : undefined}
+      min={MOTOR_STOP}
+      max={MOTOR_TEST_MAX}
+      step={5}
+      disabled={!active}
+      value={[values[motor - 1] ?? MOTOR_STOP]}
+      onValueChange={([v]) => v !== undefined && apply(values.map((old, i) => (i === motor - 1 ? v : old)))}
+    />
+  )
+  const rpmText = (motor: number) => (hasRpm ? `${telemetry?.[motor - 1]?.rpm ?? 0} rpm` : '— rpm')
 
   return (
     <Card className={active ? 'border-destructive' : undefined}>
@@ -225,25 +275,64 @@ function MotorTest({ client, motorCount, blocked }: { client: MspClient; motorCo
         </div>
         {blocked && <p className="text-muted-foreground">Save or revert your changes before testing motors.</p>}
 
-        <div className="grid grid-cols-2 gap-x-8 gap-y-5">
-          {order.map((motor) => (
-            <div key={motor}>
-              <div className="mb-2 flex justify-between">
-                <span className="font-medium">Motor {motor}</span>
-                <span className="font-mono tabular-nums">{values[motor - 1] ?? MOTOR_STOP}</span>
+        {count === 4 ? (
+          <div className="relative mx-auto aspect-square w-full max-w-sm">
+            {/* frame seen from above, nose up */}
+            <svg viewBox="0 0 100 100" className="absolute inset-0 size-full text-muted-foreground" aria-hidden="true">
+              <path d="M22 22 78 78M78 22 22 78" stroke="currentColor" strokeWidth={4} strokeLinecap="round" opacity={0.5} />
+              <rect x={40} y={38} width={20} height={24} rx={3} fill="var(--card)" stroke="currentColor" strokeWidth={1.5} />
+              <path d="m50 41 4 6h-8z" fill="var(--primary)" />
+              <text x={50} y={33} textAnchor="middle" fontSize={3.2} letterSpacing={0.4} fill="currentColor">
+                FRONT
+              </text>
+            </svg>
+
+            {QUAD_POSITIONS.map(({ motor, className }) => {
+              const spinning = (values[motor - 1] ?? MOTOR_STOP) > MOTOR_STOP && active
+              const clockwise = spinsClockwise(motor, snapshot.propsOut)
+              const Spin = clockwise ? RotateCw : RotateCcw
+              return (
+                <div
+                  key={motor}
+                  className={cn(
+                    'absolute flex aspect-square w-[44%] flex-col items-center justify-center gap-1 rounded-full border-2 bg-card',
+                    className,
+                    spinning ? 'border-destructive' : 'border-border',
+                  )}
+                >
+                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                    Motor {motor}
+                    <span
+                      className="flex items-center gap-0.5 text-muted-foreground"
+                      title={`Should spin ${clockwise ? 'clockwise' : 'counter-clockwise'} seen from above`}
+                    >
+                      <Spin className={cn('size-3.5', spinning && 'animate-spin', spinning && !clockwise && '[animation-direction:reverse]')} />
+                      {clockwise ? 'CW' : 'CCW'}
+                    </span>
+                  </div>
+                  {motorSlider(motor, true)}
+                  <div className="font-mono text-xs tabular-nums">{values[motor - 1] ?? MOTOR_STOP}</div>
+                  <div className="font-mono text-xs text-muted-foreground tabular-nums">{rpmText(motor)}</div>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-x-8 gap-y-5">
+            {Array.from({ length: count }, (_, i) => i + 1).map((motor) => (
+              <div key={motor}>
+                <div className="mb-2 flex justify-between">
+                  <span className="font-medium">Motor {motor}</span>
+                  <span className="font-mono tabular-nums">
+                    {values[motor - 1] ?? MOTOR_STOP} · {rpmText(motor)}
+                  </span>
+                </div>
+                {motorSlider(motor, false)}
               </div>
-              <Slider
-                aria-label={`Motor ${motor}`}
-                min={MOTOR_STOP}
-                max={MOTOR_TEST_MAX}
-                step={5}
-                disabled={!active}
-                value={[values[motor - 1] ?? MOTOR_STOP]}
-                onValueChange={([v]) => v !== undefined && apply(values.map((old, i) => (i === motor - 1 ? v : old)))}
-              />
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
+        {!hasRpm && <p className="text-muted-foreground">RPM readout needs bidirectional DShot.</p>}
 
         <div>
           <div className="mb-2 flex justify-between">
@@ -263,5 +352,72 @@ function MotorTest({ client, motorCount, blocked }: { client: MspClient; motorCo
         {error && <Notice tone="error">{error}</Notice>}
       </CardContent>
     </Card>
+  )
+}
+
+const ZONE_STYLE: Record<IdleZone, { bar: string; text: string; icon: typeof CircleCheck }> = {
+  good: { bar: 'bg-success', text: 'text-success', icon: CircleCheck },
+  warning: { bar: 'bg-warning', text: 'text-warning', icon: TriangleAlert },
+  danger: { bar: 'bg-destructive', text: 'text-destructive', icon: OctagonAlert },
+}
+
+/** `dyn_idle_min_rpm` slider with the recommended zones for the drone type painted under the track. */
+function DynamicIdle({ value, enabled, onChange }: { value: number; enabled: boolean; onChange: (value: number) => void }) {
+  const inRange = value >= DYN_IDLE_MIN && value <= DYN_IDLE_MAX
+  const zones = DYN_IDLE_ZONES[DRONE_TYPE]
+  const span = DYN_IDLE_MAX - DYN_IDLE_MIN
+  const percent = (v: number) => ((Math.min(DYN_IDLE_MAX, Math.max(DYN_IDLE_MIN, v)) - DYN_IDLE_MIN) / span) * 100
+
+  let status: { zone: IdleZone; text: string }
+  if (!inRange) status = { zone: 'warning', text: value === 0 ? 'Off — drag the slider to turn dynamic idle on' : `Set to ${value}, outside this slider` }
+  else {
+    const zone = dynIdleZone(value, DRONE_TYPE)
+    const low = value < zones.goodMin
+    status = {
+      zone,
+      text:
+        zone === 'good'
+          ? `Good for a ${zones.label}`
+          : zone === 'warning'
+            ? `${low ? 'A bit low' : 'A bit high'} for a ${zones.label} (${zones.goodMin}–${zones.goodMax} recommended)`
+            : low
+              ? 'Too low: motors can stall in hard moves'
+              : 'Too high: the quad floats and motors run hot',
+    }
+  }
+  const { text, icon: Icon } = ZONE_STYLE[status.zone]
+
+  return (
+    <div role="group" aria-labelledby="dyn-idle-label" className="flex flex-col gap-2">
+      <div className="font-mono tabular-nums">{inRange ? `${value} (${value * 100} rpm)` : 'off'}</div>
+      <Slider
+        aria-labelledby="dyn-idle-label"
+        min={DYN_IDLE_MIN}
+        max={DYN_IDLE_MAX}
+        step={1}
+        disabled={!enabled}
+        value={[inRange ? value : DYN_IDLE_MIN]}
+        onValueChange={([v]) => v !== undefined && onChange(v)}
+      />
+      {/* zone band: each value owns the stretch around its tick */}
+      <div className="relative mx-2 h-1.5" aria-hidden="true">
+        {dynIdleSegments(DRONE_TYPE).map(({ from, to, zone }) => (
+          <div
+            key={from}
+            className={cn('absolute h-full rounded-full', ZONE_STYLE[zone].bar)}
+            style={{ left: `${percent(from - 0.5)}%`, right: `${100 - percent(to + 0.5)}%` }}
+          />
+        ))}
+      </div>
+      <p className={cn('flex items-center gap-1.5', text)}>
+        <Icon className="size-4 shrink-0" />
+        <span className="text-foreground">{status.text}</span>
+      </p>
+      <p className="text-muted-foreground">
+        {enabled
+          ? 'Lowest RPM the motors are allowed to drop to in flight.'
+          : 'Needs bidirectional DShot: the flight controller has to know the motor RPM.'}
+      </p>
+    </div>
   )
 }

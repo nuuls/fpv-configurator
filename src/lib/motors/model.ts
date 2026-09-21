@@ -25,6 +25,8 @@ export const MOTOR_MAX = 2000
 export const MOTOR_TEST_MAX = 1300
 
 const ADVANCED_CONFIG_PROTOCOL_OFFSET = 3
+/** `dyn_idle_min_rpm` inside MSP_PID_ADVANCED (94). Same offset with and without USE_DYN_IDLE. */
+const PID_ADVANCED_DYN_IDLE_OFFSET = 49
 
 export interface MotorsSnapshot {
   /** Raw MSP_ADVANCED_CONFIG payload; written back with only the protocol byte changed. */
@@ -36,6 +38,8 @@ export interface MotorsSnapshot {
   bidirDshot: boolean
   mixerMode: number
   propsOut: boolean
+  /** `dyn_idle_min_rpm` of the current PID profile, in units of 100 rpm. 0 = dynamic idle off. */
+  dynIdle: number
 }
 
 export interface MotorsDraft {
@@ -44,6 +48,7 @@ export interface MotorsDraft {
   poles: number
   /** "Props out": yaw_motors_reversed. */
   propsOut: boolean
+  dynIdle: number
 }
 
 export function readMotors(snapshot: MotorsSnapshot): MotorsDraft {
@@ -52,11 +57,16 @@ export function readMotors(snapshot: MotorsSnapshot): MotorsDraft {
     bidirDshot: snapshot.bidirDshot,
     poles: snapshot.poles,
     propsOut: snapshot.propsOut,
+    dynIdle: snapshot.dynIdle,
   }
 }
 
-export function validateMotors(draft: MotorsDraft): string[] {
+export function validateMotors(draft: MotorsDraft, snapshot?: MotorsSnapshot): string[] {
   const problems: string[] = []
+  // An untouched out-of-range value from the FC (typically 0 = off) is fine; an edited one must be in range.
+  const untouched = snapshot !== undefined && draft.dynIdle === snapshot.dynIdle
+  if (!untouched && (draft.dynIdle < DYN_IDLE_MIN || draft.dynIdle > DYN_IDLE_MAX))
+    problems.push(`Dynamic idle must be between ${DYN_IDLE_MIN} and ${DYN_IDLE_MAX}.`)
   if (!Number.isInteger(draft.poles) || draft.poles < 4 || draft.poles > 40 || draft.poles % 2 !== 0)
     problems.push('Motor poles must be an even number between 4 and 40 (count the magnets; usually 12 or 14).')
   return problems
@@ -141,4 +151,69 @@ export function decodeSetMotor(payload: Uint8Array): number[] {
 /** Second byte: keep runaway-takeoff prevention enabled. */
 export function encodeArmingDisabled(disabled: boolean): Uint8Array {
   return Uint8Array.of(disabled ? 1 : 0, 0)
+}
+
+// ---- dynamic idle (dyn_idle_min_rpm, ×100 rpm) ----
+
+export const DYN_IDLE_MIN = 12
+export const DYN_IDLE_MAX = 40
+
+export type DroneType = 'five-inch'
+export type IdleZone = 'good' | 'warning' | 'danger'
+
+/** Recommended idle per drone type (SPEC §2 Motors). Everything outside good ± warningMargin is danger. */
+export const DYN_IDLE_ZONES: Record<DroneType, { label: string; goodMin: number; goodMax: number; warningMargin: number }> = {
+  'five-inch': { label: '5"', goodMin: 18, goodMax: 25, warningMargin: 3 },
+}
+
+export function decodeDynIdle(pidAdvanced: Uint8Array): number {
+  return pidAdvanced[PID_ADVANCED_DYN_IDLE_OFFSET] ?? 0
+}
+
+export function dynIdleZone(value: number, type: DroneType): IdleZone {
+  const { goodMin, goodMax, warningMargin } = DYN_IDLE_ZONES[type]
+  if (value >= goodMin && value <= goodMax) return 'good'
+  return value >= goodMin - warningMargin && value <= goodMax + warningMargin ? 'warning' : 'danger'
+}
+
+/** Contiguous zones across the slider range, for colouring its track. `to` is inclusive. */
+export function dynIdleSegments(type: DroneType): { from: number; to: number; zone: IdleZone }[] {
+  const segments: { from: number; to: number; zone: IdleZone }[] = []
+  for (let value = DYN_IDLE_MIN; value <= DYN_IDLE_MAX; value++) {
+    const zone = dynIdleZone(value, type)
+    const last = segments.at(-1)
+    if (last && last.zone === zone) last.to = value
+    else segments.push({ from: value, to: value, zone })
+  }
+  return segments
+}
+
+// ---- MSP_MOTOR_TELEMETRY (139): count, then per motor rpm:u32 invalid:u16 temp:u8 voltage:u16 current:u16 mAh:u16 ----
+
+export interface MotorTelemetry {
+  rpm: number
+  /** Share of bad telemetry packets in percent (100 = no telemetry at all). */
+  invalidPercent: number
+}
+
+export function decodeMotorTelemetry(payload: Uint8Array): MotorTelemetry[] {
+  const r = new ByteReader(payload)
+  const count = r.u8()
+  const motors: MotorTelemetry[] = []
+  for (let i = 0; i < count && r.remaining >= 13; i++) {
+    motors.push({ rpm: r.u32(), invalidPercent: r.u16() / 100 })
+    r.skip(7)
+  }
+  return motors
+}
+
+export function encodeMotorTelemetry(motors: MotorTelemetry[]): Uint8Array {
+  const w = new ByteWriter().u8(motors.length)
+  for (const m of motors) w.u32(m.rpm).u16(Math.round(m.invalidPercent * 100)).zeros(7)
+  return w.toBytes()
+}
+
+/** Expected spin direction seen from above. Betaflight Quad X, props in: 1 CW, 2 CCW, 3 CCW, 4 CW; props out is the opposite. */
+export function spinsClockwise(motor: number, propsOut: boolean): boolean {
+  return (motor === 1 || motor === 4) !== propsOut
 }
