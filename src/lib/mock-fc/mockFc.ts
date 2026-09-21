@@ -70,6 +70,7 @@ import {
   type VtxPowerLevel,
 } from '@/lib/vtx/model'
 import { ByteReader, ByteWriter } from '@/lib/msp/bytes'
+import { MockCliSession, renderDiff } from './mockCli'
 import { defaultMockEscs, MockFourWayInterface, type MockEsc } from './mockEscs'
 
 const EMPTY = new Uint8Array(0)
@@ -221,6 +222,20 @@ function defaultOsd(): MockFcConfig['osd'] {
   return { positions, timers: [0x0a00, 0x0a01] }
 }
 
+/**
+ * What the CLI's `defaults` would leave behind, i.e. what its `diff` compares with: `defaultMockConfig` minus the
+ * setup — only the USB port speaks MSP, no modes, no telemetry.
+ */
+export function firmwareDefaultConfig(): MockFcConfig {
+  const config = defaultMockConfig()
+  return {
+    ...config,
+    ports: config.ports.map(({ identifier }) => port(identifier, identifier === 20 ? PORT_FUNCTION.MSP : 0)),
+    features: FEATURE.RX_SERIAL | FEATURE.OSD | FEATURE.AIRMODE,
+    modeSlots: config.modeSlots.map(() => ({ boxId: 0, auxChannel: 0, start: 900, end: 900 })),
+  }
+}
+
 export interface MockFcOptions {
   /** Injectable clock so tests get deterministic telemetry. */
   now?: () => number
@@ -258,6 +273,8 @@ export class MockFlightController {
   private readonly escs: MockEsc[]
   /** Non-null from MSP_SET_PASSTHROUGH on; while it hasn't exited, the port speaks 4-way instead of MSP. */
   private fourWay: MockFourWayInterface | null = null
+  /** The non-interactive CLI, from an STX until its ETX; the port doesn't speak MSP meanwhile. */
+  private cli: MockCliSession | null = null
 
   constructor(options: MockFcOptions = {}) {
     this.now = options.now ?? Date.now
@@ -296,6 +313,13 @@ export class MockFlightController {
   /** Feed bytes written by the host; returns the encoded response frames (possibly none). */
   receive(data: Uint8Array): Uint8Array[] {
     if (this.fourWay && !this.fourWay.exited) return this.fourWay.receive(data)
+    if (this.cli && !this.cli.exited) return this.cli.receive(data)
+    // The firmware looks for the STX on an idle port only. Hosts write whole MSP frames, so checking the first
+    // byte of a write is as good as that.
+    if (data[0] === 0x02) {
+      this.cli = new MockCliSession((command) => this.runCliCommand(command))
+      return [...this.cli.enter(), ...this.cli.receive(data.subarray(1))]
+    }
     this.parser.push(data)
     const out = this.outbox
     this.outbox = []
@@ -621,6 +645,12 @@ export class MockFlightController {
     }
   }
 
+  /** Output of a CLI command, null for the ones the mock doesn't have. */
+  private runCliCommand(command: string): string | null {
+    const diff = /^diff all( defaults)?$/.exec(command)
+    return diff ? renderDiff(this.running, firmwareDefaultConfig(), diff[1] !== undefined) : null
+  }
+
   private serialRxProvider(): number {
     const name = this.running.settings['serialrx_provider']
     const entry = Object.entries(SERIALRX_PROVIDER_NAMES).find(([, n]) => n === name)
@@ -696,6 +726,7 @@ export class MockFlightController {
     this.motors = new Array<number>(8).fill(MOTOR_STOP)
     this.armingDisabledByMsp = false
     this.fourWay = null
+    this.cli = null
     this.parser.reset()
     this.outbox = []
     this.onReboot?.()

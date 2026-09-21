@@ -185,7 +185,7 @@ Header (app name · link to the source code · alpha warning · firmware · conn
 sidebar tabs + page. The alpha warning is always shown: a big, warning-coloured notice that this is an alpha test
 version and many things are not properly tested yet. One sidebar tab per scope item in §2, in this order (single source: `src/routes.ts`):
 
-Setup · Ports · Orientation · PID Tuning · Filters · Rates · Modes · Motors · ESC · OSD · Analog VTX · Blackbox
+Setup · Ports · Orientation · PID Tuning · Filters · Rates · Modes · Motors · ESC · OSD · Analog VTX · Diff Checker · Blackbox
 
 Small screens (below 768 px, e.g. a phone — mock FC only there): the sidebar is a drawer over the page, opened
 and closed with a menu button in the header; it also closes on picking a tab, tapping outside of it, or Escape.

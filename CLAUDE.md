@@ -82,6 +82,7 @@ src/
     ports/ blackbox/ orientation/ modes/ tuning/ motors/ rates/ setup/ osd/ filters/
                            one folder per feature: model.ts (types, payload codecs, pure logic) + io.ts
                            (read snapshot / save via MspClient). Core messages stay in msp/messages.ts.
+    diff/                  CLI `diff all defaults` over the MSP port (non-interactive CLI) + its parser
     transport/             byte pipes: types.ts (interface), webserial.ts, mock.ts
     mock-fc/mockFc.ts      simulated Betaflight 2026.6 FC: running vs. saved config, EEPROM write, reboot
   stores/
@@ -171,6 +172,9 @@ Firmware facts that are easy to get wrong (verified against Betaflight 2026.6.2 
 - ESCs don't sit in their bootloader when the 4-way interface starts: they jump into it once the signal wire was
   high for a few hundred ms (longer with a startup tune), and the FC's `cmd_DeviceInitFlash` gives up within ~50 ms.
   Wait (1.2 s) before the first one and retry with pauses — an immediate attempt always fails on real ESCs.
+- CLI without reboot: `0x02` (STX) on an idle MSP port starts a non-interactive CLI (echoes the STX; no command
+  echo, no prompt), `0x03` (ETX) ends it and is echoed — see `lib/diff/io.ts`. `#` starts the interactive one,
+  which sets `ARMING_DISABLED_CLI` until the next power cycle even after `exit noreboot`. Both are ignored while armed.
 - API 1.49 (`master`) removes the serial function-mask messages in favour of `rx_uart`/`vtx_uart`/… settings.
 
 ## Adding a feature (e.g. a new tab backed by a new MSP message)

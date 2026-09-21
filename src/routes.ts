@@ -4,6 +4,7 @@ import {
   Cable,
   Cpu,
   Fan,
+  FileDiff,
   Filter,
   Gauge,
   HardDrive,
@@ -15,6 +16,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { BlackboxPage } from '@/pages/Blackbox'
+import { DiffPage } from '@/pages/Diff'
 import { EscPage } from '@/pages/Esc'
 import { FiltersPage } from '@/pages/Filters'
 import { ModesPage } from '@/pages/Modes'
@@ -50,6 +52,7 @@ export const ROUTES: AppRoute[] = [
   { path: '/esc', label: 'ESC', icon: Cpu, component: EscPage },
   { path: '/osd', label: 'OSD', icon: MonitorPlay, component: OsdPage },
   { path: '/vtx', label: 'Analog VTX', icon: Radio, component: VtxPage },
+  { path: '/diff', label: 'Diff Checker', icon: FileDiff, component: DiffPage },
   { path: '/blackbox', label: 'Blackbox', icon: HardDrive, component: BlackboxPage },
 ]
 

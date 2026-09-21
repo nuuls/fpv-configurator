@@ -10,7 +10,8 @@ describe('sidebar', () => {
     await openTab('Setup')
     const tabs = within(screen.getByRole('navigation', { name: 'Tabs' })).getAllByRole('link')
     expect(tabs.map((tab) => tab.textContent)).toEqual([
-      'Setup', 'Ports', 'Orientation', 'PID Tuning', 'Filters', 'Rates', 'Modes', 'Motors', 'ESC', 'OSD', 'Analog VTX', 'Blackbox',
+      'Setup', 'Ports', 'Orientation', 'PID Tuning', 'Filters', 'Rates', 'Modes', 'Motors', 'ESC', 'OSD', 'Analog VTX', 'Diff Checker',
+      'Blackbox',
     ])
   })
 })
