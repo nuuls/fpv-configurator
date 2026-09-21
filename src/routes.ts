@@ -2,6 +2,7 @@ import type { ComponentType } from 'react'
 import {
   Activity,
   Cable,
+  Cpu,
   Fan,
   Filter,
   Gauge,
@@ -14,6 +15,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { BlackboxPage } from '@/pages/Blackbox'
+import { EscPage } from '@/pages/Esc'
 import { FiltersPage } from '@/pages/Filters'
 import { ModesPage } from '@/pages/Modes'
 import { MotorsPage } from '@/pages/Motors'
@@ -45,6 +47,7 @@ export const ROUTES: AppRoute[] = [
   { path: '/rates', label: 'Rates', icon: Activity, component: RatesPage },
   { path: '/modes', label: 'Modes', icon: ToggleLeft, component: ModesPage },
   { path: '/motors', label: 'Motors', icon: Fan, component: MotorsPage },
+  { path: '/esc', label: 'ESC', icon: Cpu, component: EscPage },
   { path: '/osd', label: 'OSD', icon: MonitorPlay, component: OsdPage },
   { path: '/vtx', label: 'Analog VTX', icon: Radio, component: VtxPage },
   { path: '/blackbox', label: 'Blackbox', icon: HardDrive, component: BlackboxPage },

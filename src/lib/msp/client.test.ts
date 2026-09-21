@@ -118,3 +118,52 @@ describe('MspClient request handling', () => {
     await expect(request).resolves.toHaveLength(6)
   })
 })
+
+describe('MspClient exclusive sessions', () => {
+  it('gives the session the raw link and holds back requests until it ends', async () => {
+    const transport = new FakeTransport()
+    const client = new MspClient(transport)
+    const raw: number[] = []
+    let finish = () => {}
+
+    const session = client.exclusive(async (link) => {
+      link.onData((chunk) => raw.push(...chunk))
+      await link.write(Uint8Array.of(0x2f, 1, 2))
+      await new Promise<void>((resolve) => (finish = resolve))
+      return 'done'
+    })
+    const queued = client.request(MSP.FC_VARIANT)
+    await flush()
+    expect(transport.written).toEqual([Uint8Array.of(0x2f, 1, 2)]) // the MSP request is still waiting
+
+    // Bytes that would be a valid MSP response go to the session, not to the parser.
+    transport.receive(encodeV1(MSP.FC_VARIANT, Uint8Array.of(1, 2, 3, 4), 'response'))
+    expect(raw).toHaveLength(10)
+
+    finish()
+    await expect(session).resolves.toBe('done')
+    await flush()
+    expect(transport.written).toHaveLength(2)
+    transport.receive(encodeV1(MSP.FC_VARIANT, Uint8Array.of(66, 84, 70, 76), 'response'))
+    await expect(queued).resolves.toEqual(Uint8Array.of(66, 84, 70, 76))
+  })
+
+  it('can send MSP requests of its own, and hands the link back when the session throws', async () => {
+    const transport = new FakeTransport()
+    const client = new MspClient(transport)
+
+    const session = client.exclusive(async (link) => {
+      const reply = await link.request(MSP.SET_PASSTHROUGH)
+      link.onData(() => {})
+      throw new Error(`count ${reply[0]}`)
+    })
+    await flush()
+    transport.receive(encodeV1(MSP.SET_PASSTHROUGH, Uint8Array.of(4), 'response'))
+    await expect(session).rejects.toThrow('count 4')
+
+    const next = client.request(MSP.API_VERSION)
+    await flush()
+    transport.receive(encodeV1(MSP.API_VERSION, Uint8Array.of(0, 1, 48), 'response'))
+    await expect(next).resolves.toEqual(Uint8Array.of(0, 1, 48))
+  })
+})

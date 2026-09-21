@@ -64,6 +64,8 @@ export const MSP = {
   SET_VTXTABLE_BAND: 227,
   SET_VTXTABLE_POWERLEVEL: 228,
   MODE_RANGES_EXTRA: 238,
+  /** No payload = BLHeli 4-way ESC passthrough: replies with the ESC count, then the port speaks 4-way (lib/esc). */
+  SET_PASSTHROUGH: 245,
   EEPROM_WRITE: 250,
 
   // MSP v2 (16-bit codes)

@@ -30,6 +30,18 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>
 }
 
+/**
+ * The serial link while an `exclusive` session owns it, e.g. for the ESC passthrough where the FC stops
+ * speaking MSP for a while.
+ */
+export interface ExclusiveLink {
+  /** An MSP request that skips the queue — the session already is the queue's current entry. */
+  request(code: number, payload?: Uint8Array, options?: MspClientOptions): Promise<Uint8Array>
+  write(data: Uint8Array): Promise<void>
+  /** From now until the session ends, incoming bytes go to `listener` instead of the MSP parser. */
+  onData(listener: (chunk: Uint8Array) => void): Unsubscribe
+}
+
 export interface MspClientOptions {
   /** Response timeout. Default 1000 ms; can be overridden per request (e.g. EEPROM writes are slow). */
   timeoutMs?: number
@@ -49,6 +61,7 @@ export class MspClient {
 
   private queue: Promise<unknown> = Promise.resolve()
   private pending: PendingRequest | null = null
+  private rawListener: ((chunk: Uint8Array) => void) | null = null
   private closed = false
 
   constructor(transport: Transport, options: MspClientOptions = {}) {
@@ -56,7 +69,7 @@ export class MspClient {
     this.timeoutMs = options.timeoutMs ?? 1000
     this.parser = new MspParser((frame) => this.handleFrame(frame))
     this.unsubscribe = [
-      transport.onData((chunk) => this.parser.push(chunk)),
+      transport.onData((chunk) => (this.rawListener ? this.rawListener(chunk) : this.parser.push(chunk))),
       transport.onClose(() => this.dispose()),
     ]
   }
@@ -65,6 +78,33 @@ export class MspClient {
   request(code: number, payload?: Uint8Array, options: MspClientOptions = {}): Promise<Uint8Array> {
     const timeoutMs = options.timeoutMs ?? this.timeoutMs
     const run = this.queue.then(() => this.send(code, payload, timeoutMs))
+    this.queue = run.catch(() => {})
+    return run
+  }
+
+  /**
+   * Runs `session` with the link to itself: it starts once the requests queued before it are done, and
+   * requests made meanwhile wait until it settles. MSP parsing resumes from a clean state afterwards.
+   */
+  exclusive<T>(session: (link: ExclusiveLink) => Promise<T>): Promise<T> {
+    const run = this.queue.then(async () => {
+      if (this.closed) throw new MspDisconnectedError()
+      try {
+        return await session({
+          request: (code, payload, options = {}) => this.send(code, payload, options.timeoutMs ?? this.timeoutMs),
+          write: (data) => this.transport.write(data),
+          onData: (listener) => {
+            this.rawListener = listener
+            return () => {
+              if (this.rawListener === listener) this.rawListener = null
+            }
+          },
+        })
+      } finally {
+        this.rawListener = null
+        this.parser.reset()
+      }
+    })
     this.queue = run.catch(() => {})
     return run
   }

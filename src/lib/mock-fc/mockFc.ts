@@ -70,6 +70,7 @@ import {
   type VtxPowerLevel,
 } from '@/lib/vtx/model'
 import { ByteReader, ByteWriter } from '@/lib/msp/bytes'
+import { defaultMockEscs, MockFourWayInterface, type MockEsc } from './mockEscs'
 
 const EMPTY = new Uint8Array(0)
 
@@ -226,6 +227,8 @@ export interface MockFcOptions {
   config?: MockFcConfig
   /** Gyro sample rate, a property of the hardware: 8000 (default) or e.g. 3200 for a BMI270. */
   gyroSampleRateHz?: number
+  /** The ESCs behind the motor outputs, reachable through MSP_SET_PASSTHROUGH. Default: `defaultMockEscs()`. */
+  escs?: MockEsc[]
 }
 
 /**
@@ -252,10 +255,14 @@ export class MockFlightController {
   private armingDisabledByMsp = false
   private accCalibrations = 0
   private flash = { usedBytes: 3_500_000, ready: true }
+  private readonly escs: MockEsc[]
+  /** Non-null from MSP_SET_PASSTHROUGH on; while it hasn't exited, the port speaks 4-way instead of MSP. */
+  private fourWay: MockFourWayInterface | null = null
 
   constructor(options: MockFcOptions = {}) {
     this.now = options.now ?? Date.now
     this.gyroSampleRateHz = options.gyroSampleRateHz ?? 8000
+    this.escs = options.escs ?? defaultMockEscs()
     this.saved = structuredClone(options.config ?? defaultMockConfig())
     this.running = structuredClone(this.saved)
     this.osdInit()
@@ -281,8 +288,14 @@ export class MockFlightController {
     return this.armingDisabledByMsp
   }
 
+  /** The last ESC passthrough session (null before the first one). For assertions in tests. */
+  get escPassthrough(): MockFourWayInterface | null {
+    return this.fourWay
+  }
+
   /** Feed bytes written by the host; returns the encoded response frames (possibly none). */
   receive(data: Uint8Array): Uint8Array[] {
+    if (this.fourWay && !this.fourWay.exited) return this.fourWay.receive(data)
     this.parser.push(data)
     const out = this.outbox
     this.outbox = []
@@ -518,6 +531,13 @@ export class MockFlightController {
       case MSP.SET_ARMING_DISABLED:
         this.armingDisabledByMsp = request[0] === 1
         return EMPTY
+      case MSP.SET_PASSTHROUGH:
+        // Only the BLHeli 4-way mode (no payload, or mode 0xFF). `esc4wayInit` disables the motor outputs; from
+        // the reply on the port speaks 4-way until cmd_InterfaceExit (see `receive`).
+        if (request.length > 0 && request[0] !== 0xff) return Uint8Array.of(0)
+        this.motors = new Array<number>(8).fill(MOTOR_STOP)
+        this.fourWay = new MockFourWayInterface(this.escs)
+        return Uint8Array.of(this.escs.length)
 
       case MSP.VTX_CONFIG: {
         const vtx = this.running.vtx
@@ -675,6 +695,7 @@ export class MockFlightController {
     this.osdInit()
     this.motors = new Array<number>(8).fill(MOTOR_STOP)
     this.armingDisabledByMsp = false
+    this.fourWay = null
     this.parser.reset()
     this.outbox = []
     this.onReboot?.()

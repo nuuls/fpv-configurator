@@ -161,6 +161,10 @@ Firmware facts that are easy to get wrong (verified against Betaflight 2026.6.2 
 - `MSP_SIMPLIFIED_TUNING` is 53 bytes (17 PID sliders, 18 D-term filter, 18 gyro filter) and carries the same
   lowpass cutoffs as `MSP_FILTER_CONFIG`. A filter slider only rescales filters whose cutoff isn't 0, and only
   `MSP_SET_FILTER_CONFIG` re-initialises the running filters — send it last. `dyn_notch_count` max is 7.
+- `MSP_SET_PASSTHROUGH` (245) without payload starts the BLHeli 4-way interface even when it reports 0 ESCs: the
+  port stops speaking MSP until `cmd_InterfaceExit`, then the FC re-enables the motor outputs by itself (no
+  reboot). Run such sessions through `MspClient.exclusive` (see `lib/esc/io.ts`) so polls wait instead of
+  corrupting them. `lib/esc` is read-only on purpose — flashing is under **Never**.
 - API 1.49 (`master`) removes the serial function-mask messages in favour of `rx_uart`/`vtx_uart`/… settings.
 
 ## Adding a feature (e.g. a new tab backed by a new MSP message)
