@@ -68,8 +68,11 @@ describe('message decoders', () => {
       boardName: 'SPEEDYBEEF405V4',
       manufacturerId: 'SPBE',
       gyroSampleRateHz: 3200,
+      configurationProblems: 0b01,
     }
     expect(decodeBoardInfo(encodeBoardInfo(info))).toEqual(info)
+    // firmware before the configuration problems were added: the payload ends after the gyro rate
+    expect(decodeBoardInfo(encodeBoardInfo(info).slice(0, -4))).toEqual({ ...info, configurationProblems: 0 })
   })
 
   it('decodes a legacy MSP_BOARD_INFO that only has identifier + revision', () => {
@@ -80,6 +83,7 @@ describe('message decoders', () => {
       boardName: '',
       manufacturerId: '',
       gyroSampleRateHz: 0,
+      configurationProblems: 0,
     })
   })
 

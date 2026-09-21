@@ -1,4 +1,6 @@
+import { CircleCheck, TriangleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { Link } from 'react-router'
 import { AttitudeIndicator } from '@/components/AttitudeIndicator'
 import { Notice } from '@/components/Notice'
 import { SaveBar } from '@/components/SaveBar'
@@ -13,7 +15,16 @@ import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 import { formatApiVersion, formatFirmware } from '@/lib/format'
 import { readAnalog, readAttitude, readStatus } from '@/lib/msp/api'
 import { readSetupSnapshot, saveSetup } from '@/lib/setup/io'
-import { formatLoopRate, pidLoopOptions, readSetup, type SetupSnapshot } from '@/lib/setup/model'
+import {
+  applyFix,
+  formatLoopRate,
+  pidLoopOptions,
+  preflightChecks,
+  readSetup,
+  type PreflightCheck,
+  type SetupSnapshot,
+} from '@/lib/setup/model'
+import { cn } from '@/lib/utils'
 import { useConnectionStore } from '@/stores/connection'
 
 const PATH = '/setup'
@@ -37,6 +48,7 @@ export function SetupPage() {
   if (!fcInfo) return null
 
   const loopOptions = snapshot ? pidLoopOptions(fcInfo.board.gyroSampleRateHz, readSetup(snapshot).pidDenom) : []
+  const checks = snapshot && draft ? preflightChecks(snapshot, draft) : null
   const sensors = status ? SENSOR_NAMES.filter((_, bit) => status.sensors & (1 << bit)) : []
 
   return (
@@ -104,7 +116,7 @@ export function SetupPage() {
                           variant={draft.pidDenom === denom ? 'default' : 'outline'}
                           aria-pressed={draft.pidDenom === denom}
                           className="rounded-none first:rounded-l-md last:rounded-r-md not-first:-ml-px"
-                          onClick={() => setDraft({ pidDenom: denom })}
+                          onClick={() => setDraft({ ...draft, pidDenom: denom })}
                         >
                           {formatLoopRate(hz)}
                         </Button>
@@ -120,6 +132,28 @@ export function SetupPage() {
               <Row label="PID profile" value={status ? String(status.pidProfile + 1) : '—'} />
               <Row label="Sensors" value={status ? sensors.join(', ') || 'None' : '—'} />
             </Rows>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Pre-flight checklist</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {checks && draft ? (
+              <>
+                <p className="mb-2 text-sm text-muted-foreground" aria-live="polite">
+                  {checklistSummary(checks)}
+                </p>
+                <ul aria-label="Pre-flight checklist" className="divide-y text-sm">
+                  {checks.map((check) => (
+                    <CheckRow key={check.id} check={check} onFix={() => setDraft(applyFix(draft, check.id))} />
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">{readError ? '—' : 'Reading…'}</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -140,6 +174,40 @@ export function SetupPage() {
         />
       )}
     </>
+  )
+}
+
+function checklistSummary(checks: PreflightCheck[]): string {
+  const failing = checks.filter((check) => !check.ok).length
+  if (failing > 0) return `${failing} of ${checks.length} settings need attention.`
+  return checks.some((check) => check.pending) ? 'All set once the fixes are saved.' : 'All set.'
+}
+
+function CheckRow({ check, onFix }: { check: PreflightCheck; onFix: () => void }) {
+  const Icon = check.ok ? CircleCheck : TriangleAlert
+  return (
+    <li aria-label={check.label} className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 py-1.5">
+      <Icon
+        aria-hidden
+        className={cn('size-4 shrink-0', !check.ok ? 'text-warning' : check.pending ? 'text-primary' : 'text-success')}
+      />
+      <span>{check.label}</span>
+      <span className="ml-auto font-mono text-muted-foreground tabular-nums">
+        {check.detail}
+        {check.pending && ' · not saved yet'}
+      </span>
+      {check.fix === 'here' ? (
+        <Button size="sm" variant="outline" onClick={onFix}>
+          Fix
+        </Button>
+      ) : (
+        check.fix && (
+          <Button size="sm" variant="outline" asChild>
+            <Link to={check.fix.path}>Open {check.fix.tab}</Link>
+          </Button>
+        )
+      )}
+    </li>
   )
 }
 

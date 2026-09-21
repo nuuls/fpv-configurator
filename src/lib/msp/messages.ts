@@ -72,7 +72,15 @@ export interface BoardInfo {
   manufacturerId: string
   /** `gyro.sampleRateHz`, e.g. 8000 or 3200 (BMI270). API >= 1.43; 0 when the firmware doesn't report it. */
   gyroSampleRateHz: number
+  /** `CONFIGURATION_PROBLEM` bits, sent right after the gyro rate. 0 when the firmware doesn't report them. */
+  configurationProblems: number
 }
+
+/** Bits of `BoardInfo.configurationProblems` (msp.c `PROBLEM_…`). */
+export const CONFIGURATION_PROBLEM = {
+  ACC_NEEDS_CALIBRATION: 1 << 0,
+  MOTOR_PROTOCOL_DISABLED: 1 << 1,
+} as const
 
 export function decodeBoardInfo(payload: Uint8Array): BoardInfo {
   const r = new ByteReader(payload)
@@ -83,6 +91,7 @@ export function decodeBoardInfo(payload: Uint8Array): BoardInfo {
     boardName: '',
     manufacturerId: '',
     gyroSampleRateHz: 0,
+    configurationProblems: 0,
   }
   // boardType:u8, targetCapabilities:u8, then the length-prefixed names
   if (r.remaining >= 3) {
@@ -96,6 +105,7 @@ export function decodeBoardInfo(payload: Uint8Array): BoardInfo {
     r.skip(SIGNATURE_LENGTH + 2)
     info.gyroSampleRateHz = r.u16()
   }
+  if (r.remaining >= 4) info.configurationProblems = r.u32()
   return info
 }
 
@@ -112,6 +122,7 @@ export function encodeBoardInfo(info: BoardInfo): Uint8Array {
     .u8(0) // mcuTypeId
     .u8(0) // configurationState
     .u16(info.gyroSampleRateHz)
+    .u32(info.configurationProblems)
     .toBytes()
 }
 

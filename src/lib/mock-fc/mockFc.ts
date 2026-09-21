@@ -13,6 +13,7 @@ import {
   encodeFeatureMask,
   encodeSerialConfig,
   encodeStatus,
+  CONFIGURATION_PROBLEM,
   FEATURE,
   SERIALRX_CRSF,
   SERIALRX_PROVIDER_NAMES,
@@ -108,6 +109,12 @@ export interface MockFcConfig {
   /** Raw `item_pos` per OSD element and the two timer configs, see lib/osd/model.ts for the bits. */
   osd: { positions: number[]; timers: number[] }
   vtx: MockVtxConfig
+  /** Raw MSP_ARMING_CONFIG payload: auto_disarm_delay, reserved, small_angle, gyro_cal_on_first_arm. */
+  armingConfig: number[]
+  /** Raw MSP_BEEPER_CONFIG payload: beeper_off_flags (u32), dshotBeaconTone, dshotBeaconOffFlags (u32). */
+  beeperConfig: number[]
+  /** `accZero.calibrationCompleted`: set by MSP_ACC_CALIBRATION, reported in MSP_BOARD_INFO. */
+  accCalibrated: boolean
 }
 
 /** Like the firmware: fixed storage for 8 bands and 8 power levels, the counts say how much of it is in use. */
@@ -191,6 +198,11 @@ export function defaultMockConfig(): MockFcConfig {
       bands: Array.from({ length: VTX_MAX_BANDS }, emptyVtxBand),
       powerLevels: Array.from({ length: VTX_MAX_POWER_LEVELS }, emptyVtxPowerLevel),
     },
+    // Betaflight defaults: disarm after 5 s, arm angle 25°
+    armingConfig: [5, 0, 25, 0],
+    // Betaflight defaults (DShot beacon tone 1, off for RX lost + RX set), but with the RX set beep muted
+    beeperConfig: [0x00, 0x02, 0, 0, 1, 0x02, 0x02, 0, 0],
+    accCalibrated: false,
   }
 }
 
@@ -314,6 +326,7 @@ export class MockFlightController {
           boardName: 'MOCKF405',
           manufacturerId: 'MOCK',
           gyroSampleRateHz: this.gyroSampleRateHz,
+          configurationProblems: this.running.accCalibrated ? 0 : CONFIGURATION_PROBLEM.ACC_NEEDS_CALIBRATION,
         })
       case MSP.STATUS:
         return encodeStatus({
@@ -372,6 +385,7 @@ export class MockFlightController {
       case MSP.ACC_CALIBRATION:
         // The firmware saves the whole config once the calibration is through (saveConfigAndNotify).
         this.accCalibrations++
+        this.running.accCalibrated = true
         this.saved = structuredClone(this.running)
         return EMPTY
 
@@ -558,6 +572,19 @@ export class MockFlightController {
         this.running.vtx.powerLevels[index - 1] = { ...level, label: level.label.toUpperCase() }
         return EMPTY
       }
+
+      case MSP.ARMING_CONFIG:
+        return Uint8Array.from(this.running.armingConfig)
+      case MSP.SET_ARMING_CONFIG:
+        if (request.length < 2) return null
+        this.running.armingConfig = [...request, ...this.running.armingConfig.slice(request.length)]
+        return EMPTY
+      case MSP.BEEPER_CONFIG:
+        return Uint8Array.from(this.running.beeperConfig)
+      case MSP.SET_BEEPER_CONFIG:
+        if (request.length < 4) return null
+        this.running.beeperConfig = [...request, ...this.running.beeperConfig.slice(request.length)]
+        return EMPTY
 
       case MSP.EEPROM_WRITE:
         this.saved = structuredClone(this.running)

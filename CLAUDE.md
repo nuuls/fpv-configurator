@@ -145,6 +145,10 @@ Firmware facts that are easy to get wrong (verified against Betaflight 2026.6.2 
 - Port identifiers: USB VCP 20, UART1 = 51. Never modify the USB VCP port config.
 - PID loop rate = gyro sample rate (u16 near the end of `MSP_BOARD_INFO`) / `pid_process_denom` (byte 1 of
   `MSP_ADVANCED_CONFIG`). The firmware raises the denominator itself if the motor protocol is too slow.
+- `MSP_BOARD_INFO` ends (after the gyro rate) with a u32 of configuration problems: bit 0 = accelerometer not
+  calibrated (`accHasBeenCalibrated()`). The ACC_CALIBRATION arming flag is only raised when something uses the acc.
+- `MSP_BEEPER_CONFIG`: `beeper_off_flags` u32, DShot beacon tone u8, `dshotBeaconOffFlags` u32. A set bit
+  **mutes** the beep; bit = `1 << (beeperMode_e - 1)`: RX_LOST bit 1, RX_SET bit 9.
 - Motor outputs set with `MSP_SET_MOTOR` persist until changed or reboot — always stop them on every exit path.
 - `MSP2_CLI_SETTING` can **write** any CLI variable (`name = value`) but reads always fail in 2026.6.
   Read values through the classic messages instead.
