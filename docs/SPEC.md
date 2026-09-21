@@ -157,7 +157,7 @@ scope item in §2, in this order (single source: `src/routes.ts`):
 
 Setup · Ports · Orientation · PID Tuning · Filters · Rates · Modes · Motors · OSD · VTX · Blackbox
 
-Tabs still marked TBD in §2 (Filters, Rates, VTX) show a "not specified yet" placeholder.
+Tabs still marked TBD in §2 (Rates, VTX) show a "not specified yet" placeholder.
 _Assumed — change freely; the drone-type setup step has no place in the layout yet._
 
 ## 5. Global behaviour

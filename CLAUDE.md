@@ -73,7 +73,7 @@ src/
       messages.ts          typed payload decoders/encoders, one pair per message
       client.ts            MspClient: serialized request/response with timeouts
       api.ts               high-level typed reads/writes (request + decode) — what the UI calls
-    ports/ blackbox/ orientation/ modes/ tuning/ motors/ rates/ setup/ osd/
+    ports/ blackbox/ orientation/ modes/ tuning/ motors/ rates/ setup/ osd/ filters/
                            one folder per feature: model.ts (types, payload codecs, pure logic) + io.ts
                            (read snapshot / save via MspClient). Core messages stay in msp/messages.ts.
     transport/             byte pipes: types.ts (interface), webserial.ts, mock.ts
@@ -145,6 +145,9 @@ Firmware facts that are easy to get wrong (verified against Betaflight 2026.6.2 
 - OSD element position (u16): x bits 0–4 plus bit 10 (HD, x ≥ 32), y bits 5–9, visible-in-profile bits 11–13,
   variant bits 14–15. `MSP_SET_OSD_CONFIG` first byte: element index, `-2` = timer, `-1` = general settings.
   The custom message elements (81–84) have no CLI setting and their text can't be read back.
+- `MSP_SIMPLIFIED_TUNING` is 53 bytes (17 PID sliders, 18 D-term filter, 18 gyro filter) and carries the same
+  lowpass cutoffs as `MSP_FILTER_CONFIG`. A filter slider only rescales filters whose cutoff isn't 0, and only
+  `MSP_SET_FILTER_CONFIG` re-initialises the running filters — send it last. `dyn_notch_count` max is 7.
 - API 1.49 (`master`) removes the serial function-mask messages in favour of `rx_uart`/`vtx_uart`/… settings.
 
 ## Adding a feature (e.g. a new tab backed by a new MSP message)

@@ -25,6 +25,13 @@ import {
   encodeSdcardSummary,
   type BlackboxConfig,
 } from '@/lib/blackbox/model'
+import {
+  applyFilterSliders,
+  copySharedCutoffs,
+  defaultFilterConfig,
+  defaultFilterSliders,
+  isFilterConfigRejected,
+} from '@/lib/filters/model'
 import { decodeSetModeRange, encodeModeRanges, encodeRc, type ModeSlot } from '@/lib/modes/model'
 import {
   decodeSetMotor,
@@ -76,6 +83,8 @@ export interface MockFcConfig {
   modeSlots: ModeSlot[]
   /** Raw MSP_SIMPLIFIED_TUNING payload: 9 PID sliders, 8 reserved bytes, then the filter sliders. */
   simplifiedTuning: number[]
+  /** Raw MSP_FILTER_CONFIG payload; shares its lowpass cutoffs with `simplifiedTuning` (lib/filters/model.ts). */
+  filterConfig: number[]
   /** Raw MSP_ADVANCED_CONFIG payload; byte 3 is the motor protocol. */
   advancedConfig: number[]
   motor: { poles: number; bidirDshot: boolean; mixerMode: number; propsOut: boolean }
@@ -126,7 +135,8 @@ export function defaultMockConfig(): MockFcConfig {
       return { boxId: 0, auxChannel: 0, start: 900, end: 900 }
     }),
     // Betaflight defaults: sliders on (RPY), everything at 1.0 including Dynamic D.
-    simplifiedTuning: [2, 100, 100, 100, 100, 100, 100, 100, 100, ...new Array<number>(8 + 14).fill(0)],
+    simplifiedTuning: [2, 100, 100, 100, 100, 100, 100, 100, 100, ...new Array<number>(8).fill(0), ...defaultFilterSliders()],
+    filterConfig: defaultFilterConfig(),
     // denom 1 · DSHOT300 · pwm rate 480 · idle 550 · ... · debug count 80
     advancedConfig: [1, 1, 0, 6, 0xe0, 0x01, 0x26, 0x02, 0, 0, 0, 0, 48, 125, 0, 0, 0, 1, 0, 80],
     motor: { poles: 14, bidirDshot: false, mixerMode: 3, propsOut: false },
@@ -379,10 +389,19 @@ export class MockFlightController {
         return Uint8Array.from(this.running.simplifiedTuning)
       case MSP.SET_SIMPLIFIED_TUNING:
         if (request.length !== this.running.simplifiedTuning.length) return null
-        this.running.simplifiedTuning = [...request]
+        this.running.simplifiedTuning = applyFilterSliders(request)
+        this.running.filterConfig = copySharedCutoffs('toFilterConfig', this.running.filterConfig, this.running.simplifiedTuning)
         return EMPTY
       case MSP.CALCULATE_SIMPLIFIED_PID:
         return calculatePids(request)
+
+      case MSP.FILTER_CONFIG:
+        return Uint8Array.from(this.running.filterConfig)
+      case MSP.SET_FILTER_CONFIG:
+        if (request.length !== this.running.filterConfig.length || isFilterConfigRejected(request)) return null
+        this.running.filterConfig = [...request]
+        this.running.simplifiedTuning = copySharedCutoffs('toSimplified', this.running.filterConfig, this.running.simplifiedTuning)
+        return EMPTY
 
       case MSP.RC_TUNING:
         return Uint8Array.from(this.running.rcTuning)

@@ -1,0 +1,84 @@
+# Filters
+
+Status: ready
+_Implemented; mock acceptance passes (`src/pages/Filters.test.tsx`, `src/lib/filters/model.test.ts`). Set to `built` once the hardware checks pass._
+Route: `/filters` · Page: `src/pages/Filters.tsx` · Logic: `src/lib/filters/`
+
+## Purpose
+
+The minimal filter stack for a quad with working RPM filtering: two sliders and three numbers, everything else off.
+
+## Layout
+
+```
++-------------------------------------------+-------------------------------------------+
+| Gyro lowpass 2 (PT1)        1.0 · 500 Hz  | RPM filter                                |
+| [----------o----------]  0 … 2            |   Min frequency   [ 100 ] Hz              |
+|                                           | Dynamic notch                             |
+| D-term filtering   1.00 · 75–150 / 150 Hz |   Notch count     [ 1 v ]                 |
+| [----------o----------]  0.5 … 1.5        |   Min frequency   [ 100 ] Hz              |
++-------------------------------------------+-------------------------------------------+
+```
+
+## Controls
+
+| Control | Type | Betaflight setting / MSP | Values · default | Notes |
+| ------- | ---- | ------------------------ | ---------------- | ----- |
+| Gyro lowpass 2 | slider | `simplified_gyro_filter_multiplier` → `gyro_lpf2_static_hz` = 500 Hz × slider · `MSP_SIMPLIFIED_TUNING` (140/141) + `MSP_FILTER_CONFIG` (92/93) | 0–2.0, step 0.1 · 1.0 | 0 = filter off (`gyro_lpf2_static_hz = 0`). Resulting cutoff shown next to the value |
+| D-term filtering | slider | `simplified_dterm_filter_multiplier` → `dterm_lpf1_dyn_min/max_hz`, `dterm_lpf1_static_hz`, `dterm_lpf2_static_hz` | 0.50–1.50, step 0.05 · 1.0 | Range widens if the FC's value is outside. Resulting cutoffs shown |
+| RPM filter min frequency | number | `rpm_filter_min_hz` · `MSP_FILTER_CONFIG` byte 44 | 30–200 Hz · 100 | |
+| Dynamic notch count | select | `dyn_notch_count` · byte 48 | Off, 1–7 · app recommends 1 (firmware default 3) | |
+| Dynamic notch min frequency | number | `dyn_notch_min_hz` · bytes 41–42 | 20–250 Hz · 100 | Disabled while the count is Off |
+
+Pinned on every save ("No other filters"): gyro lowpass 1 off (`gyro_lpf1_static_hz`, `gyro_lpf1_dyn_min/max_hz` = 0),
+`gyro_lpf2_type = PT1`, static gyro notches 1 + 2 and the D-term notch off, both filter sliders on
+(`simplified_gyro_filter`, `simplified_dterm_filter`) so the cutoffs are the firmware defaults × slider, and
+`rpm_filter_harmonics = 3` if it was 0 (RPM filter off). PID slider bytes in `MSP_SIMPLIFIED_TUNING` are passed
+through untouched; so are yaw lowpass, D-term lowpass types/expo, dynamic notch Q/max and RPM filter Q/weights/fade.
+
+## Behaviour
+
+- **Save**, no reboot: `MSP_SET_SIMPLIFIED_TUNING`, then `MSP_SET_FILTER_CONFIG` (re-initialises gyro, dynamic
+  notch, RPM and D-term filters in the running firmware), then `MSP_EEPROM_WRITE`.
+- If the FC has filter settings this app pins (true for stock Betaflight: gyro lowpass 1 is on), a warning
+  lists what saving will change.
+- Warning when bidirectional DShot is off (`MSP_MOTOR_CONFIG`): the RPM filter isn't running, and this stack
+  relies on it. Points to the Motors tab.
+- Applies to the FC's current PID profile (D-term filters are per profile); profiles are not shown.
+
+## Hidden on purpose
+
+- Gyro lowpass 1, static notch filters, filter types, dynamic lowpass expo, dynamic notch Q and max frequency,
+  RPM filter harmonics / Q / weights / fade range, yaw lowpass, PID profiles.
+
+## Acceptance
+
+Mock FC (stock Betaflight filters, bidirectional DShot off):
+
+- [x] Two sliders at 1.0, RPM min 100 Hz, notch count 3, notch min 100 Hz; pinned-filters and
+      bidirectional-DShot warnings shown
+- [x] Change slider + numbers → Save (no reboot) → values persist, pinned-filters warning gone
+- [x] Gyro slider at 0 shows "Off" and saves `gyro_lpf2_static_hz = 0`
+- [x] Out-of-range frequency blocks saving with a message
+- [x] PID Tuning sliders are unchanged by a Filters save, and the other way round
+
+On real hardware:
+
+- [ ] After saving, Betaflight Configurator shows gyro lowpass 1 off, lowpass 2 PT1 at 500 Hz × slider, and the
+      D-term slider position
+- [ ] `diff all` shows only the settings listed above
+
+## Decisions
+
+- **"No other filters" = the others are turned off**, not just hidden — the RPM-filter-era minimal stack
+  (gyro lowpass 2 only, one dynamic notch, D-term lowpasses). Saving on a stock quad therefore disables gyro
+  lowpass 1; the page says so before the first save.
+- **Yaw lowpass is left alone** (firmware default 100 Hz): it smooths yaw P, it isn't noise filtering.
+- **Slider 0–2**: Betaflight's multiplier range is 0.1–2.0 (CLI rejects < 10), so the step is 0.1 and 0 means "off".
+- **"Notch count (1 default)"**: the tab shows what the FC has and recommends 1; actually applying 1 is left to
+  the drone-type "Apply defaults" step (SPEC §2), which doesn't exist yet.
+- RPM filter can't be turned off here ("only min frequency"); harmonics 0 is reset to the firmware default 3.
+
+## Open questions
+
+_None._
