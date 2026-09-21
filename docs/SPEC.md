@@ -150,7 +150,7 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
 	- VTX table can be edited manually after loading preset
 
 - Diff checker
-	- Compares all current settings to the betaflight defaults and displays the differences
+	- Compares the current tuning settings (PIDs, rates, filters) to the betaflight defaults and displays the differences — not the setup like VTX table, modes and serial ports
 	- This is mostly for debugging purposes for now
 
 - Blackbox

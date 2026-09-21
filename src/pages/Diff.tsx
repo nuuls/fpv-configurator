@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { describeError } from '@/hooks/useFcSnapshot'
 import { readDiff } from '@/lib/diff/io'
-import { countDifferences, type DiffEntry, type DiffReport, type DiffSection } from '@/lib/diff/model'
+import { countDifferences, tuningOnly, type DiffEntry, type DiffReport, type DiffSection } from '@/lib/diff/model'
 import type { MspClient } from '@/lib/msp/client'
 import { useConnectionStore } from '@/stores/connection'
 
@@ -37,7 +37,7 @@ export function DiffPage() {
     <>
       <PageHeader
         title="Diff Checker"
-        description="Every setting that is not at its Betaflight default, as the flight controller itself reports it. Nothing is changed."
+        description="Every tuning setting — PIDs, rates, filters — that is not at its Betaflight default, as the flight controller itself reports it. Nothing is changed."
       />
       <Card>
         <CardContent className="flex flex-wrap items-center gap-4 text-sm">
@@ -53,15 +53,16 @@ export function DiffPage() {
       </Card>
 
       {state.phase === 'failed' && <Notice tone="error">{state.message}</Notice>}
-      {state.phase === 'done' && <DiffReportView report={state.report} />}
+      {state.phase === 'done' && <DiffReportView report={tuningOnly(state.report)} />}
     </>
   )
 }
 
 function summary(report: DiffReport): string {
-  const count = countDifferences(report)
-  const differences = count === 1 ? '1 difference' : `${count} differences`
-  return [differences, report.board, report.firmware].filter(Boolean).join(' · ')
+  const count = countDifferences(tuningOnly(report))
+  const hidden = countDifferences(report) - count
+  const differences = count === 1 ? '1 tuning difference' : `${count} tuning differences`
+  return [differences, hidden > 0 && `${hidden} other hidden`, report.board, report.firmware].filter(Boolean).join(' · ')
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -76,7 +77,7 @@ function CopyButton({ text }: { text: string }) {
   }
   return (
     <Button variant="outline" onClick={() => void copy()}>
-      {status === 'copied' ? 'Copied' : status === 'failed' ? 'Copying failed' : 'Copy as text'}
+      {status === 'copied' ? 'Copied' : status === 'failed' ? 'Copying failed' : 'Copy full diff'}
     </Button>
   )
 }
@@ -90,7 +91,7 @@ function DiffReportView({ report }: { report: DiffReport }) {
         </Notice>
       ))}
       {report.sections.length === 0 && report.errors.length === 0 && (
-        <Notice>No differences — every setting is at its default.</Notice>
+        <Notice>No tuning differences — PIDs, rates and filters are at their defaults.</Notice>
       )}
       <div className="mt-4 grid gap-4">
         {report.sections.map((section, index) => (

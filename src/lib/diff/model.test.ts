@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { countDifferences, parseDiff } from './model'
+import { countDifferences, parseDiff, tuningOnly } from './model'
 
 /** `diff all defaults` as Betaflight 2026.6 prints it (CRLF line ends, blank line before every heading). */
 const OUTPUT = [
@@ -113,6 +113,66 @@ describe('parseDiff', () => {
   it('keeps the output for the clipboard with plain line feeds', () => {
     expect(report.text.startsWith('# version\n# Betaflight')).toBe(true)
     expect(report.text).not.toContain('\r')
+  })
+})
+
+describe('tuningOnly', () => {
+  const report = parseDiff(OUTPUT)
+  const tuning = tuningOnly(report)
+
+  it('keeps the PID and rate profiles and drops the setup sections', () => {
+    expect(tuning.sections.map((s) => s.title)).toEqual(['master', 'profile 1', 'rateprofile 0'])
+    expect(tuning.sections.find((s) => s.title === 'profile 1')).toEqual(
+      report.sections.find((s) => s.title === 'profile 1'),
+    )
+  })
+
+  it('keeps only the tuning settings of master', () => {
+    expect(tuning.sections.find((s) => s.title === 'master')?.entries).toEqual([
+      { kind: 'setting', name: 'dshot_bidir', value: 'ON', defaultValue: 'OFF' },
+    ])
+    expect(countDifferences(tuning)).toBe(3)
+  })
+
+  it('knows the filter, RC smoothing and motor settings, but not the rest of master', () => {
+    const names = [
+      'gyro_lpf1_static_hz',
+      'dyn_notch_count',
+      'rpm_filter_harmonics',
+      'simplified_gyro_filter',
+      'rc_smoothing_auto_factor',
+      'motor_idle',
+      'pid_process_denom',
+      'deadband',
+    ]
+    const others = [
+      'align_board_yaw',
+      'serialrx_provider',
+      'osd_vbat_pos',
+      'vtx_power',
+      'gyro_calib_duration',
+      'motor_kv',
+      'yaw_motors_reversed',
+    ]
+    const output = ['# master', ...[...names, ...others].map((name) => `set ${name} = 1`)].join(
+      '\r\n',
+    )
+    expect(
+      tuningOnly(parseDiff(output)).sections[0]?.entries.map((entry) =>
+        entry.kind === 'setting' ? entry.name : entry.line,
+      ),
+    ).toEqual(names)
+  })
+
+  it('drops battery profiles and lines that are no settings', () => {
+    const output =
+      '# battery_profile 0\r\nset vbat_max_cell_voltage = 440\r\n\r\n# profile 0\r\n#set p_roll = 45\r\n'
+    expect(tuningOnly(parseDiff(output)).sections).toEqual([])
+  })
+
+  it('leaves the text for the clipboard complete', () => {
+    expect(tuning.text).toBe(report.text)
+    expect(tuning.firmware).toBe(report.firmware)
   })
 })
 

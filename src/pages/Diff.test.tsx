@@ -12,42 +12,32 @@ const rows = (section: string) =>
     .filter((cells) => cells.length > 0) // the header row has none
 
 describe('Diff Checker tab', () => {
-  it("lists the mock FC's setup by CLI section, defaults marked", async () => {
+  it("hides the mock FC's setup: features, serial ports and modes are no tuning", async () => {
     await openTab('Diff Checker')
-    expect(await screen.findByText(/^6 differences · MOCK\/MOCKF405 · Betaflight \/ /)).toBeInTheDocument()
-
-    expect(rows('feature')).toEqual([
-      ['feature -TELEMETRYdefault'],
-      ['feature -ESC_SENSORdefault'],
-      ['feature TELEMETRY'],
-      ['feature ESC_SENSOR'],
-    ])
-    expect(rows('serial')).toEqual([
-      ['serial UART2 0 115200 57600 0 115200default'],
-      ['serial UART2 64 115200 57600 0 115200'],
-      ['serial UART3 0 115200 57600 0 115200default'],
-      ['serial UART3 1024 115200 57600 0 115200'],
-    ])
-    expect(rows('aux')).toContainEqual(['aux 0 0 0 1700 2100 0 0'])
-    expect(screen.queryByRole('group', { name: 'master' })).toBeNull()
+    expect(await screen.findByText(/^0 tuning differences · 6 other hidden · MOCK\/MOCKF405 · Betaflight \/ /)).toBeInTheDocument()
+    expect(screen.getByText(/^No tuning differences/)).toBeInTheDocument()
+    expect(screen.queryAllByRole('group')).toEqual([])
   })
 
-  it('shows a setting changed on another tab with its default, and reads again on demand', async () => {
-    const user = await openTab('Orientation')
-    await user.selectOptions(await screen.findByLabelText('Yaw'), '90°')
+  it('shows a tuning setting changed on another tab with its default, and reads again on demand', async () => {
+    const user = await openTab('Motors')
+    await user.click(await screen.findByLabelText('Bidirectional DShot'))
+    await user.selectOptions(screen.getByLabelText('Prop direction'), 'out')
     await saveAndReboot(user)
 
     await user.click(screen.getByRole('link', { name: 'Diff Checker' }))
-    expect(await screen.findByText(/^7 differences/)).toBeInTheDocument()
-    expect(rows('master')).toEqual([['align_board_yaw', '90', '0']])
+    // yaw_motors_reversed is setup, not tuning
+    expect(await screen.findByText(/^1 tuning difference · 7 other hidden/)).toBeInTheDocument()
+    expect(rows('master')).toEqual([['dshot_bidir', 'ON', 'OFF']])
+    expect(screen.queryByRole('group', { name: 'feature' })).toBeNull()
 
     await user.click(screen.getByRole('button', { name: 'Read again' }))
-    expect(await screen.findByText(/^7 differences/)).toBeInTheDocument()
+    expect(await screen.findByText(/^1 tuning difference/)).toBeInTheDocument()
   })
 
-  it('copies the raw diff', async () => {
+  it('copies the complete diff, setup included', async () => {
     const user = await openTab('Diff Checker')
-    await user.click(await screen.findByRole('button', { name: 'Copy as text' }))
+    await user.click(await screen.findByRole('button', { name: 'Copy full diff' }))
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument()
     const text = await navigator.clipboard.readText()
     expect(text.startsWith('# version\n# Betaflight / ')).toBe(true)
@@ -56,7 +46,7 @@ describe('Diff Checker tab', () => {
 
   it('leaves the FC talking MSP: other tabs still load afterwards', async () => {
     const user = await openTab('Diff Checker')
-    await screen.findByText(/^6 differences/)
+    await screen.findByText(/^0 tuning differences/)
     await user.click(screen.getByRole('link', { name: 'Orientation' }))
     expect(await screen.findByLabelText('Yaw')).toBeInTheDocument()
   })

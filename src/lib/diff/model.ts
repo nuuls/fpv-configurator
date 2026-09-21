@@ -136,6 +136,44 @@ export function parseDiff(output: string): DiffReport {
   return report
 }
 
+/** PID and rate profiles hold nothing but the tune. `battery_profile` doesn't. */
+const TUNING_SECTION = /^(profile|rateprofile) \d+$/
+/**
+ * The `master` settings that shape how the quad flies (names from the firmware's `cli/settings.c`): gyro filters,
+ * RC smoothing and deadband, the RPM limiter, and what the PID loop and the RPM filter run on. `dshot_idle_value`
+ * is the older name of `motor_idle`.
+ */
+const TUNING_SETTING_PREFIXES = ['gyro_lpf', 'gyro_notch', 'dyn_notch_', 'rpm_filter_', 'rpm_limit', 'simplified_', 'rc_smoothing']
+const TUNING_SETTINGS = new Set([
+  'gyro_hardware_lpf',
+  'pid_process_denom',
+  'motor_pwm_protocol',
+  'dshot_bidir',
+  'motor_poles',
+  'motor_idle',
+  'dshot_idle_value',
+  'mixer_type',
+  'deadband',
+  'yaw_deadband',
+])
+
+function isTuningEntry(section: DiffSection, entry: DiffEntry): boolean {
+  if (entry.kind !== 'setting') return false
+  if (TUNING_SECTION.test(section.title)) return true
+  return section.title === 'master' && (TUNING_SETTINGS.has(entry.name) || TUNING_SETTING_PREFIXES.some((prefix) => entry.name.startsWith(prefix)))
+}
+
+/**
+ * The report without the setup (features, serial ports, modes, VTX table, resources, OSD, …): PID and rate
+ * profiles plus the tuning settings of `master`. `text` stays the complete output.
+ */
+export function tuningOnly(report: DiffReport): DiffReport {
+  const sections = report.sections
+    .map((section) => ({ ...section, entries: section.entries.filter((entry) => isTuningEntry(section, entry)) }))
+    .filter((section) => section.entries.length > 0)
+  return { ...report, sections }
+}
+
 /** Default lines explain a difference, they aren't one. */
 export function countDifferences(report: DiffReport): number {
   let count = 0
