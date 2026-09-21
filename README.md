@@ -28,4 +28,10 @@ On Linux your user needs access to the serial device (on Arch-based distros: `uu
 | `pnpm build`  | Static production build      |
 | `pnpm format` | Format with Prettier         |
 
+## CI and deployment
+
+GitHub Actions (`.github/workflows/ci.yml`) runs `pnpm check` and `pnpm build` on every push. Pushes to
+`master` are deployed to GitHub Pages: <https://nuuls.github.io/fpv-configurator/>. This needs _Settings → Pages →
+Source_ set to **GitHub Actions** once.
+
 Architecture and conventions are documented in [CLAUDE.md](./CLAUDE.md).
