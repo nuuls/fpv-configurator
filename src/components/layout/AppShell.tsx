@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Outlet } from 'react-router'
 import { ConfirmDialogHost } from '@/components/ConfirmDialogHost'
 import { isSupportedFirmware } from '@/lib/format'
@@ -12,6 +12,17 @@ import { Sidebar } from './Sidebar'
 export function AppShell() {
   const status = useConnectionStore((s) => s.status)
   const fcInfo = useConnectionStore((s) => s.fcInfo)
+  // Small screens only: the sidebar is a drawer there. On wide screens it is always shown.
+  const [navOpen, setNavOpen] = useState(false)
+
+  useEffect(() => {
+    if (!navOpen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setNavOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [navOpen])
 
   let page: ReactNode = <WelcomePage />
   if (status === 'rebooting') page = <RebootingPage />
@@ -22,10 +33,10 @@ export function AppShell() {
 
   return (
     <div className="flex h-dvh flex-col">
-      <Header />
-      <div className="flex min-h-0 flex-1">
-        <Sidebar disabled={!tabsUsable} />
-        <main className="min-w-0 flex-1 overflow-y-auto p-6">{page}</main>
+      <Header navOpen={navOpen} onToggleNav={() => setNavOpen((open) => !open)} />
+      <div className="relative flex min-h-0 flex-1">
+        <Sidebar disabled={!tabsUsable} open={navOpen} onClose={() => setNavOpen(false)} />
+        <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6">{page}</main>
       </div>
       <ConfirmDialogHost />
     </div>

@@ -173,6 +173,11 @@ version and many things are not properly tested yet. One sidebar tab per scope i
 
 Setup · Ports · Orientation · PID Tuning · Filters · Rates · Modes · Motors · ESC · OSD · Analog VTX · Blackbox
 
+Small screens (below 768 px, e.g. a phone — mock FC only there): the sidebar is a drawer over the page, opened
+and closed with a menu button in the header; it also closes on picking a tab, tapping outside of it, or Escape.
+The header shows the app name and "Source" as icons only, hides the firmware version, and puts the alpha warning
+on its own row.
+
 A tab still marked TBD in §2 shows a "not specified yet" placeholder (`src/pages/PlaceholderPage.tsx`); currently none.
 _Assumed — change freely; the drone-type setup step has no place in the layout yet._
 
