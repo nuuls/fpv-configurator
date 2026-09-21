@@ -1,5 +1,5 @@
 import { useState, type PointerEvent } from 'react'
-import { actualRate, niceMax, type CurveSeries } from '@/lib/rates/model'
+import { niceMax, rateAt, type CurveSeries } from '@/lib/rates/model'
 
 const WIDTH = 480
 const HEIGHT = 300
@@ -15,7 +15,7 @@ const SERIES_COLOR = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)']
 export function RateCurveChart({ series }: { series: CurveSeries[] }) {
   const [hoverStick, setHoverStick] = useState<number | null>(null)
 
-  const top = niceMax(Math.max(...series.map((s) => actualRate(s.rates, 1, s.limit)), 1))
+  const top = niceMax(Math.max(...series.map((s) => rateAt(s.type, s.rates, 1, s.limit)), 1))
   const x = (stick: number) => MARGIN.left + stick * PLOT_WIDTH
   const y = (rate: number) => MARGIN.top + PLOT_HEIGHT - (rate / top) * PLOT_HEIGHT
   const color = (s: CurveSeries) => SERIES_COLOR[s.axis] ?? 'var(--foreground)'
@@ -34,7 +34,7 @@ export function RateCurveChart({ series }: { series: CurveSeries[] }) {
           <li key={s.axis} className="flex items-center gap-2">
             <span aria-hidden="true" className="inline-block h-0.5 w-4 rounded-full" style={{ background: color(s) }} />
             <span>{s.label}</span>
-            <span className="text-muted-foreground tabular-nums">max {Math.round(actualRate(s.rates, 1, s.limit))}°/s</span>
+            <span className="text-muted-foreground tabular-nums">max {Math.round(rateAt(s.type, s.rates, 1, s.limit))}°/s</span>
           </li>
         ))}
       </ul>
@@ -69,7 +69,7 @@ export function RateCurveChart({ series }: { series: CurveSeries[] }) {
             strokeLinecap="round"
             points={Array.from({ length: SAMPLES + 1 }, (_, i) => {
               const stick = i / SAMPLES
-              return `${x(stick).toFixed(1)},${y(actualRate(s.rates, stick, s.limit)).toFixed(1)}`
+              return `${x(stick).toFixed(1)},${y(rateAt(s.type, s.rates, stick, s.limit)).toFixed(1)}`
             }).join(' ')}
           />
         ))}
@@ -78,7 +78,7 @@ export function RateCurveChart({ series }: { series: CurveSeries[] }) {
           <g pointerEvents="none">
             <line x1={x(hoverStick)} x2={x(hoverStick)} y1={MARGIN.top} y2={MARGIN.top + PLOT_HEIGHT} stroke="var(--muted-foreground)" strokeDasharray="3 3" />
             {series.map((s) => (
-              <circle key={s.axis} cx={x(hoverStick)} cy={y(actualRate(s.rates, hoverStick, s.limit))} r={4.5} fill={color(s)} stroke="var(--card)" strokeWidth={2} />
+              <circle key={s.axis} cx={x(hoverStick)} cy={y(rateAt(s.type, s.rates, hoverStick, s.limit))} r={4.5} fill={color(s)} stroke="var(--card)" strokeWidth={2} />
             ))}
           </g>
         )}
@@ -105,7 +105,7 @@ export function RateCurveChart({ series }: { series: CurveSeries[] }) {
             <div key={s.axis} className="flex items-center gap-2 tabular-nums">
               <span aria-hidden="true" className="inline-block size-2 rounded-full" style={{ background: color(s) }} />
               <span>{s.label}</span>
-              <span className="ml-auto pl-3 font-medium">{Math.round(actualRate(s.rates, hoverStick, s.limit))}°/s</span>
+              <span className="ml-auto pl-3 font-medium">{Math.round(rateAt(s.type, s.rates, hoverStick, s.limit))}°/s</span>
             </div>
           ))}
         </div>

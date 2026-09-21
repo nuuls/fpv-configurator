@@ -13,27 +13,26 @@ import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 import type { MspClient } from '@/lib/msp/client'
 import { readRatesSnapshot, saveRates } from '@/lib/rates/io'
 import {
-  ACTUAL_DEFAULTS,
   applySync,
   AXES,
   curveSeries,
+  defaultRates,
   detectSync,
   editAxis,
-  FIELD_LABELS,
+  fieldName,
   followerAxes,
-  LIMITS,
   rateLimits,
-  RATES_TYPE_ACTUAL,
-  RATES_TYPE_NAMES,
+  RATE_FIELDS,
+  RATES_TYPES,
+  ratesTypeName,
   readRates,
+  shown,
   validateRates,
-  type RateField,
   type RatesSnapshot,
   type SyncMode,
 } from '@/lib/rates/model'
 
 const PATH = '/rates'
-const FIELDS: RateField[] = ['center', 'max', 'expo']
 const SYNC_LABELS: Record<SyncMode, string> = {
   all: 'Sync all axes',
   'roll-pitch': 'Sync pitch and roll',
@@ -59,15 +58,14 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Rat
   useUnsavedChanges(PATH, dirty)
 
   const fcType = readRates(snapshot).type
-  const actual = draft.type === RATES_TYPE_ACTUAL
+  const spec = RATES_TYPES[draft.type]
   const followers = followerAxes(sync)
 
   const changeType = (type: number) => {
-    // Numbers mean something different in every rate type, so switching starts from Actual's defaults.
-    if (type === RATES_TYPE_ACTUAL && fcType !== RATES_TYPE_ACTUAL) {
-      setSync('all')
-      setDraft({ type, axes: AXES.map(() => ({ ...ACTUAL_DEFAULTS })) })
-    } else setDraft({ ...readRates(snapshot), type })
+    // Numbers mean something different in every rate type, so every switch starts from that type's defaults.
+    const defaults = defaultRates(type)
+    setSync(defaults ? 'all' : detectSync(readRates(snapshot).axes))
+    setDraft(defaults ?? readRates(snapshot))
   }
 
   const changeSync = (next: SyncMode) => {
@@ -81,27 +79,24 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Rat
         <Card>
           <CardHeader>
             <CardTitle>Rates</CardTitle>
-            <CardDescription>
-              Center sensitivity is how twitchy the quad feels around mid-stick, max rate is the rotation speed at full
-              stick, expo bends the curve between the two.
-            </CardDescription>
+            {spec && <CardDescription>{spec.help}</CardDescription>}
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
             <div className="flex flex-wrap gap-4">
               <label className="flex items-center gap-3 text-sm font-medium">
                 Rate type
                 <NativeSelect value={draft.type} onChange={(e) => changeType(Number(e.target.value))}>
-                  <NativeSelectOption value={RATES_TYPE_ACTUAL}>Actual</NativeSelectOption>
-                  {fcType !== RATES_TYPE_ACTUAL && (
-                    <NativeSelectOption value={fcType}>
-                      {RATES_TYPE_NAMES[fcType] ?? `Type ${fcType}`} (not supported yet)
+                  {Object.entries(RATES_TYPES).map(([type, { name }]) => (
+                    <NativeSelectOption key={type} value={type}>
+                      {name}
                     </NativeSelectOption>
-                  )}
+                  ))}
+                  {!RATES_TYPES[fcType] && <NativeSelectOption value={fcType}>{ratesTypeName(fcType)} (not supported)</NativeSelectOption>}
                 </NativeSelect>
               </label>
               <label className="flex items-center gap-3 text-sm font-medium">
                 Axes
-                <NativeSelect value={sync} disabled={!actual} onChange={(e) => changeSync(e.target.value as SyncMode)}>
+                <NativeSelect value={sync} disabled={!spec} onChange={(e) => changeSync(e.target.value as SyncMode)}>
                   {(Object.keys(SYNC_LABELS) as SyncMode[]).map((mode) => (
                     <NativeSelectOption key={mode} value={mode}>
                       {SYNC_LABELS[mode]}
@@ -111,36 +106,38 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Rat
               </label>
             </div>
 
-            {actual ? (
+            {spec ? (
               <table className="w-full border-separate border-spacing-x-2 border-spacing-y-2 text-sm">
                 <thead>
                   <tr className="text-left text-muted-foreground">
                     <th />
-                    <th className="font-normal">{FIELD_LABELS.center} (°/s)</th>
-                    <th className="font-normal">{FIELD_LABELS.max} (°/s)</th>
-                    <th className="font-normal">{FIELD_LABELS.expo}</th>
+                    {RATE_FIELDS.map((field) => (
+                      <th key={field} scope="col" className="font-normal">
+                        {spec.fields[field].label}
+                        {spec.fields[field].unit && ` (${spec.fields[field].unit})`}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {AXES.map((axisName, axis) => (
                     <tr key={axisName}>
-                      <th className="pr-2 text-left font-medium">{axisName}</th>
-                      {FIELDS.map((field) => {
-                        const { min, max, step } = LIMITS[field]
-                        const scale = field === 'expo' ? 100 : 1
+                      <th scope="row" className="pr-2 text-left font-medium">{axisName}</th>
+                      {RATE_FIELDS.map((field) => {
+                        const fieldSpec = spec.fields[field]
                         return (
                           <td key={field}>
                             <NumberInput
-                              aria-label={`${axisName} ${FIELD_LABELS[field].toLowerCase()}`}
-                              min={min / scale}
-                              max={max / scale}
-                              step={step / scale}
+                              aria-label={fieldName(fieldSpec, axis)}
+                              min={shown(fieldSpec, fieldSpec.min)}
+                              max={shown(fieldSpec, fieldSpec.max)}
+                              step={shown(fieldSpec, fieldSpec.step)}
                               disabled={followers.includes(axis)}
-                              value={(draft.axes[axis]?.[field] ?? 0) / scale}
+                              value={shown(fieldSpec, draft.axes[axis]?.[field] ?? 0)}
                               onValueChange={(value) =>
                                 setDraft({
                                   ...draft,
-                                  axes: editAxis(draft.axes, sync, axis, field, Math.round(value * scale)),
+                                  axes: editAxis(draft.axes, sync, axis, field, Math.round(value * 10 ** fieldSpec.decimals)),
                                 })
                               }
                               className="h-9 w-full min-w-20 rounded-md border bg-transparent px-3 tabular-nums disabled:opacity-50 dark:bg-input/30"
@@ -154,9 +151,9 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Rat
               </table>
             ) : (
               <Notice>
-                This quad uses {RATES_TYPE_NAMES[fcType] ?? 'another'} rates, which this app can&apos;t edit yet. Pick{' '}
-                <strong>Actual</strong> to switch — that starts from Betaflight&apos;s default rates (70 / 670 / 0), because
-                the numbers of different rate types aren&apos;t comparable.
+                This quad uses a rate type this app doesn&apos;t know ({ratesTypeName(fcType)}). Pick another rate type to
+                switch — that starts from the new type&apos;s default rates, because the numbers of different rate types
+                aren&apos;t comparable.
               </Notice>
             )}
           </CardContent>
@@ -167,10 +164,10 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Rat
             <CardTitle>Rate curve</CardTitle>
           </CardHeader>
           <CardContent>
-            {actual ? (
-              <RateCurveChart series={curveSeries(draft.axes, rateLimits(snapshot))} />
+            {spec ? (
+              <RateCurveChart series={curveSeries(draft, rateLimits(snapshot))} />
             ) : (
-              <p className="text-sm text-muted-foreground">Shown for Actual rates.</p>
+              <p className="text-sm text-muted-foreground">Not available for this rate type.</p>
             )}
           </CardContent>
         </Card>

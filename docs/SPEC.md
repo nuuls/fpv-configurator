@@ -84,7 +84,7 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
 	- Very simple interface, only one profile
 	- Dropdown for rate type
 		- Actual (default)
-		- ...others (not implemented yet)
+		- Betaflight, Raceflight, KISS, Quick — switching always resets to that type's defaults
 	- 3x3 input matrix
 	- Values can be synced across axis:
 		- Sync all (default)
