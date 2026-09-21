@@ -1,7 +1,6 @@
 import { CircleCheck, TriangleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
-import { AttitudeIndicator } from '@/components/AttitudeIndicator'
 import { Notice } from '@/components/Notice'
 import { SaveBar } from '@/components/SaveBar'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -13,7 +12,7 @@ import { useMspPoll } from '@/hooks/useMspPoll'
 import { useSave } from '@/hooks/useSave'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 import { formatApiVersion, formatFirmware } from '@/lib/format'
-import { readAnalog, readAttitude, readStatus } from '@/lib/msp/api'
+import { readStatus } from '@/lib/msp/api'
 import { readSetupSnapshot, saveSetup } from '@/lib/setup/io'
 import {
   applyFix,
@@ -37,8 +36,6 @@ const toDraft = (snapshot: SetupSnapshot | null) => snapshot && readSetup(snapsh
 /** Spec: docs/tabs/setup.md */
 export function SetupPage() {
   const fcInfo = useConnectionStore((s) => s.fcInfo)
-  const attitude = useMspPoll(readAttitude, 50)
-  const analog = useMspPoll(readAnalog, 250)
   const status = useMspPoll(readStatus, 500)
   const { client, snapshot, error: readError, reload } = useFcSnapshot(readSetupSnapshot)
   const { draft, setDraft, dirty, revert } = useDraft(snapshot, toDraft)
@@ -53,7 +50,7 @@ export function SetupPage() {
 
   return (
     <>
-      <PageHeader title="Setup" description="Flight controller identity and live telemetry." />
+      <PageHeader title="Setup" description="Flight controller identity, system status and pre-flight checklist." />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
@@ -67,33 +64,6 @@ export function SetupPage() {
               <Row label="Board" value={fcInfo.board.boardName || fcInfo.board.identifier} />
               <Row label="Target" value={fcInfo.board.targetName || '—'} />
               <Row label="Manufacturer" value={fcInfo.board.manufacturerId || '—'} />
-            </Rows>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Attitude</CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-center gap-6">
-            <AttitudeIndicator roll={attitude?.roll ?? 0} pitch={attitude?.pitch ?? 0} />
-            <Rows>
-              <Row label="Roll" value={attitude ? `${attitude.roll.toFixed(1)}°` : '—'} />
-              <Row label="Pitch" value={attitude ? `${attitude.pitch.toFixed(1)}°` : '—'} />
-              <Row label="Heading" value={attitude ? `${attitude.yaw}°` : '—'} />
-            </Rows>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Battery</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Rows>
-              <Row label="Voltage" value={analog ? `${analog.voltage.toFixed(2)} V` : '—'} />
-              <Row label="Current" value={analog ? `${analog.amperage.toFixed(2)} A` : '—'} />
-              <Row label="Consumed" value={analog ? `${analog.mAhDrawn} mAh` : '—'} />
             </Rows>
           </CardContent>
         </Card>

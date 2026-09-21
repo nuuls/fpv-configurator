@@ -5,16 +5,14 @@ Route: `/setup` · Page: `src/pages/Setup.tsx`
 
 ## Purpose
 
-FC identity and live telemetry at a glance, the one hardware-level setting that has no other home (the PID
+FC identity and system status at a glance, the one hardware-level setting that has no other home (the PID
 loop frequency), and a pre-flight checklist that verifies the settings a quad should not fly without.
 
 ## Layout
 
 ```
 +---------------------------+---------------------------+
-| Flight controller         | Attitude                  |
-+---------------------------+---------------------------+
-| Battery                   | System                    |
+| Flight controller         | System                    |
 |                           |  PID loop freq [4k][8k]   |
 +---------------------------+---------------------------+
 | Pre-flight checklist                                  |
@@ -31,8 +29,6 @@ loop frequency), and a pre-flight checklist that verifies the settings a quad sh
 | Control | Type | Betaflight setting / MSP | Values · default | Notes |
 | ------- | ---- | ------------------------ | ---------------- | ----- |
 | Firmware, MSP API, board, target, manufacturer | readout | `MSP_FC_VERSION`, `MSP_API_VERSION`, `MSP_BOARD_INFO` | | read at connect |
-| Roll, pitch, heading + horizon | live readout | `MSP_ATTITUDE` @ 20 Hz | degrees | |
-| Voltage, current, consumed | live readout | `MSP_ANALOG` @ 4 Hz | V, A, mAh | |
 | PID loop frequency | button group | `pid_process_denom` · `MSP_ADVANCED_CONFIG` byte 1 (read-modify-write) | see Behaviour · FC value | needs reboot |
 | Cycle time, CPU load, PID profile, sensors | live readout | `MSP_STATUS` @ 2 Hz | | |
 | Check: bidirectional DShot is enabled | check + link to Motors | `dshot_bidir` · `MSP_MOTOR_CONFIG` byte 8 | pass = on | edited on Motors |
@@ -65,6 +61,7 @@ loop frequency), and a pre-flight checklist that verifies the settings a quad sh
 
 - Magnetometer calibration, reset settings, backup / restore (accelerometer calibration lives on Orientation)
 - Arming-disable flags, GPS, instruments
+- Attitude (horizon, roll / pitch / heading) and battery readouts (voltage, current, consumed)
 - Free choice of `pid_process_denom` (1–16)
 - Free choice of arm angle, the other beeper conditions, DShot beacon, other features
 

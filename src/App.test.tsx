@@ -25,7 +25,7 @@ describe('App', () => {
     expect(await screen.findByRole('heading', { name: 'Setup' })).toBeInTheDocument()
     expect(screen.getAllByText('BTFL 2026.6.2').length).toBeGreaterThan(0)
     expect(screen.getByText('MOCKF405')).toBeInTheDocument()
-    expect(await screen.findByText(/^\d+\.\d\d V$/)).toBeInTheDocument()
+    expect(await screen.findByText(/^\d+ µs$/)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Disconnect' }))
     expect(await screen.findByText('No flight controller connected')).toBeInTheDocument()

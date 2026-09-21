@@ -96,7 +96,7 @@ src/
     useUnsavedChanges.ts   mark a tab dirty + ask before navigating away
   routes.ts                tab list — single source for router AND sidebar
   components/layout/       AppShell, Header (connect buttons), Sidebar, PageHeader
-  components/              SaveBar, Notice/LoadingState, ConfirmDialogHost, BoardView, AttitudeIndicator
+  components/              SaveBar, Notice/LoadingState, ConfirmDialogHost, BoardView
   components/ui/           shadcn components (generated; excluded from lint; they import `cn` from the
                            `cn` package, app code uses `@/lib/utils`)
   pages/                   one file per tab
