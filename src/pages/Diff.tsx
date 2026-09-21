@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Notice } from '@/components/Notice'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -84,8 +84,8 @@ function CopyButton({ text }: { text: string }) {
 
 /** The two sides of a difference, coloured as `git diff` does: what it was (the default) and what it is now. */
 const SIDES = {
-  default: { marker: '-', label: 'default', line: 'bg-destructive/10', gutter: 'text-destructive', value: 'bg-destructive/25' },
-  current: { marker: '+', label: 'current', line: 'bg-success/10', gutter: 'text-success', value: 'bg-success/25' },
+  default: 'bg-destructive/25',
+  current: 'bg-success/25',
 } as const
 
 function DiffReportView({ report }: { report: DiffReport }) {
@@ -100,13 +100,10 @@ function DiffReportView({ report }: { report: DiffReport }) {
         <Notice>No tuning differences — PIDs, rates and filters are at their defaults.</Notice>
       )}
       {report.sections.length > 0 && (
-        <p className="mt-4 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-muted-foreground">
-          <span>
-            <span className={cn('mr-1.5 rounded-sm px-1.5', SIDES.default.value, SIDES.default.gutter)}>-</span>Betaflight default
-          </span>
-          <span>
-            <span className={cn('mr-1.5 rounded-sm px-1.5', SIDES.current.value, SIDES.current.gutter)}>+</span>this flight controller
-          </span>
+        <p className="mt-4 font-mono text-xs text-muted-foreground">
+          <Value side="default">Betaflight default</Value>
+          <Arrow />
+          <Value side="current">this flight controller</Value>
         </p>
       )}
       <div className="mt-2 grid gap-4">
@@ -118,7 +115,7 @@ function DiffReportView({ report }: { report: DiffReport }) {
   )
 }
 
-/** A section reads like a file in `git diff`: its CLI heading, then a `-` default and a `+` current line per difference. */
+/** A section reads like a file in `git diff`: its CLI heading, then one line per difference. */
 function SectionDiff({ section }: { section: DiffSection }) {
   const count = section.entries.filter((entry) => entry.kind === 'setting' || !entry.isDefault).length
   return (
@@ -127,42 +124,45 @@ function SectionDiff({ section }: { section: DiffSection }) {
         <h2 className="font-medium">{section.title}</h2>
         <span className="font-sans text-xs text-muted-foreground">{count === 1 ? '1 difference' : `${count} differences`}</span>
       </header>
-      <ul>
+      <ul className="py-1">
         {section.entries.map((entry, index) => (
-          <EntryLines key={index} entry={entry} />
+          <li key={index} className="px-3 py-0.5 hover:bg-muted/50">
+            <code className="break-all whitespace-pre-wrap">
+              <EntryLine entry={entry} />
+            </code>
+          </li>
         ))}
       </ul>
     </section>
   )
 }
 
-function EntryLines({ entry }: { entry: DiffEntry }) {
+/** `set d_roll = 30 → 34`: the command as the CLI takes it, with the default in front of the value that is set. */
+function EntryLine({ entry }: { entry: DiffEntry }) {
   if (entry.kind === 'setting') {
-    const command = `set ${entry.name} = `
     return (
       <>
-        {entry.defaultValue !== null && <DiffLine side="default" command={command} value={entry.defaultValue} />}
-        <DiffLine side="current" command={command} value={entry.value} />
+        set {entry.name} ={' '}
+        {entry.defaultValue !== null && (
+          <>
+            <Value side="default">{entry.defaultValue}</Value>
+            <Arrow />
+          </>
+        )}
+        <Value side="current">{entry.value}</Value>
       </>
     )
   }
   // Commands other than `set` (feature, serial, aux, …) stay the lines the CLI printed.
-  return <DiffLine side={entry.isDefault ? 'default' : 'current'} command={entry.line} />
+  return <Value side={entry.isDefault ? 'default' : 'current'}>{entry.line}</Value>
 }
 
-/** `value` is what differs between the two lines of a setting; it gets the stronger highlight. */
-function DiffLine({ side, command, value }: { side: keyof typeof SIDES; command: string; value?: string }) {
-  const style = SIDES[side]
-  return (
-    <li className={cn('flex px-3 py-0.5', style.line)}>
-      <span aria-hidden className={cn('w-5 shrink-0 select-none', style.gutter)}>
-        {style.marker}
-      </span>
-      <span className="sr-only">{style.label}: </span>
-      <code className="min-w-0 break-all whitespace-pre-wrap">
-        {command}
-        {value !== undefined && <span className={cn('rounded-sm px-0.5', style.value)}>{value}</span>}
-      </code>
-    </li>
-  )
+/** `<del>` / `<ins>` say which side it is without the colour. */
+function Value({ side, children }: { side: keyof typeof SIDES; children: ReactNode }) {
+  const Tag = side === 'default' ? 'del' : 'ins'
+  return <Tag className={cn('rounded-sm px-1 no-underline', SIDES[side])}>{children}</Tag>
+}
+
+function Arrow() {
+  return <span className="text-muted-foreground"> → </span>
 }

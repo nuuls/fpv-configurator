@@ -5,8 +5,7 @@ import { openTab, resetAppAfterEach, saveAndReboot } from '@/test/app'
 
 resetAppAfterEach()
 
-/** The `-` / `+` markers are decoration; to a screen reader a line says "default: …" or "current: …". */
-const lines = (section: string) =>
+const lines =(section: string) =>
   within(screen.getByRole('group', { name: section }))
     .getAllByRole('listitem')
     .map((line) => line.textContent)
@@ -28,8 +27,11 @@ describe('Diff Checker tab', () => {
     await user.click(screen.getByRole('link', { name: 'Diff Checker' }))
     // yaw_motors_reversed is setup, not tuning
     expect(await screen.findByText(/^1 tuning difference · 7 other hidden/)).toBeInTheDocument()
-    expect(lines('master')).toEqual(['-default: set dshot_bidir = OFF', '+current: set dshot_bidir = ON'])
-    expect(within(screen.getByRole('group', { name: 'master' })).getByText('1 difference')).toBeInTheDocument()
+    expect(lines('master')).toEqual(['set dshot_bidir = OFF → ON'])
+    const master = within(screen.getByRole('group', { name: 'master' }))
+    expect(master.getByText('OFF').tagName).toBe('DEL') // the default, red
+    expect(master.getByText('ON').tagName).toBe('INS') // what is set, green
+    expect(master.getByText('1 difference')).toBeInTheDocument()
     expect(screen.queryByRole('group', { name: 'feature' })).toBeNull()
 
     await user.click(screen.getByRole('button', { name: 'Read again' }))

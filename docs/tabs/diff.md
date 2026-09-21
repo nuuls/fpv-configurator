@@ -15,23 +15,20 @@ fly differently from a stock one. The setup (ports, modes, VTX table, OSD, …) 
 | [Read again] [Copy full diff]                                   |
 |        3 tuning differences · 7 other hidden · board · firmware |
 +-----------------------------------------------------------------+
-  [-] Betaflight default   [+] this flight controller
+  [Betaflight default] → [this flight controller]
 +-----------------------------------------------------------------+
 | master                                             1 difference |
-| - set dshot_bidir = OFF                                  (red)  |
-| + set dshot_bidir = ON                                  (green) |
+| set dshot_bidir = [OFF] → [ON]                                  |
 +-----------------------------------------------------------------+
 | profile 0                                         2 differences |
-| - set d_roll = 30                                               |
-| + set d_roll = 34                                               |
-| - set d_pitch = 34                                              |
-| + set d_pitch = 38                                              |
+| set d_roll = [30] → [34]                                        |
+| set d_pitch = [34] → [38]                                       |
 +-----------------------------------------------------------------+
 | rateprofile 0 …                                                 |
 +-----------------------------------------------------------------+
 ```
 
-Like `git diff`: a section is a "file", the default is the removed line, the current value the added one.
+Coloured like `git diff`: a section is a "file"; in a line the default is marked red, the current value green.
 
 ## Controls
 
@@ -40,9 +37,9 @@ Like `git diff`: a section is a "file", the default is the removed line, the cur
 | Read again | button | CLI `diff all defaults` | — | The tab also reads once when it is opened |
 | Copy full diff | button | — | — | The **complete** CLI output as it came (setup included), to paste into a bug report |
 | Summary | readout | `# version`, `board_name`, `manufacturer_id` lines | — | Number of tuning differences · how many other differences are hidden · board · firmware |
-| Legend | readout | — | — | `-` Betaflight default · `+` this flight controller; only while there are differences |
+| Legend | readout | — | — | Red "Betaflight default" → green "this flight controller"; only while there are differences |
 | Section block | readout | CLI headings `master`, `profile N`, `rateprofile N` | — | Only sections with tuning differences; every PID / rate profile (`all`). Header: heading · number of differences |
-| Setting lines | readout | `set name = value` + `#set name = default` | — | Red `- set name = default` above green `+ set name = value`, the value highlighted; no `-` line if the FC printed no default. Long values wrap |
+| Setting line | readout | `set name = value` + `#set name = default` | — | One line: `set name = default → value`, the default marked red, the value green; only the green value if the FC printed no default. Long values wrap |
 
 ## Behaviour
 
@@ -82,7 +79,7 @@ Checkable with **Connect Mock FC** (so the mock has to support it):
 - [x] Open the tab → "0 tuning differences · 6 other hidden" and the empty state: the mock's telemetry, UART2/UART3
       and two modes are setup, so there are no cards
 - [x] Motors → Bidirectional DShot on, props out → Save & Reboot → Diff Checker → "1 tuning difference · 7 other
-      hidden", `master` lists only `- set dshot_bidir = OFF` / `+ set dshot_bidir = ON` (not `yaw_motors_reversed`)
+      hidden", `master` lists only `set dshot_bidir = OFF → ON` (not `yaw_motors_reversed`)
 - [x] Read again reads again; Copy full diff puts the complete raw CLI output on the clipboard
 - [x] Afterwards other tabs load as usual (the FC is back in MSP)
 
@@ -106,10 +103,10 @@ _Made while building without asking (2026-09-21) — change freely._
   names from the firmware's `cli/settings.c`; commands other than `set` are all setup. The copy button keeps the
   complete diff (renamed "Copy full diff"), so nothing is lost for bug reports, and the summary counts what is hidden.
 - CLI names and values are shown as they are, not translated — the tab is a debugging tool.
-- Looks like `git diff` (2026-09-21, asked for by the user — the three-column table was hard to read): per setting a
-  red `-` line with the default and a green `+` line with the current value, written as the CLI command so a line can
-  be pasted into a CLI. Pairs per setting rather than git's "all removals, then all additions" of a hunk, so the two
-  values of one setting sit on top of each other. Screen readers get "default:" / "current:" instead of the markers.
+- Coloured like `git diff` (2026-09-21, asked for by the user — the three-column table was hard to read), condensed
+  to one line per setting on the user's request: `set name = default → value`, the default marked red and the value
+  green, instead of a `-` and a `+` line. The values are `<del>` / `<ins>` elements, so the sides don't depend on the
+  colour alone.
 - Sidebar label "Diff Checker", between Analog VTX and Blackbox as in SPEC §2.
 
 ## Open questions
