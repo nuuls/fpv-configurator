@@ -10,6 +10,7 @@ docs/
     _TEMPLATE.md     copy this for every new tab
     <tab>.md         one file per tab, same name as the route (src/routes.ts)
   refs/              screenshots, sketches, photos referenced from the specs
+  research/          firmware investigations for features not (yet) in scope
 ```
 
 ## Format rules
