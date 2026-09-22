@@ -180,9 +180,9 @@ On real hardware:
 - [ ] 8 kHz with DSHOT300 + bidirectional DShot comes back as 4 kHz after the reboot
 - [ ] Fresh FC: accelerometer check fails, passes after calibrating; arm angle Fix survives a power cycle
 - [ ] After Fix beeper + Save: `beacon` in the CLI lists RX_LOST and RX_SET, and the ESCs beep with the BEEPER switch
-- [ ] A quad set up in Betaflight Configurator lists what that configurator changed, minus what this app's tabs
+- [x] A quad set up in Betaflight Configurator lists what that configurator changed, minus what this app's tabs
       cover, features and calibrations; resetting a `profile 1` setting leaves the selected profile as it was and
-      survives the power cycle
+      survives the power cycle (user, 2026-09-22)
 
 ## Open questions
 
