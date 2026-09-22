@@ -10,7 +10,13 @@ interface ButtonGroupProps<T extends string | number> {
 }
 
 /** Pick one of a few values: joined buttons, the current one filled. */
-export function ButtonGroup<T extends string | number>({ label, options, value, onChange, disabled }: ButtonGroupProps<T>) {
+export function ButtonGroup<T extends string | number>({
+  label,
+  options,
+  value,
+  onChange,
+  disabled,
+}: ButtonGroupProps<T>) {
   return (
     <div role="group" aria-label={label} className="inline-flex">
       {options.map((option) => (
@@ -21,7 +27,7 @@ export function ButtonGroup<T extends string | number>({ label, options, value, 
           variant={option.value === value ? 'default' : 'outline'}
           aria-pressed={option.value === value}
           disabled={disabled}
-          className="min-w-9 rounded-none first:rounded-l-md last:rounded-r-md not-first:-ml-px"
+          className="min-w-9 rounded-none not-first:-ml-px first:rounded-l-md last:rounded-r-md"
           onClick={() => onChange(option.value)}
         >
           {option.label}

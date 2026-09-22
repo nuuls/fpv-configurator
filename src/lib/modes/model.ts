@@ -77,7 +77,10 @@ export function encodeSetModeRange(index: number, slot: ModeSlot): Uint8Array {
 
 export function decodeSetModeRange(payload: Uint8Array): { index: number; slot: ModeSlot } {
   const r = new ByteReader(payload)
-  return { index: r.u8(), slot: { boxId: r.u8(), auxChannel: r.u8(), start: toPwm(r.u8()), end: toPwm(r.u8()) } }
+  return {
+    index: r.u8(),
+    slot: { boxId: r.u8(), auxChannel: r.u8(), start: toPwm(r.u8()), end: toPwm(r.u8()) },
+  }
 }
 
 // ---- MSP_BOXIDS (119): one permanent id per byte · MSP_RC (105): one u16 per channel ----
@@ -121,15 +124,22 @@ export function unmanagedSlotCount(snapshot: ModesSnapshot): number {
 export function validateModes(snapshot: ModesSnapshot, draft: ModesDraft): string[] {
   const problems: string[] = []
   const ranges = draft.flatMap((mode) => mode.ranges)
-  if (ranges.some((range) => range.start >= range.end)) problems.push('A range needs a start below its end.')
+  if (ranges.some((range) => range.start >= range.end))
+    problems.push('A range needs a start below its end.')
   const capacity = snapshot.slots.length - unmanagedSlotCount(snapshot)
-  if (ranges.length > capacity) problems.push(`Too many ranges: the flight controller has room for ${capacity}.`)
+  if (ranges.length > capacity)
+    problems.push(`Too many ranges: the flight controller has room for ${capacity}.`)
   return problems
 }
 
 /** Slot writes that turn the FC's current ranges into the draft. Only changed slots are returned. */
-export function planModeWrites(snapshot: ModesSnapshot, draft: ModesDraft): { index: number; slot: ModeSlot }[] {
-  const wanted: ModeSlot[] = draft.flatMap((mode) => mode.ranges.map((range) => ({ boxId: mode.boxId, ...range })))
+export function planModeWrites(
+  snapshot: ModesSnapshot,
+  draft: ModesDraft,
+): { index: number; slot: ModeSlot }[] {
+  const wanted: ModeSlot[] = draft.flatMap((mode) =>
+    mode.ranges.map((range) => ({ boxId: mode.boxId, ...range })),
+  )
 
   // Reuse the slots our modes already occupy first, then free ones; never an unmanaged mode's slot.
   const indexed = snapshot.slots.map((current, index) => ({ current, index }))
@@ -141,7 +151,9 @@ export function planModeWrites(snapshot: ModesSnapshot, draft: ModesDraft): { in
   const writes: { index: number; slot: ModeSlot }[] = []
   pool.forEach(({ current, index }, position) => {
     const next = wanted[position] ?? EMPTY_SLOT
-    const unchanged = isUsed(current) ? JSON.stringify(current) === JSON.stringify(next) : !isUsed(next)
+    const unchanged = isUsed(current)
+      ? JSON.stringify(current) === JSON.stringify(next)
+      : !isUsed(next)
     if (!unchanged) writes.push({ index, slot: next })
   })
   return writes

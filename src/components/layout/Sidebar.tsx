@@ -17,13 +17,19 @@ export function Sidebar({ disabled, open, onClose }: SidebarProps) {
 
   return (
     <>
-      {open && <div aria-hidden className="absolute inset-0 z-30 bg-black/50 md:hidden" onClick={onClose} />}
+      {open && (
+        <div
+          aria-hidden
+          className="absolute inset-0 z-30 bg-black/50 md:hidden"
+          onClick={onClose}
+        />
+      )}
       <nav
         id={SIDEBAR_ID}
         aria-label="Tabs"
         aria-disabled={disabled}
         className={cn(
-          'flex w-52 shrink-0 flex-col gap-1 overflow-y-auto border-r bg-background p-3',
+          'bg-background flex w-52 shrink-0 flex-col gap-1 overflow-y-auto border-r p-3',
           'max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:transition-[translate,visibility] max-md:duration-200',
           !open && 'max-md:invisible max-md:-translate-x-full',
         )}
@@ -36,7 +42,7 @@ export function Sidebar({ disabled, open, onClose }: SidebarProps) {
             onClick={onClose}
             className={({ isActive }) =>
               cn(
-                'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
+                'text-muted-foreground hover:bg-accent hover:text-accent-foreground flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                 isActive && !disabled && 'bg-accent text-accent-foreground',
                 disabled && 'pointer-events-none opacity-40',
               )
@@ -45,7 +51,11 @@ export function Sidebar({ disabled, open, onClose }: SidebarProps) {
             <Icon className="size-4" />
             {label}
             {dirtyPaths.includes(path) && (
-              <span title="Unsaved changes" aria-label="Unsaved changes" className="ml-auto size-2 rounded-full bg-primary" />
+              <span
+                title="Unsaved changes"
+                aria-label="Unsaved changes"
+                className="bg-primary ml-auto size-2 rounded-full"
+              />
             )}
           </NavLink>
         ))}

@@ -56,7 +56,11 @@ export function crc8DvbS2Of(bytes: Uint8Array): number {
   return crc
 }
 
-export function encodeV1(code: number, payload: Uint8Array = EMPTY, direction: MspDirection = 'request'): Uint8Array {
+export function encodeV1(
+  code: number,
+  payload: Uint8Array = EMPTY,
+  direction: MspDirection = 'request',
+): Uint8Array {
   if (code < 0 || code > V1_MAX_CODE) throw new RangeError(`MSP v1 code out of range: ${code}`)
   if (payload.length > MAX_PAYLOAD_SIZE) throw new RangeError('MSP payload too large')
 
@@ -82,7 +86,11 @@ export function encodeV1(code: number, payload: Uint8Array = EMPTY, direction: M
   return out
 }
 
-export function encodeV2(code: number, payload: Uint8Array = EMPTY, direction: MspDirection = 'request'): Uint8Array {
+export function encodeV2(
+  code: number,
+  payload: Uint8Array = EMPTY,
+  direction: MspDirection = 'request',
+): Uint8Array {
   if (code < 0 || code > 0xffff) throw new RangeError(`MSP v2 code out of range: ${code}`)
   if (payload.length > MAX_PAYLOAD_SIZE) throw new RangeError('MSP payload too large')
 

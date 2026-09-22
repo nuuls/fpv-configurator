@@ -111,7 +111,10 @@ export const useConnectionStore = create<ConnectionState>()((set, get) => {
         opened.onConnected?.()
       } catch (error) {
         const hint = opened?.onFailed?.() ?? ''
-        set({ ...DISCONNECTED, error: isPickerCancelled(error) ? null : describeError(error) + hint })
+        set({
+          ...DISCONNECTED,
+          error: isPickerCancelled(error) ? null : describeError(error) + hint,
+        })
       }
     },
 

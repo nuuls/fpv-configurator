@@ -13,12 +13,12 @@ Assign radio switches to the four modes a normal pilot needs. Betaflight's layou
 One card per mode: **Arm** (box 0), **Angle** (1), **Turtle mode** (35, "FLIP OVER AFTER CRASH"), **Beeper** (13).
 A mode the firmware build doesn't offer (`MSP_BOXIDS`, 119) is not shown.
 
-| Control | Type | Betaflight setting / MSP | Values · default | Notes |
-| ------- | ---- | ------------------------ | ---------------- | ----- |
-| Channel | select per range | `MSP_MODE_RANGES` (34) / `MSP_SET_MODE_RANGE` (35) | AUX 1..n | n from the live channel count |
-| Range | two-thumb slider | same | 900–2100 µs, step 25 · new range 1700–2100 | Marker shows the live channel value (`MSP_RC` @ 10 Hz) |
-| Add range / remove | buttons | same | — | |
-| Active | badge + card highlight | derived from `MSP_RC` | — | |
+| Control            | Type                   | Betaflight setting / MSP                           | Values · default                           | Notes                                                  |
+| ------------------ | ---------------------- | -------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------ |
+| Channel            | select per range       | `MSP_MODE_RANGES` (34) / `MSP_SET_MODE_RANGE` (35) | AUX 1..n                                   | n from the live channel count                          |
+| Range              | two-thumb slider       | same                                               | 900–2100 µs, step 25 · new range 1700–2100 | Marker shows the live channel value (`MSP_RC` @ 10 Hz) |
+| Add range / remove | buttons                | same                                               | —                                          |                                                        |
+| Active             | badge + card highlight | derived from `MSP_RC`                              | —                                          |                                                        |
 
 ## Behaviour
 

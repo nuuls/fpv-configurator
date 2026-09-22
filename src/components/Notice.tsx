@@ -7,9 +7,18 @@ const TONES = {
   error: 'border-destructive/40 bg-destructive/10 text-destructive',
 }
 
-export function Notice({ tone = 'info', children }: { tone?: keyof typeof TONES; children: ReactNode }) {
+export function Notice({
+  tone = 'info',
+  children,
+}: {
+  tone?: keyof typeof TONES
+  children: ReactNode
+}) {
   return (
-    <p role={tone === 'error' ? 'alert' : undefined} className={cn('mt-4 rounded-md border p-3 text-sm', TONES[tone])}>
+    <p
+      role={tone === 'error' ? 'alert' : undefined}
+      className={cn('mt-4 rounded-md border p-3 text-sm', TONES[tone])}
+    >
       {children}
     </p>
   )
@@ -17,5 +26,9 @@ export function Notice({ tone = 'info', children }: { tone?: keyof typeof TONES;
 
 /** Standard body for a tab that is still reading (or failed to read) its config. */
 export function LoadingState({ error }: { error: string | null }) {
-  return error ? <Notice tone="error">{error}</Notice> : <p className="text-sm text-muted-foreground">Reading…</p>
+  return error ? (
+    <Notice tone="error">{error}</Notice>
+  ) : (
+    <p className="text-muted-foreground text-sm">Reading…</p>
+  )
 }

@@ -5,7 +5,12 @@
  * API 1.49 replaces function masks with `rx_uart` / `vtx_uart` / ... settings. When that is added,
  * `PortAssignments` stays the same and only `readAssignments` / `planWrites` get a second variant.
  */
-import { FEATURE, SERIALRX_CRSF, SERIALRX_PROVIDER_NAMES, type SerialPortConfig } from '@/lib/msp/messages'
+import {
+  FEATURE,
+  SERIALRX_CRSF,
+  SERIALRX_PROVIDER_NAMES,
+  type SerialPortConfig,
+} from '@/lib/msp/messages'
 
 /** Betaflight `serialPortFunction_e` (io/serial.h). */
 export const PORT_FUNCTION = {
@@ -110,7 +115,9 @@ export function isSelectablePort(identifier: number): boolean {
 /** Labels for the function bits on a port that this tab doesn't manage. Empty = none. */
 export function unmanagedFunctions(functionMask: number): string[] {
   if (!(functionMask & ~MANAGED_MASK)) return []
-  const labels = UNMANAGED_FUNCTION_LABELS.filter(([mask]) => functionMask & mask).map(([, label]) => label)
+  const labels = UNMANAGED_FUNCTION_LABELS.filter(([mask]) => functionMask & mask).map(
+    ([, label]) => label,
+  )
   return labels.length ? labels : ['another function']
 }
 
@@ -119,9 +126,15 @@ export function serialRxProviderName(provider: number): string {
 }
 
 /** The UART a GPS is set up on: GPS port function plus the `GPS` feature. Null = no GPS. */
-export function configuredGpsPort({ ports, features }: Pick<PortsSnapshot, 'ports' | 'features'>): number | null {
+export function configuredGpsPort({
+  ports,
+  features,
+}: Pick<PortsSnapshot, 'ports' | 'features'>): number | null {
   if (!(features & FEATURE.GPS)) return null
-  return ports.find((p) => isSelectablePort(p.identifier) && p.functionMask & PORT_FUNCTION.GPS)?.identifier ?? null
+  return (
+    ports.find((p) => isSelectablePort(p.identifier) && p.functionMask & PORT_FUNCTION.GPS)
+      ?.identifier ?? null
+  )
 }
 
 export function readAssignments(snapshot: PortsSnapshot): PortAssignments {
@@ -131,12 +144,19 @@ export function readAssignments(snapshot: PortsSnapshot): PortAssignments {
   const rxPort = portWith(PORT_FUNCTION.RX_SERIAL)
   let receiver: PortAssignments['receiver']
   if (snapshot.features & FEATURE.RX_SPI) receiver = { type: 'spi', port: null }
-  else if (rxPort === null || !(snapshot.features & FEATURE.RX_SERIAL)) receiver = { type: 'none', port: null }
-  else receiver = { type: snapshot.serialRxProvider === SERIALRX_CRSF ? 'crsf' : 'other', port: rxPort }
+  else if (rxPort === null || !(snapshot.features & FEATURE.RX_SERIAL))
+    receiver = { type: 'none', port: null }
+  else
+    receiver = {
+      type: snapshot.serialRxProvider === SERIALRX_CRSF ? 'crsf' : 'other',
+      port: rxPort,
+    }
 
   let vtx: PortAssignments['vtx'] = { type: 'none', port: null }
   const vtxPort = ports.find(
-    (p) => p.functionMask & (PORT_FUNCTION.VTX_MSP | PORT_FUNCTION.VTX_SMARTAUDIO | PORT_FUNCTION.VTX_TRAMP),
+    (p) =>
+      p.functionMask &
+      (PORT_FUNCTION.VTX_MSP | PORT_FUNCTION.VTX_SMARTAUDIO | PORT_FUNCTION.VTX_TRAMP),
   )
   if (vtxPort) {
     const type: VtxType =
@@ -178,7 +198,8 @@ export function usedPorts(assignments: PortAssignments): { port: number; usedBy:
 export function validateAssignments(assignments: PortAssignments): string[] {
   const problems: string[] = []
   const { receiver, vtx, gps, mspDevices } = assignments
-  if (receiver.type === 'crsf' && receiver.port === null) problems.push('Pick a port for the receiver.')
+  if (receiver.type === 'crsf' && receiver.port === null)
+    problems.push('Pick a port for the receiver.')
   if (vtx.type !== 'none' && vtx.port === null) problems.push('Pick a port for the VTX.')
   if (gps.enabled && gps.port === null) problems.push('Pick a port for the GPS.')
   if (mspDevices.includes(null)) problems.push('Pick a port for every MSP device.')
@@ -204,7 +225,8 @@ export function planWrites(snapshot: PortsSnapshot, assignments: PortAssignments
   }
 
   const { receiver, vtx, gps, mspDevices } = assignments
-  if (receiver.type === 'crsf' || receiver.type === 'other') add(receiver.port, PORT_FUNCTION.RX_SERIAL)
+  if (receiver.type === 'crsf' || receiver.type === 'other')
+    add(receiver.port, PORT_FUNCTION.RX_SERIAL)
   if (vtx.type === 'msp') add(vtx.port, PORT_FUNCTION.MSP | PORT_FUNCTION.VTX_MSP)
   if (vtx.type === 'smartaudio') add(vtx.port, PORT_FUNCTION.VTX_SMARTAUDIO)
   if (vtx.type === 'tramp') add(vtx.port, PORT_FUNCTION.VTX_TRAMP)
@@ -241,10 +263,16 @@ export function planWrites(snapshot: PortsSnapshot, assignments: PortAssignments
     settings.push({ name: 'serialrx_provider', value: 'CRSF' })
   }
   if (vtx.type === 'msp' && before.vtx.type !== 'msp') {
-    settings.push({ name: 'osd_displayport_device', value: 'MSP' }, { name: 'vcd_video_system', value: 'HD' })
+    settings.push(
+      { name: 'osd_displayport_device', value: 'MSP' },
+      { name: 'vcd_video_system', value: 'HD' },
+    )
   }
   if (vtx.type !== 'msp' && before.vtx.type === 'msp') {
-    settings.push({ name: 'osd_displayport_device', value: 'AUTO' }, { name: 'vcd_video_system', value: 'AUTO' })
+    settings.push(
+      { name: 'osd_displayport_device', value: 'AUTO' },
+      { name: 'vcd_video_system', value: 'AUTO' },
+    )
   }
 
   return { ports, features, settings, replaced }

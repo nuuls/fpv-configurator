@@ -12,7 +12,9 @@ export const useUnsavedStore = create<UnsavedState>()((set) => ({
   setDirty: (path, dirty) =>
     set((s) => {
       if (s.dirtyPaths.includes(path) === dirty) return s
-      return { dirtyPaths: dirty ? [...s.dirtyPaths, path] : s.dirtyPaths.filter((p) => p !== path) }
+      return {
+        dirtyPaths: dirty ? [...s.dirtyPaths, path] : s.dirtyPaths.filter((p) => p !== path),
+      }
     }),
 }))
 

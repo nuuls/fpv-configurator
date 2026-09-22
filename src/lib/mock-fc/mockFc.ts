@@ -42,7 +42,11 @@ import {
   encodeMotorTelemetry,
   MOTOR_STOP,
 } from '@/lib/motors/model'
-import { decodeBoardAlignment, encodeBoardAlignment, type BoardAlignment } from '@/lib/orientation/model'
+import {
+  decodeBoardAlignment,
+  encodeBoardAlignment,
+  type BoardAlignment,
+} from '@/lib/orientation/model'
 import {
   decodePosition,
   decodeSetOsdConfig,
@@ -134,7 +138,12 @@ export interface MockVtxConfig {
   powerLevels: VtxPowerLevel[]
 }
 
-const emptyVtxBand = (): VtxBand => ({ name: '', letter: '', isFactory: false, frequencies: new Array<number>(VTX_MAX_CHANNELS).fill(0) })
+const emptyVtxBand = (): VtxBand => ({
+  name: '',
+  letter: '',
+  isFactory: false,
+  frequencies: new Array<number>(VTX_MAX_CHANNELS).fill(0),
+})
 const emptyVtxPowerLevel = (): VtxPowerLevel => ({ value: 0, label: '' })
 
 const port = (identifier: number, functionMask = 0): SerialPortConfig => ({
@@ -158,7 +167,8 @@ export function defaultMockConfig(): MockFcConfig {
       port(55),
       port(56),
     ],
-    features: FEATURE.RX_SERIAL | FEATURE.TELEMETRY | FEATURE.OSD | FEATURE.AIRMODE | FEATURE.ESC_SENSOR,
+    features:
+      FEATURE.RX_SERIAL | FEATURE.TELEMETRY | FEATURE.OSD | FEATURE.AIRMODE | FEATURE.ESC_SENSOR,
     settings: {
       serialrx_provider: 'CRSF',
       osd_displayport_device: 'AUTO',
@@ -174,7 +184,12 @@ export function defaultMockConfig(): MockFcConfig {
       anti_gravity_gain: '80', // a profile setting at its default, for tests that change it
     },
     boardAlignment: { roll: 0, pitch: 0, yaw: 0 },
-    blackbox: { supported: true, device: BLACKBOX_DEVICE.FLASH, sampleRate: 1, fieldsDisabledMask: 0 },
+    blackbox: {
+      supported: true,
+      device: BLACKBOX_DEVICE.FLASH,
+      sampleRate: 1,
+      fieldsDisabledMask: 0,
+    },
     // ARM on AUX1 high, plus FAILSAFE (a mode the app doesn't manage) on AUX4.
     modeSlots: Array.from({ length: MODE_SLOT_COUNT }, (_, i): ModeSlot => {
       if (i === 0) return { boxId: 0, auxChannel: 0, start: 1700, end: 2100 }
@@ -182,13 +197,28 @@ export function defaultMockConfig(): MockFcConfig {
       return { boxId: 0, auxChannel: 0, start: 900, end: 900 }
     }),
     // Betaflight defaults: sliders on (RPY), everything at 1.0 including Dynamic D.
-    simplifiedTuning: [2, 100, 100, 100, 100, 100, 100, 100, 100, ...new Array<number>(8).fill(0), ...defaultFilterSliders()],
+    simplifiedTuning: [
+      2,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      ...new Array<number>(8).fill(0),
+      ...defaultFilterSliders(),
+    ],
     filterConfig: defaultFilterConfig(),
     // denom 1 · DSHOT300 · pwm rate 480 · idle 550 · ... · debug count 80
     advancedConfig: [1, 1, 0, 6, 0xe0, 0x01, 0x26, 0x02, 0, 0, 0, 0, 48, 125, 0, 0, 0, 1, 0, 80],
     motor: { poles: 14, bidirDshot: false, mixerMode: 3, propsOut: false },
     // Betaflight defaults: Actual rates, 70 / 670 / 0 on every axis, rate limit 1998, throttle mid 50
-    rcTuning: [7, 0, 67, 67, 67, 0, 50, 0, 0, 0, 0, 7, 7, 0, 0, 100, 0xce, 0x07, 0xce, 0x07, 0xce, 0x07, 3, 0],
+    rcTuning: [
+      7, 0, 67, 67, 67, 0, 50, 0, 0, 0, 0, 7, 7, 0, 0, 100, 0xce, 0x07, 0xce, 0x07, 0xce, 0x07, 3,
+      0,
+    ],
     osd: defaultOsd(),
     // Betaflight defaults: F1 (5740 MHz), lowest power, and no VTX table yet
     vtx: {
@@ -219,7 +249,9 @@ export function defaultMockConfig(): MockFcConfig {
 function defaultOsd(): MockFcConfig['osd'] {
   const hidden = { profiles: 0, variant: 0 }
   const shown = { profiles: 0b111, variant: 0 }
-  const positions = new Array<number>(FIRMWARE_ELEMENT_COUNT).fill(encodePosition({ x: 21, y: 10, ...hidden }))
+  const positions = new Array<number>(FIRMWARE_ELEMENT_COUNT).fill(
+    encodePosition({ x: 21, y: 10, ...hidden }),
+  )
   positions[elementIndex('WARNINGS')] = encodePosition({ x: 9, y: 10, ...shown })
   positions[elementIndex('AVG_CELL_VOLTAGE')] = encodePosition({ x: 1, y: 14, ...shown })
   positions[elementIndex('CROSSHAIRS')] = encodePosition({ x: 13, y: 6, ...shown })
@@ -235,7 +267,9 @@ export function firmwareDefaultConfig(): MockFcConfig {
   const config = defaultMockConfig()
   return {
     ...config,
-    ports: config.ports.map(({ identifier }) => port(identifier, identifier === 20 ? PORT_FUNCTION.MSP : 0)),
+    ports: config.ports.map(({ identifier }) =>
+      port(identifier, identifier === 20 ? PORT_FUNCTION.MSP : 0),
+    ),
     features: FEATURE.RX_SERIAL | FEATURE.OSD | FEATURE.AIRMODE,
     settings: { ...config.settings, crashflip_motor_percent: '0', osd_units: 'METRIC' },
     modeSlots: config.modeSlots.map(() => ({ boxId: 0, auxChannel: 0, start: 900, end: 900 })),
@@ -374,12 +408,16 @@ export class MockFlightController {
           boardName: 'MOCKF405',
           manufacturerId: 'MOCK',
           gyroSampleRateHz: this.gyroSampleRateHz,
-          configurationProblems: this.running.accCalibrated ? 0 : CONFIGURATION_PROBLEM.ACC_NEEDS_CALIBRATION,
+          configurationProblems: this.running.accCalibrated
+            ? 0
+            : CONFIGURATION_PROBLEM.ACC_NEEDS_CALIBRATION,
         })
       case MSP.STATUS:
         return encodeStatus({
           // PID loop time: gyro rate / pid_process_denom
-          cycleTimeUs: Math.round((1e6 * (this.running.advancedConfig[1] ?? 1)) / this.gyroSampleRateHz),
+          cycleTimeUs: Math.round(
+            (1e6 * (this.running.advancedConfig[1] ?? 1)) / this.gyroSampleRateHz,
+          ),
           i2cErrors: 0,
           sensors: 0b100001, // gyro + acc
           modeFlags: 0,
@@ -493,14 +531,27 @@ export class MockFlightController {
         return Uint8Array.from(BOX_IDS)
       case MSP.RC:
         // Sticks centred, throttle low; AUX1 low (disarmed), AUX2 sweeping so ranges visibly toggle.
-        return encodeRc([1500, 1500, 1500, 1000, 1000, Math.round(1500 + 500 * Math.sin(t * 0.8)), 1500, 1000])
+        return encodeRc([
+          1500,
+          1500,
+          1500,
+          1000,
+          1000,
+          Math.round(1500 + 500 * Math.sin(t * 0.8)),
+          1500,
+          1000,
+        ])
 
       case MSP.SIMPLIFIED_TUNING:
         return Uint8Array.from(this.running.simplifiedTuning)
       case MSP.SET_SIMPLIFIED_TUNING:
         if (request.length !== this.running.simplifiedTuning.length) return null
         this.running.simplifiedTuning = applyFilterSliders(request)
-        this.running.filterConfig = copySharedCutoffs('toFilterConfig', this.running.filterConfig, this.running.simplifiedTuning)
+        this.running.filterConfig = copySharedCutoffs(
+          'toFilterConfig',
+          this.running.filterConfig,
+          this.running.simplifiedTuning,
+        )
         return EMPTY
       case MSP.CALCULATE_SIMPLIFIED_PID:
         return calculatePids(request)
@@ -508,9 +559,14 @@ export class MockFlightController {
       case MSP.FILTER_CONFIG:
         return Uint8Array.from(this.running.filterConfig)
       case MSP.SET_FILTER_CONFIG:
-        if (request.length !== this.running.filterConfig.length || isFilterConfigRejected(request)) return null
+        if (request.length !== this.running.filterConfig.length || isFilterConfigRejected(request))
+          return null
         this.running.filterConfig = [...request]
-        this.running.simplifiedTuning = copySharedCutoffs('toSimplified', this.running.filterConfig, this.running.simplifiedTuning)
+        this.running.simplifiedTuning = copySharedCutoffs(
+          'toSimplified',
+          this.running.filterConfig,
+          this.running.simplifiedTuning,
+        )
         return EMPTY
 
       case MSP.RC_TUNING:
@@ -523,7 +579,9 @@ export class MockFlightController {
       case MSP.ADVANCED_CONFIG:
         return Uint8Array.from(this.running.advancedConfig)
       case MSP.SET_ADVANCED_CONFIG:
-        this.running.advancedConfig = this.running.advancedConfig.map((byte, i) => request[i] ?? byte)
+        this.running.advancedConfig = this.running.advancedConfig.map(
+          (byte, i) => request[i] ?? byte,
+        )
         return EMPTY
       case MSP.MOTOR_CONFIG:
         return encodeMotorConfig({
@@ -617,7 +675,12 @@ export class MockFlightController {
         const frequencies = Array.from({ length: VTX_MAX_CHANNELS }, (_, i) =>
           i < vtx.channelCount ? (band.frequencies[i] ?? 0) : 0,
         )
-        vtx.bands[index - 1] = { ...band, name: band.name.toUpperCase(), letter: band.letter.toUpperCase(), frequencies }
+        vtx.bands[index - 1] = {
+          ...band,
+          name: band.name.toUpperCase(),
+          letter: band.letter.toUpperCase(),
+          frequencies,
+        }
         if (index === vtx.band) vtx.frequency = frequencies[vtx.channel - 1] ?? 0
         return EMPTY
       }
@@ -674,7 +737,8 @@ export class MockFlightController {
       const [, off, name = ''] = feature
       const bit = (FEATURE as Record<string, number>)[name]
       if (bit === undefined) return '###ERROR IN feature: INVALID NAME###\r\n'
-      this.running.features = (off ? this.running.features & ~bit : this.running.features | bit) >>> 0
+      this.running.features =
+        (off ? this.running.features & ~bit : this.running.features | bit) >>> 0
       return `${off ? 'Disabled' : 'Enabled'} ${name}\r\n`
     }
     if (CLI_PROFILE_SWITCH.test(command)) return `${command}\r\n`
@@ -690,7 +754,10 @@ export class MockFlightController {
   /** `vcd_video_system` as its enum value (AUTO, PAL, NTSC, HD). */
   private videoSystem(): number {
     const name = this.running.settings['vcd_video_system'] ?? ''
-    return Math.max(0, VIDEO_SYSTEM_NAMES.findIndex((n) => n.toUpperCase() === name))
+    return Math.max(
+      0,
+      VIDEO_SYSTEM_NAMES.findIndex((n) => n.toUpperCase() === name),
+    )
   }
 
   /**
@@ -713,7 +780,11 @@ export class MockFlightController {
     positions.forEach((raw, i) => {
       const position = decodePosition(raw)
       if (position.x < cols && position.y < rows) return
-      positions[i] = encodePosition({ ...position, x: Math.min(position.x, cols - 1), y: Math.min(position.y, rows - 1) })
+      positions[i] = encodePosition({
+        ...position,
+        x: Math.min(position.x, cols - 1),
+        y: Math.min(position.y, rows - 1),
+      })
     })
   }
 
@@ -730,7 +801,12 @@ export class MockFlightController {
       lowPowerDisarm: next.lowPowerDisarm,
       pitModeFrequency: next.pitModeFrequency,
     })
-    if (next.bands > VTX_MAX_BANDS || next.channels > VTX_MAX_CHANNELS || next.powerLevels > VTX_MAX_POWER_LEVELS) return false
+    if (
+      next.bands > VTX_MAX_BANDS ||
+      next.channels > VTX_MAX_CHANNELS ||
+      next.powerLevels > VTX_MAX_POWER_LEVELS
+    )
+      return false
     vtx.bandCount = next.bands
     vtx.channelCount = next.channels
     vtx.powerLevelCount = next.powerLevels
@@ -743,7 +819,12 @@ export class MockFlightController {
 
   /** Like the firmware: unknown port identifiers fail the whole message. */
   private setSerialConfig(ports: SerialPortConfig[]): boolean {
-    if (ports.some((p) => !this.running.ports.some((existing) => existing.identifier === p.identifier))) return false
+    if (
+      ports.some(
+        (p) => !this.running.ports.some((existing) => existing.identifier === p.identifier),
+      )
+    )
+      return false
     this.running.ports = this.running.ports.map(
       (existing) => ports.find((p) => p.identifier === existing.identifier) ?? existing,
     )
@@ -765,7 +846,16 @@ export class MockFlightController {
 
 /** Rough stand-in for the firmware's slider math; enough for the preview to react sensibly. */
 function calculatePids(sliders: Uint8Array): Uint8Array {
-  const [, master = 100, pitchDGain = 100, iGain = 100, dGain = 100, piGain = 100, dMaxGain = 100, ffGain = 100] = sliders
+  const [
+    ,
+    master = 100,
+    pitchDGain = 100,
+    iGain = 100,
+    dGain = 100,
+    piGain = 100,
+    dMaxGain = 100,
+    ffGain = 100,
+  ] = sliders
   const pitchPiGain = sliders[8] ?? 100
   const scale = (base: number, ...percents: number[]) =>
     Math.min(250, Math.round(percents.reduce((value, percent) => (value * percent) / 100, base)))

@@ -1,10 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { defaultMockConfig, firmwareDefaultConfig, MockFlightController } from '@/lib/mock-fc/mockFc'
+import {
+  defaultMockConfig,
+  firmwareDefaultConfig,
+  MockFlightController,
+} from '@/lib/mock-fc/mockFc'
 import { readFcInfo } from '@/lib/msp/api'
 import { MspClient } from '@/lib/msp/client'
 import { MockTransport } from '@/lib/transport/mock'
 import { Emitter, type Transport } from '@/lib/transport/types'
-import { CliCommandError, CliTimeoutError, CliUnavailableError, readDiff, runCliCommands } from './io'
+import {
+  CliCommandError,
+  CliTimeoutError,
+  CliUnavailableError,
+  readDiff,
+  runCliCommands,
+} from './io'
 import { countDifferences } from './model'
 
 async function openMock(fc = new MockFlightController()) {
@@ -60,7 +70,9 @@ describe('readDiff against the mock FC', () => {
   })
 
   it('reports nothing for an FC at its defaults', async () => {
-    const report = await readDiff(await openMock(new MockFlightController({ config: firmwareDefaultConfig() })))
+    const report = await readDiff(
+      await openMock(new MockFlightController({ config: firmwareDefaultConfig() })),
+    )
     expect(report.sections).toEqual([])
   })
 
@@ -94,15 +106,21 @@ describe('runCliCommands against the mock FC', () => {
     const client = await openMock(fc)
     await runCliCommands(client, ['profile 0', 'set osd_units = METRIC', 'profile 0'])
     const master = (await readDiff(client)).sections.find((s) => s.title === 'master')
-    expect(master?.entries.map((e) => (e.kind === 'setting' ? e.name : e.line))).toEqual(['crashflip_motor_percent'])
+    expect(master?.entries.map((e) => (e.kind === 'setting' ? e.name : e.line))).toEqual([
+      'crashflip_motor_percent',
+    ])
     expect(fc.savedConfig.settings.osd_units).toBe('IMPERIAL')
     expect((await readFcInfo(client)).variant).toBe('BTFL')
   })
 
   it('rejects with what the CLI complained about, and leaves the link in MSP', async () => {
     const client = await openMock()
-    await expect(runCliCommands(client, ['set no_such_setting = 1'])).rejects.toThrow(/INVALID NAME/)
-    await expect(runCliCommands(client, ['set no_such_setting = 1'])).rejects.toBeInstanceOf(CliCommandError)
+    await expect(runCliCommands(client, ['set no_such_setting = 1'])).rejects.toThrow(
+      /INVALID NAME/,
+    )
+    await expect(runCliCommands(client, ['set no_such_setting = 1'])).rejects.toBeInstanceOf(
+      CliCommandError,
+    )
     expect((await readFcInfo(client)).variant).toBe('BTFL')
   })
 
@@ -127,24 +145,37 @@ describe('readDiff on the wire', () => {
     transport.receive(ascii('\r\n# master\r\nset small'))
     transport.receive(Uint8Array.of(...ascii('_angle = 180\r\n'), 0x03))
     expect((await pending).sections).toEqual([
-      { title: 'master', entries: [{ kind: 'setting', name: 'small_angle', value: '180', defaultValue: null }] },
+      {
+        title: 'master',
+        entries: [{ kind: 'setting', name: 'small_angle', value: '180', defaultValue: null }],
+      },
     ])
   })
 
   it('sends every line of a script in one go, the ETX last', async () => {
     const transport = new FakeTransport()
-    const pending = runCliCommands(new MspClient(transport), ['profile 1', 'set tpa_rate = 65', 'profile 0'])
+    const pending = runCliCommands(new MspClient(transport), [
+      'profile 1',
+      'set tpa_rate = 65',
+      'profile 0',
+    ])
     await flush()
     transport.receive(Uint8Array.of(0x02))
     await flush()
-    expect(transport.written[1]).toEqual(Uint8Array.of(...ascii('profile 1\nset tpa_rate = 65\nprofile 0\n'), 0x03))
-    transport.receive(Uint8Array.of(...ascii('profile 1\r\ntpa_rate set to 65\r\nprofile 0\r\n'), 0x03))
+    expect(transport.written[1]).toEqual(
+      Uint8Array.of(...ascii('profile 1\nset tpa_rate = 65\nprofile 0\n'), 0x03),
+    )
+    transport.receive(
+      Uint8Array.of(...ascii('profile 1\r\ntpa_rate set to 65\r\nprofile 0\r\n'), 0x03),
+    )
     await expect(pending).resolves.toBeUndefined()
   })
 
   it('fails when the FC ignores the STX (armed), and sends an ETX anyway', async () => {
     const transport = new FakeTransport()
-    await expect(readDiff(new MspClient(transport), { enterTimeoutMs: 10 })).rejects.toBeInstanceOf(CliUnavailableError)
+    await expect(readDiff(new MspClient(transport), { enterTimeoutMs: 10 })).rejects.toBeInstanceOf(
+      CliUnavailableError,
+    )
     expect(transport.written.at(-1)).toEqual(Uint8Array.of(0x03))
   })
 

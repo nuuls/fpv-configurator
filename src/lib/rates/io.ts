@@ -8,7 +8,11 @@ export async function readRatesSnapshot(client: MspClient): Promise<RatesSnapsho
 }
 
 /** Applies to the FC's current rate profile. Takes effect immediately, no reboot. */
-export async function saveRates(client: MspClient, snapshot: RatesSnapshot, draft: RatesDraft): Promise<void> {
+export async function saveRates(
+  client: MspClient,
+  snapshot: RatesSnapshot,
+  draft: RatesDraft,
+): Promise<void> {
   await client.request(MSP.SET_RC_TUNING, buildRcTuning(snapshot, draft))
   await saveToEeprom(client)
 }

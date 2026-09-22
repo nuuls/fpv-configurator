@@ -21,12 +21,12 @@ On Linux your user needs access to the serial device (on Arch-based distros: `uu
 
 ## Scripts
 
-| Command       | What it does                 |
-| ------------- | ---------------------------- |
-| `pnpm dev`    | Dev server with HMR          |
-| `pnpm check`  | Typecheck + lint + tests     |
-| `pnpm build`  | Static production build      |
-| `pnpm format` | Format with Prettier         |
+| Command       | What it does             |
+| ------------- | ------------------------ |
+| `pnpm dev`    | Dev server with HMR      |
+| `pnpm check`  | Typecheck + lint + tests |
+| `pnpm build`  | Static production build  |
+| `pnpm format` | Format with Prettier     |
 
 ## CI and deployment
 
@@ -41,13 +41,13 @@ Architecture and conventions are documented in [CLAUDE.md](./CLAUDE.md).
 This app would not exist without the open-source projects it re-implements. Protocol and byte layouts, value
 tables, presets and a lot of behaviour are taken from — or checked against — their source code:
 
-| Project                                                                          | License  | Used for                                                  |
-| -------------------------------------------------------------------------------- | -------- | --------------------------------------------------------- |
-| [Betaflight](https://github.com/betaflight/betaflight) (firmware)                | GPL-3.0  | MSP messages and byte layouts, BLHeli 4-way interface     |
-| [Betaflight Configurator](https://github.com/betaflight/betaflight-configurator) | GPL-3.0  | Reference for every tab: behaviour, ranges, calculations  |
-| [Betaflight firmware presets](https://github.com/betaflight/firmware-presets)    | GPL-3.0  | VTX tables                                                |
-| [ESC Configurator](https://github.com/stylesuxx/esc-configurator)                | AGPL-3.0 | BLHeli_S / Bluejay settings layouts and value tables      |
-| [AM32](https://github.com/am32-firmware/AM32) (firmware)                         | GPL-3.0  | AM32 settings (EEPROM) layout and value handling          |
+| Project                                                                          | License  | Used for                                                 |
+| -------------------------------------------------------------------------------- | -------- | -------------------------------------------------------- |
+| [Betaflight](https://github.com/betaflight/betaflight) (firmware)                | GPL-3.0  | MSP messages and byte layouts, BLHeli 4-way interface    |
+| [Betaflight Configurator](https://github.com/betaflight/betaflight-configurator) | GPL-3.0  | Reference for every tab: behaviour, ranges, calculations |
+| [Betaflight firmware presets](https://github.com/betaflight/firmware-presets)    | GPL-3.0  | VTX tables                                               |
+| [ESC Configurator](https://github.com/stylesuxx/esc-configurator)                | AGPL-3.0 | BLHeli_S / Bluejay settings layouts and value tables     |
+| [AM32](https://github.com/am32-firmware/AM32) (firmware)                         | GPL-3.0  | AM32 settings (EEPROM) layout and value handling         |
 
 The per-tab sources are listed in `docs/tabs/*.md`. [Bluejay](https://github.com/bird-sanctuary/bluejay),
 [BLHeli](https://github.com/bitdump/BLHeli) and

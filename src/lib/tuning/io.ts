@@ -19,12 +19,22 @@ export async function readTuningSnapshot(client: MspClient): Promise<TuningSnaps
 }
 
 /** Asks the firmware what PIDs the draft sliders would produce, without applying anything. */
-export async function previewPids(client: MspClient, snapshot: TuningSnapshot, draft: TuningDraft): Promise<AxisPids[]> {
-  return decodePidfs(await client.request(MSP.CALCULATE_SIMPLIFIED_PID, buildCalculateRequest(snapshot, draft)))
+export async function previewPids(
+  client: MspClient,
+  snapshot: TuningSnapshot,
+  draft: TuningDraft,
+): Promise<AxisPids[]> {
+  return decodePidfs(
+    await client.request(MSP.CALCULATE_SIMPLIFIED_PID, buildCalculateRequest(snapshot, draft)),
+  )
 }
 
 /** Resolves true when a reboot is needed for the change to take effect (RC smoothing changes). */
-export async function saveTuning(client: MspClient, snapshot: TuningSnapshot, draft: TuningDraft): Promise<boolean> {
+export async function saveTuning(
+  client: MspClient,
+  snapshot: TuningSnapshot,
+  draft: TuningDraft,
+): Promise<boolean> {
   await client.request(MSP.SET_SIMPLIFIED_TUNING, buildSimplifiedTuning(snapshot, draft))
   const settings = smoothingWrites(snapshot, draft)
   for (const { name, value } of settings) await writeSetting(client, name, value)

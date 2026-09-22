@@ -10,7 +10,8 @@ export function PlaceholderPage({ title, description }: { title: string; descrip
         <CardHeader>
           <CardTitle>Not specified yet</CardTitle>
           <CardDescription>
-            This tab is still marked TBD in docs/SPEC.md. Describe what it should do in docs/tabs/ and it can be built.
+            This tab is still marked TBD in docs/SPEC.md. Describe what it should do in docs/tabs/
+            and it can be built.
           </CardDescription>
         </CardHeader>
       </Card>

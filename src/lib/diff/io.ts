@@ -44,7 +44,10 @@ export interface ReadDiffOptions {
  * Asks the FC's CLI what differs from the defaults of its firmware and board (every profile). Takes over the MSP
  * link while it runs — other requests wait — and changes nothing on the FC.
  */
-export async function readDiff(client: MspClient, options: ReadDiffOptions = {}): Promise<DiffReport> {
+export async function readDiff(
+  client: MspClient,
+  options: ReadDiffOptions = {},
+): Promise<DiffReport> {
   return parseDiff(await runCli(client, COMMAND, options))
 }
 
@@ -52,7 +55,11 @@ export async function readDiff(client: MspClient, options: ReadDiffOptions = {})
  * Runs CLI command lines (`set name = value`, `profile 1`, …) the same way, in one session: the running config
  * changes, nothing is saved. Rejects with the first error the CLI printed (`###ERROR IN set: INVALID NAME###`).
  */
-export async function runCliCommands(client: MspClient, lines: string[], options: ReadDiffOptions = {}): Promise<void> {
+export async function runCliCommands(
+  client: MspClient,
+  lines: string[],
+  options: ReadDiffOptions = {},
+): Promise<void> {
   if (lines.length === 0) return
   const errors = cliErrors(await runCli(client, lines.map((line) => `${line}\n`).join(''), options))
   if (errors[0] !== undefined) throw new CliCommandError(errors[0])
@@ -62,7 +69,12 @@ export async function runCliCommands(client: MspClient, lines: string[], options
 function runCli(client: MspClient, script: string, options: ReadDiffOptions): Promise<string> {
   return client.exclusive(async (link) => {
     try {
-      const output = await runScript(link, script, options.enterTimeoutMs ?? 1000, options.idleTimeoutMs ?? 3000)
+      const output = await runScript(
+        link,
+        script,
+        options.enterTimeoutMs ?? 1000,
+        options.idleTimeoutMs ?? 3000,
+      )
       return new TextDecoder().decode(output)
     } catch (cause) {
       // Whatever went wrong, don't leave the port in CLI mode. An idle MSP port ignores the byte.
@@ -73,7 +85,12 @@ function runCli(client: MspClient, script: string, options: ReadDiffOptions): Pr
 }
 
 /** Resolves with the bytes between the FC's STX and ETX. */
-function runScript(link: ExclusiveLink, script: string, enterTimeoutMs: number, idleTimeoutMs: number): Promise<Uint8Array> {
+function runScript(
+  link: ExclusiveLink,
+  script: string,
+  enterTimeoutMs: number,
+  idleTimeoutMs: number,
+): Promise<Uint8Array> {
   return new Promise<Uint8Array>((resolve, reject) => {
     const output: number[] = []
     let entered = false

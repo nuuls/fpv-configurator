@@ -50,7 +50,8 @@ function snapshotWith(
   return { config, canvas: canvasFor(config.videoSystem, { cols: 0, rows: 0 }), gpsConfigured }
 }
 
-const shownAt = (x: number, y: number, variant = 0) => encodePosition({ x, y, profiles: 0b111, variant })
+const shownAt = (x: number, y: number, variant = 0) =>
+  encodePosition({ x, y, profiles: 0b111, variant })
 
 describe('OSD elements', () => {
   it('uses the firmware indices of osd_items_e', () => {
@@ -58,7 +59,9 @@ describe('OSD elements', () => {
       22, 11, 12, 46, 21, 29, 6, 81, 82, 83, 84, 10, 15,
     ])
     // GPS_SATS, GPS_SPEED, GPS_LAT, GPS_LON, HOME_DIR, HOME_DIST, FLIGHT_DIST, EFFICIENCY
-    expect(OSD_ELEMENTS.filter((def) => def.gps).map((def) => def.index)).toEqual([14, 13, 24, 23, 30, 31, 47, 58])
+    expect(OSD_ELEMENTS.filter((def) => def.gps).map((def) => def.index)).toEqual([
+      14, 13, 24, 23, 30, 31, 47, 58,
+    ])
     expect(elementName(2)).toBe('Crosshairs')
     expect(elementName(5)).toBe('Timer 1')
     expect(elementName(200)).toBe('Element 200')
@@ -86,7 +89,9 @@ describe('GPS elements', () => {
   it('are only managed while a GPS is set up', () => {
     const without = snapshotWith(satsShown)
     expect(availableElements(without)).toHaveLength(13)
-    expect(toDraft(without).elements.some((el) => el.index === elementIndex('GPS_SATS'))).toBe(false)
+    expect(toDraft(without).elements.some((el) => el.index === elementIndex('GPS_SATS'))).toBe(
+      false,
+    )
 
     const withGps = snapshotWith(satsShown, {}, true)
     expect(availableElements(withGps)).toHaveLength(21)
@@ -129,7 +134,9 @@ describe('MSP_OSD_CONFIG', () => {
     const timers = [2, 0x00, 0x0a, 0x01, 0x0a]
     const warnings = [0xff, 0xff, 20, 0xff, 0xff, 0x0f, 0x00]
     const tail = [3, 2, 2, 24, 11, 80, 0, 60, 0] // 3 profiles, #2 selected, overlay, camera frame, alarms
-    const config = decodeOsdConfig(Uint8Array.from([...header, ...items, ...stats, ...timers, ...warnings, ...tail]))
+    const config = decodeOsdConfig(
+      Uint8Array.from([...header, ...items, ...stats, ...timers, ...warnings, ...tail]),
+    )
     expect(config).toEqual({
       supported: true,
       deviceDetected: true,
@@ -143,13 +150,23 @@ describe('MSP_OSD_CONFIG', () => {
 
   it('tolerates short and empty payloads', () => {
     expect(decodeOsdConfig(new Uint8Array(0)).supported).toBe(false)
-    const short = decodeOsdConfig(Uint8Array.from([0x01, 1, 0, 20, 0, 0, 0, 2, 0, 0, 0x65, 0x08, 0x00, 0x00]))
-    expect(short).toMatchObject({ supported: true, deviceDetected: false, positions: [0x0865, 0], timers: [] })
+    const short = decodeOsdConfig(
+      Uint8Array.from([0x01, 1, 0, 20, 0, 0, 0, 2, 0, 0, 0x65, 0x08, 0x00, 0x00]),
+    )
+    expect(short).toMatchObject({
+      supported: true,
+      deviceDetected: false,
+      positions: [0x0865, 0],
+      timers: [],
+    })
     expect(short).toMatchObject({ profileCount: 1, selectedProfile: 1 })
   })
 
   it('round-trips through the mock encoder', () => {
-    const { config } = snapshotWith({ WARNINGS: shownAt(9, 10) }, { selectedProfile: 3, videoSystem: VIDEO_SYSTEM.NTSC })
+    const { config } = snapshotWith(
+      { WARNINGS: shownAt(9, 10) },
+      { selectedProfile: 3, videoSystem: VIDEO_SYSTEM.NTSC },
+    )
     expect(decodeOsdConfig(encodeOsdConfig(config))).toEqual(config)
   })
 })
@@ -157,7 +174,10 @@ describe('MSP_OSD_CONFIG', () => {
 describe('MSP_SET_OSD_CONFIG', () => {
   it('addresses an element on the in-flight screen', () => {
     expect([...encodeSetOsdElement(22, 0x3c08)]).toEqual([22, 0x08, 0x3c, 1])
-    expect(decodeSetOsdConfig(encodeSetOsdElement(22, 0x3c08))).toEqual({ element: 22, position: 0x3c08 })
+    expect(decodeSetOsdConfig(encodeSetOsdElement(22, 0x3c08))).toEqual({
+      element: 22,
+      position: 0x3c08,
+    })
     expect(() => encodeSetOsdElement(0xff, 0)).toThrow(RangeError)
   })
 
@@ -204,7 +224,9 @@ describe('draft', () => {
   it('reads visibility from the selected profile', () => {
     const profile2Only = encodePosition({ x: 3, y: 4, profiles: 0b010, variant: 0 })
     const draftFor = (selectedProfile: number) =>
-      toDraft(snapshotWith({ DISARMED: profile2Only }, { selectedProfile })).elements.find((el) => el.index === 29)
+      toDraft(snapshotWith({ DISARMED: profile2Only }, { selectedProfile })).elements.find(
+        (el) => el.index === 29,
+      )
     expect(draftFor(1)).toEqual({ index: 29, x: 3, y: 4, shown: false })
     expect(draftFor(2)).toEqual({ index: 29, x: 3, y: 4, shown: true })
   })
@@ -217,7 +239,9 @@ describe('draft', () => {
   })
 
   it('moves an element off the default pile when it is switched on, but keeps a chosen place', () => {
-    const snapshot = snapshotWith({ ALTITUDE: encodePosition({ x: 4, y: 4, profiles: 0, variant: 0 }) })
+    const snapshot = snapshotWith({
+      ALTITUDE: encodePosition({ x: 4, y: 4, profiles: 0, variant: 0 }),
+    })
     const draft = toDraft(snapshot)
     const timer = setElementShown(draft, 6, true, SD).elements.find((el) => el.index === 6)
     expect(timer).toEqual({ index: 6, x: 24, y: 1, shown: true })
@@ -263,11 +287,17 @@ describe('planOsdWrites', () => {
   it('forces the VTX element to the combined variant', () => {
     const snapshot = snapshotWith({ VTX_CHANNEL: shownAt(20, 13, 1) })
     const draft = setElementCell(toDraft(snapshot), 21, { x: 8 })
-    expect(planOsdWrites(snapshot, draft)).toContainEqual({ element: 10, position: shownAt(20, 13, 0) })
+    expect(planOsdWrites(snapshot, draft)).toContainEqual({
+      element: 10,
+      position: shownAt(20, 13, 0),
+    })
   })
 
   it('switches off other elements only when asked to', () => {
-    const snapshot = snapshotWith({ CROSSHAIRS: shownAt(13, 6, 2), CRAFT_NAME: encodePosition({ x: 1, y: 1, profiles: 0b010, variant: 0 }) })
+    const snapshot = snapshotWith({
+      CROSSHAIRS: shownAt(13, 6, 2),
+      CRAFT_NAME: encodePosition({ x: 1, y: 1, profiles: 0b010, variant: 0 }),
+    })
     expect(otherVisibleElements(snapshot)).toEqual([2, 8])
     expect(planOsdWrites(snapshot, { ...toDraft(snapshot), hideOthers: true })).toEqual([
       { element: 2, position: encodePosition({ x: 13, y: 6, profiles: 0, variant: 2 }) },
@@ -282,7 +312,9 @@ describe('planOsdWrites', () => {
     expect(planOsdWrites(snapshot, draft)).toContainEqual({ timer: 1, config: 0x0521 })
 
     const lastArmed = snapshotWith({ ITEM_TIMER_2: shownAt(24, 1) }, { timers: [0x0a00, 0x0a02] })
-    expect(planOsdWrites(lastArmed, setElementCell(toDraft(lastArmed), 6, { y: 2 }))).toHaveLength(1)
+    expect(planOsdWrites(lastArmed, setElementCell(toDraft(lastArmed), 6, { y: 2 }))).toHaveLength(
+      1,
+    )
     const hidden = snapshotWith({}, { timers: [0x0a00, onTime] })
     expect(planOsdWrites(hidden, toDraft(hidden))).toEqual([])
   })

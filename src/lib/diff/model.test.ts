@@ -84,13 +84,22 @@ describe('parseDiff', () => {
   const report = parseDiff(OUTPUT)
 
   it('reads the firmware and the board from the header', () => {
-    expect(report.firmware).toBe('Betaflight / STM32F405 (S405) 2026.6.2 Jun 30 2026 / 12:00:00 (e0b7bb01b) MSP API: 1.48')
+    expect(report.firmware).toBe(
+      'Betaflight / STM32F405 (S405) 2026.6.2 Jun 30 2026 / 12:00:00 (e0b7bb01b) MSP API: 1.48',
+    )
     expect(report.board).toBe('SPBE/SPEEDYBEEF405V4')
     expect(report.errors).toEqual([])
   })
 
   it('keeps the sections with differences and drops the restore commands', () => {
-    expect(report.sections.map((s) => s.title)).toEqual(['name', 'feature', 'serial', 'master', 'profile 1', 'rateprofile 0'])
+    expect(report.sections.map((s) => s.title)).toEqual([
+      'name',
+      'feature',
+      'serial',
+      'master',
+      'profile 1',
+      'rateprofile 0',
+    ])
   })
 
   it('keeps the lines that restore the profile selection', () => {
@@ -108,7 +117,9 @@ describe('parseDiff', () => {
   })
 
   it('shows the craft name as a setting', () => {
-    expect(report.sections[0]?.entries).toEqual([{ kind: 'setting', name: 'name', value: 'Whoop', defaultValue: '-' }])
+    expect(report.sections[0]?.entries).toEqual([
+      { kind: 'setting', name: 'name', value: 'Whoop', defaultValue: '-' },
+    ])
   })
 
   it('keeps other commands as lines, defaults marked', () => {
@@ -193,7 +204,9 @@ describe('tuningOnly', () => {
 
 describe('externalOnly', () => {
   const names = (report: ReturnType<typeof parseDiff>, title: string) =>
-    report.sections.find((s) => s.title === title)?.entries.map((entry) => (entry.kind === 'setting' ? entry.name : entry.line))
+    report.sections
+      .find((s) => s.title === title)
+      ?.entries.map((entry) => (entry.kind === 'setting' ? entry.name : entry.line))
 
   it('drops what the tabs write and keeps the craft name and the rest', () => {
     const external = externalOnly(parseDiff(OUTPUT))
@@ -247,7 +260,9 @@ describe('externalOnly', () => {
       'feedforward_boost',
       'vbat_warning_cell_voltage',
     ]
-    const output = ['# master', ...[...managed, ...others].map((name) => `set ${name} = 1`)].join('\r\n')
+    const output = ['# master', ...[...managed, ...others].map((name) => `set ${name} = 1`)].join(
+      '\r\n',
+    )
     expect(names(externalOnly(parseDiff(output)), 'master')).toEqual(others)
   })
 
@@ -310,7 +325,11 @@ describe('externalOnly', () => {
       'ibata_offset',
       'ibatv_offset',
     ]
-    const output = ['# master', ...calibrations.map((name) => `set ${name} = 1`), 'set osd_units = IMPERIAL'].join('\r\n')
+    const output = [
+      '# master',
+      ...calibrations.map((name) => `set ${name} = 1`),
+      'set osd_units = IMPERIAL',
+    ].join('\r\n')
     expect(names(externalOnly(parseDiff(output)), 'master')).toEqual(['osd_units'])
   })
 })
@@ -359,7 +378,10 @@ describe('resetCommands', () => {
   ].join('\r\n')
   const report = parseDiff(output)
   const section = (title: string) => report.sections.find((s) => s.title === title)!
-  const keys = (...titles: string[]) => new Set(titles.flatMap((title) => section(title).entries.map((e) => changeKey(section(title), e))))
+  const keys = (...titles: string[]) =>
+    new Set(
+      titles.flatMap((title) => section(title).entries.map((e) => changeKey(section(title), e))),
+    )
 
   it('undoes a flag command with the opposite flag', () => {
     expect(parseFlag('feature -TELEMETRY')).toEqual({
@@ -373,15 +395,23 @@ describe('resetCommands', () => {
       opposite: '-GYRO_CALIBRATED',
     })
     expect(parseFlag('serial UART2 64 115200 57600 0 115200')).toBeNull()
-    expect(resetLine({ kind: 'command', line: 'beacon RX_LOST', isDefault: false })).toBe('beacon -RX_LOST')
+    expect(resetLine({ kind: 'command', line: 'beacon RX_LOST', isDefault: false })).toBe(
+      'beacon -RX_LOST',
+    )
     expect(resetLine({ kind: 'command', line: 'feature TELEMETRY', isDefault: true })).toBeNull()
     expect(resetLine({ kind: 'command', line: 'map TAER1234', isDefault: false })).toBeNull()
-    expect(resetLine({ kind: 'setting', name: 'osd_units', value: 'IMPERIAL', defaultValue: 'METRIC' })).toBe('set osd_units = METRIC')
-    expect(resetLine({ kind: 'setting', name: 'vbat_scale', value: '108', defaultValue: null })).toBeNull()
+    expect(
+      resetLine({ kind: 'setting', name: 'osd_units', value: 'IMPERIAL', defaultValue: 'METRIC' }),
+    ).toBe('set osd_units = METRIC')
+    expect(
+      resetLine({ kind: 'setting', name: 'vbat_scale', value: '108', defaultValue: null }),
+    ).toBeNull()
   })
 
   it('can reset a setting with a known default and a flag, in master or in a profile the diff restores', () => {
-    const resettable = report.sections.flatMap((s) => s.entries.filter((e) => canReset(report, s, e)).map((e) => changeKey(s, e)))
+    const resettable = report.sections.flatMap((s) =>
+      s.entries.filter((e) => canReset(report, s, e)).map((e) => changeKey(s, e)),
+    )
     // vbat_scale came without a default, the craft name isn't a `set`, resources stay, and there is no
     // battery_profile restore line
     expect(resettable).toEqual([
@@ -394,27 +424,44 @@ describe('resetCommands', () => {
   })
 
   it('writes the lines in the order of the diff, switching profiles like the diff does and back at the end', () => {
-    expect(resetCommands(report, keys('feature', 'resource', 'master', 'profile 2', 'rateprofile 0', 'battery_profile 1', 'name'))).toEqual(
-      [
-        'feature TELEMETRY',
-        'feature -LED_STRIP',
-        'set osd_units = METRIC',
-        'profile 2',
-        'set anti_gravity_gain = 80',
-        'rateprofile 0',
-        'set tpa_rate = 65',
-        'profile 1',
-        'rateprofile 0',
-      ],
-    )
-    expect(resetCommands(report, keys('rateprofile 0'))).toEqual(['rateprofile 0', 'set tpa_rate = 65', 'rateprofile 0'])
+    expect(
+      resetCommands(
+        report,
+        keys(
+          'feature',
+          'resource',
+          'master',
+          'profile 2',
+          'rateprofile 0',
+          'battery_profile 1',
+          'name',
+        ),
+      ),
+    ).toEqual([
+      'feature TELEMETRY',
+      'feature -LED_STRIP',
+      'set osd_units = METRIC',
+      'profile 2',
+      'set anti_gravity_gain = 80',
+      'rateprofile 0',
+      'set tpa_rate = 65',
+      'profile 1',
+      'rateprofile 0',
+    ])
+    expect(resetCommands(report, keys('rateprofile 0'))).toEqual([
+      'rateprofile 0',
+      'set tpa_rate = 65',
+      'rateprofile 0',
+    ])
     expect(resetCommands(report, new Set())).toEqual([])
   })
 })
 
 describe('parseDiff edge cases', () => {
   it('reports no sections for an FC at its defaults', () => {
-    const report = parseDiff('# version\r\n# Betaflight / X\r\n\r\n# start the command batch\r\nbatch start\r\n\r\n# save configuration\r\nsave')
+    const report = parseDiff(
+      '# version\r\n# Betaflight / X\r\n\r\n# start the command batch\r\nbatch start\r\n\r\n# save configuration\r\nsave',
+    )
     expect(report.sections).toEqual([])
     expect(countDifferences(report)).toBe(0)
   })
@@ -422,7 +469,10 @@ describe('parseDiff edge cases', () => {
   it('works without the defaults option', () => {
     const report = parseDiff('# master\r\nset small_angle = 180\r\n')
     expect(report.sections).toEqual([
-      { title: 'master', entries: [{ kind: 'setting', name: 'small_angle', value: '180', defaultValue: null }] },
+      {
+        title: 'master',
+        entries: [{ kind: 'setting', name: 'small_angle', value: '180', defaultValue: null }],
+      },
     ])
   })
 
@@ -435,17 +485,24 @@ describe('parseDiff edge cases', () => {
   })
 
   it('collects what the CLI complains about', () => {
-    expect(parseDiff('ERR_CMD_NA: diff all defaults\r\n').errors).toEqual(['ERR_CMD_NA: diff all defaults'])
-    expect(parseDiff('###ERROR IN diff: PARSING FAILED###\r\n').errors).toEqual(['ERROR IN diff: PARSING FAILED'])
-    expect(cliErrors('osd_units set to METRIC\r\n###ERROR IN set: INVALID NAME###\r\nERR_CMD_NA: foo\r\n')).toEqual([
-      'ERROR IN set: INVALID NAME',
-      'ERR_CMD_NA: foo',
+    expect(parseDiff('ERR_CMD_NA: diff all defaults\r\n').errors).toEqual([
+      'ERR_CMD_NA: diff all defaults',
     ])
+    expect(parseDiff('###ERROR IN diff: PARSING FAILED###\r\n').errors).toEqual([
+      'ERROR IN diff: PARSING FAILED',
+    ])
+    expect(
+      cliErrors(
+        'osd_units set to METRIC\r\n###ERROR IN set: INVALID NAME###\r\nERR_CMD_NA: foo\r\n',
+      ),
+    ).toEqual(['ERROR IN set: INVALID NAME', 'ERR_CMD_NA: foo'])
     expect(cliErrors('')).toEqual([])
   })
 
   it('takes a restore line only right after its heading', () => {
-    const report = parseDiff('# restore original profile selection\r\n\r\n# master\r\nprofile 1\r\nset a = 1\r\n')
+    const report = parseDiff(
+      '# restore original profile selection\r\n\r\n# master\r\nprofile 1\r\nset a = 1\r\n',
+    )
     expect(report.restore).toEqual([])
     expect(report.sections.map((s) => s.title)).toEqual(['profile 1'])
   })

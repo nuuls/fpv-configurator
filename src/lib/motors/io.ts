@@ -25,12 +25,17 @@ export async function readMotorsSnapshot(client: MspClient): Promise<MotorsSnaps
   return { advancedConfig, ...motorConfig, ...mixer, dynIdle }
 }
 
-export async function saveMotors(client: MspClient, snapshot: MotorsSnapshot, draft: MotorsDraft): Promise<void> {
+export async function saveMotors(
+  client: MspClient,
+  snapshot: MotorsSnapshot,
+  draft: MotorsDraft,
+): Promise<void> {
   await client.request(MSP.SET_ADVANCED_CONFIG, encodeSetAdvancedConfig(snapshot, draft))
   await client.request(MSP.SET_MOTOR_CONFIG, encodeSetMotorConfig(snapshot, draft))
   await client.request(MSP.SET_MIXER_CONFIG, encodeMixerConfig(snapshot.mixerMode, draft.propsOut))
   // Written by name: the matching MSP message (SET_PID_ADVANCED) carries ~40 unrelated tuning fields.
-  if (draft.dynIdle !== snapshot.dynIdle) await writeSetting(client, 'dyn_idle_min_rpm', String(draft.dynIdle))
+  if (draft.dynIdle !== snapshot.dynIdle)
+    await writeSetting(client, 'dyn_idle_min_rpm', String(draft.dynIdle))
   await saveToEeprom(client)
 }
 

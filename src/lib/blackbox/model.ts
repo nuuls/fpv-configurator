@@ -22,7 +22,12 @@ export function decodeBlackboxConfig(payload: Uint8Array): BlackboxConfig {
   const supported = r.u8() !== 0
   const device = r.u8()
   r.skip(4) // rate numerator, rate denominator, pRatio:u16 — all superseded by sampleRate
-  return { supported, device, sampleRate: r.u8(), fieldsDisabledMask: r.remaining >= 4 ? r.u32() : 0 }
+  return {
+    supported,
+    device,
+    sampleRate: r.u8(),
+    fieldsDisabledMask: r.remaining >= 4 ? r.u32() : 0,
+  }
 }
 
 export function encodeBlackboxConfig(config: BlackboxConfig): Uint8Array {
@@ -55,7 +60,12 @@ export function decodeDataflashSummary(payload: Uint8Array): DataflashSummary {
   const r = new ByteReader(payload)
   const flags = r.u8()
   r.skip(4) // sector count
-  return { supported: (flags & 2) !== 0, ready: (flags & 1) !== 0, totalBytes: r.u32(), usedBytes: r.u32() }
+  return {
+    supported: (flags & 2) !== 0,
+    ready: (flags & 1) !== 0,
+    totalBytes: r.u32(),
+    usedBytes: r.u32(),
+  }
 }
 
 export function encodeDataflashSummary(s: DataflashSummary): Uint8Array {
@@ -69,7 +79,13 @@ export function encodeDataflashSummary(s: DataflashSummary): Uint8Array {
 
 // ---- MSP_SDCARD_SUMMARY (79) ----
 
-export const SDCARD_STATE = { NOT_PRESENT: 0, FATAL: 1, CARD_INIT: 2, FS_INIT: 3, READY: 4 } as const
+export const SDCARD_STATE = {
+  NOT_PRESENT: 0,
+  FATAL: 1,
+  CARD_INIT: 2,
+  FS_INIT: 3,
+  READY: 4,
+} as const
 
 export interface SdcardSummary {
   supported: boolean
@@ -87,7 +103,13 @@ export function decodeSdcardSummary(payload: Uint8Array): SdcardSummary {
 }
 
 export function encodeSdcardSummary(s: SdcardSummary): Uint8Array {
-  return new ByteWriter().u8(s.supported ? 1 : 0).u8(s.state).u8(0).u32(s.freeKb).u32(s.totalKb).toBytes()
+  return new ByteWriter()
+    .u8(s.supported ? 1 : 0)
+    .u8(s.state)
+    .u8(0)
+    .u32(s.freeKb)
+    .u32(s.totalKb)
+    .toBytes()
 }
 
 // ---- presentation helpers ----

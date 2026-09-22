@@ -21,7 +21,9 @@ describe('OSD tab', () => {
 
     expect(preview()).toHaveAccessibleName('OSD preview, 30 by 16 characters')
     expect(within(preview()).getAllByRole('button')).toHaveLength(2)
-    expect(within(preview()).getByRole('button', { name: 'Warnings, column 9, row 10' })).toHaveTextContent('LOW BATTERY')
+    expect(
+      within(preview()).getByRole('button', { name: 'Warnings, column 9, row 10' }),
+    ).toHaveTextContent('LOW BATTERY')
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
   })
 
@@ -34,7 +36,9 @@ describe('OSD tab', () => {
 
     await saveWithoutReboot(user)
     expect(screen.getByLabelText('Timer 2 (armed time)')).toBeChecked()
-    expect(within(preview()).getByRole('button', { name: 'Timer 2 (armed time), column 24, row 1' })).toBeInTheDocument()
+    expect(
+      within(preview()).getByRole('button', { name: 'Timer 2 (armed time), column 24, row 1' }),
+    ).toBeInTheDocument()
     expect(screen.queryByLabelText('Unsaved changes')).toBeNull()
   })
 
@@ -66,7 +70,9 @@ describe('OSD tab', () => {
 
   it('offers to hide elements it does not manage', async () => {
     const user = await openTab('OSD')
-    expect(await screen.findByText(/1 other element is switched on .* \(Crosshairs\)/)).toBeInTheDocument()
+    expect(
+      await screen.findByText(/1 other element is switched on .* \(Crosshairs\)/),
+    ).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Hide other elements' }))
     expect(screen.getByText('Will be switched off when you save.')).toBeInTheDocument()
 
@@ -76,7 +82,9 @@ describe('OSD tab', () => {
 
   it('lists the GPS elements only once a GPS is set up in the Ports tab', async () => {
     const user = await openTab('OSD')
-    expect(await screen.findByText(/GPS elements .* once a GPS is set up in the Ports tab/)).toBeInTheDocument()
+    expect(
+      await screen.findByText(/GPS elements .* once a GPS is set up in the Ports tab/),
+    ).toBeInTheDocument()
     expect(screen.queryByLabelText('GPS satellites')).toBeNull()
 
     await user.click(screen.getByRole('link', { name: 'Ports' }))
@@ -93,7 +101,9 @@ describe('OSD tab', () => {
 
     await saveWithoutReboot(user)
     expect(screen.getByLabelText('GPS satellites')).toBeChecked()
-    expect(within(preview()).getByRole('button', { name: 'GPS satellites, column 1, row 2' })).toHaveTextContent('SAT14')
+    expect(
+      within(preview()).getByRole('button', { name: 'GPS satellites, column 1, row 2' }),
+    ).toHaveTextContent('SAT14')
   })
 
   it('shows the HD canvas once a digital VTX is set up', async () => {
@@ -103,7 +113,9 @@ describe('OSD tab', () => {
     await saveAndReboot(user)
 
     await user.click(screen.getByRole('link', { name: 'OSD' }))
-    expect(await screen.findByRole('group', { name: 'OSD preview, 53 by 20 characters' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('group', { name: 'OSD preview, 53 by 20 characters' }),
+    ).toBeInTheDocument()
     expect(screen.getByText(/HD video/)).toBeInTheDocument()
   })
 })

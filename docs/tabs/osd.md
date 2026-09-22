@@ -26,48 +26,48 @@ Betaflight's OSD tab without its right-hand column: element list on the left, sc
 
 ## Controls
 
-| Control | Type | Betaflight setting / MSP | Values · default | Notes |
-| ------- | ---- | ------------------------ | ---------------- | ----- |
-| Element on/off | toggle × 13 (× 21 with a GPS) | profile bits 11–13 of `osd_*_pos` · `MSP_OSD_CONFIG` (84) / `MSP_SET_OSD_CONFIG` (85) | firmware: only Warnings on | see element table |
-| X / Y | 2 numbers per shown element | bits 0–4 + 10 (x), 5–9 (y) of the same value | 0 … columns−1 / rows−1 | same value the preview edits |
-| Preview | drag & drop, arrow keys on a focused element | — | canvas: the display's size from `MSP_OSD_CANVAS` (189); if that is unset or can't be right: 30×16 (PAL/auto), 30×13 (NTSC), 53×20 (HD) | sample text per element, one character per cell |
-| Hide other elements | button | clears the profile bits of every other element | — | only offered when the FC shows elements this app doesn't manage |
+| Control             | Type                                         | Betaflight setting / MSP                                                              | Values · default                                                                                                                       | Notes                                                           |
+| ------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Element on/off      | toggle × 13 (× 21 with a GPS)                | profile bits 11–13 of `osd_*_pos` · `MSP_OSD_CONFIG` (84) / `MSP_SET_OSD_CONFIG` (85) | firmware: only Warnings on                                                                                                             | see element table                                               |
+| X / Y               | 2 numbers per shown element                  | bits 0–4 + 10 (x), 5–9 (y) of the same value                                          | 0 … columns−1 / rows−1                                                                                                                 | same value the preview edits                                    |
+| Preview             | drag & drop, arrow keys on a focused element | —                                                                                     | canvas: the display's size from `MSP_OSD_CANVAS` (189); if that is unset or can't be right: 30×16 (PAL/auto), 30×13 (NTSC), 53×20 (HD) | sample text per element, one character per cell                 |
+| Hide other elements | button                                       | clears the profile bits of every other element                                        | —                                                                                                                                      | only offered when the FC shows elements this app doesn't manage |
 
 Elements (firmware index → `osd_item_e`):
 
-| Element | Index | CLI | Sample |
-| ------- | ----- | --- | ------ |
-| Battery average cell voltage | 22 | `osd_avg_cell_voltage_pos` | `3.98V` |
-| Current draw | 11 | `osd_current_pos` | `42.0A` |
-| Used mAh | 12 | `osd_mah_drawn_pos` | `690mAh` |
-| Link quality | 46 | `osd_link_quality_pos` | `2:100` |
-| Warnings | 21 | `osd_warnings_pos` | `LOW BATTERY` |
-| Disarmed | 29 | `osd_disarmed_pos` | `DISARMED` |
-| Timer 2 (armed time) | 6 | `osd_tim_2_pos`, `osd_tim2` | `02:43` |
-| Custom message 1–4 | 81–84 (`OSD_CUSTOM_MSG0`…`3`) | — (no CLI setting in 2026.6, MSP only) | `CUSTOM_MSG1` … |
-| VTX channel | 10 | `osd_vtx_channel_pos` | `R:1:25` |
-| Altitude | 15 | `osd_altitude_pos` | `12.3m` |
+| Element                      | Index                         | CLI                                    | Sample          |
+| ---------------------------- | ----------------------------- | -------------------------------------- | --------------- |
+| Battery average cell voltage | 22                            | `osd_avg_cell_voltage_pos`             | `3.98V`         |
+| Current draw                 | 11                            | `osd_current_pos`                      | `42.0A`         |
+| Used mAh                     | 12                            | `osd_mah_drawn_pos`                    | `690mAh`        |
+| Link quality                 | 46                            | `osd_link_quality_pos`                 | `2:100`         |
+| Warnings                     | 21                            | `osd_warnings_pos`                     | `LOW BATTERY`   |
+| Disarmed                     | 29                            | `osd_disarmed_pos`                     | `DISARMED`      |
+| Timer 2 (armed time)         | 6                             | `osd_tim_2_pos`, `osd_tim2`            | `02:43`         |
+| Custom message 1–4           | 81–84 (`OSD_CUSTOM_MSG0`…`3`) | — (no CLI setting in 2026.6, MSP only) | `CUSTOM_MSG1` … |
+| VTX channel                  | 10                            | `osd_vtx_channel_pos`                  | `R:1:25`        |
+| Altitude                     | 15                            | `osd_altitude_pos`                     | `12.3m`         |
 
 GPS elements — only listed while a GPS is set up in the Ports tab (a UART with the `GPS` function **and** feature
 `GPS`; read with `MSP2_COMMON_SERIAL_CONFIG` + `MSP_FEATURE_CONFIG`, same check as Ports → "GPS: Connected"):
 
-| Element | Index | CLI | Sample |
-| ------- | ----- | --- | ------ |
-| GPS satellites | 14 | `osd_gps_sats_pos` | `SAT14` |
-| GPS speed | 13 | `osd_gps_speed_pos` | `67KPH` |
-| GPS latitude | 24 | `osd_gps_lat_pos` | `N48.2081743` |
-| GPS longitude | 23 | `osd_gps_lon_pos` | `E16.3738189` |
-| Home direction | 30 | `osd_home_dir_pos` | `H^` |
-| Home distance | 31 | `osd_home_dist_pos` | `H120m` |
-| Flight distance | 47 | `osd_flight_dist_pos` | `1.24km` |
-| Efficiency | 58 | `osd_efficiency_pos` | `42mAh/km` |
+| Element         | Index | CLI                   | Sample        |
+| --------------- | ----- | --------------------- | ------------- |
+| GPS satellites  | 14    | `osd_gps_sats_pos`    | `SAT14`       |
+| GPS speed       | 13    | `osd_gps_speed_pos`   | `67KPH`       |
+| GPS latitude    | 24    | `osd_gps_lat_pos`     | `N48.2081743` |
+| GPS longitude   | 23    | `osd_gps_lon_pos`     | `E16.3738189` |
+| Home direction  | 30    | `osd_home_dir_pos`    | `H^`          |
+| Home distance   | 31    | `osd_home_dist_pos`   | `H120m`       |
+| Flight distance | 47    | `osd_flight_dist_pos` | `1.24km`      |
+| Efficiency      | 58    | `osd_efficiency_pos`  | `42mAh/km`    |
 
 ## Behaviour
 
 - **Save** (no reboot): one `MSP_SET_OSD_CONFIG` per element whose value changed, then `MSP_EEPROM_WRITE`. The
   general settings (`addr = -1`: video system, units, alarms, warnings) are never written.
 - **One profile:** "on" = visible in the FC's selected OSD profile. Writing an element sets it on (or off) in
-  *all* profiles, so switching profiles elsewhere changes nothing for these elements.
+  _all_ profiles, so switching profiles elsewhere changes nothing for these elements.
 - **VTX channel** is always written as variant 0 (`band:channel:power`, "combined"); other elements keep their variant bits.
 - **Timer 2:** if it is on and `osd_tim2` doesn't count armed time (source "on" / "on or armed" / "launch"),
   Save sets its source to total armed time (Betaflight's default), keeping precision and alarm.

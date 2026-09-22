@@ -19,7 +19,8 @@ async function openPortsTab() {
   return user
 }
 
-const option = (select: HTMLElement, name: RegExp) => within(select).getByRole('option', { name }) as HTMLOptionElement
+const option = (select: HTMLElement, name: RegExp) =>
+  within(select).getByRole('option', { name }) as HTMLOptionElement
 
 describe('Ports tab', () => {
   it('shows what the FC has configured', async () => {
@@ -50,7 +51,9 @@ describe('Ports tab', () => {
 
     await user.click(screen.getByRole('button', { name: 'Save & Reboot' }))
     expect(await screen.findByText('Rebooting flight controller…')).toBeInTheDocument()
-    await waitFor(() => expect(screen.queryByText('Rebooting flight controller…')).toBeNull(), { timeout: 3000 })
+    await waitFor(() => expect(screen.queryByText('Rebooting flight controller…')).toBeNull(), {
+      timeout: 3000,
+    })
 
     expect(await screen.findByLabelText('VTX type')).toHaveValue('msp')
     expect(screen.getByLabelText('VTX port')).toHaveValue('51')

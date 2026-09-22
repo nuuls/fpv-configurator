@@ -39,12 +39,24 @@ export function ModesPage() {
   return (
     <>
       <PageHeader title="Modes" description="Choose which switch position turns each mode on." />
-      {client && snapshot ? <Editor client={client} snapshot={snapshot} reload={reload} /> : <LoadingState error={error} />}
+      {client && snapshot ? (
+        <Editor client={client} snapshot={snapshot} reload={reload} />
+      ) : (
+        <LoadingState error={error} />
+      )}
     </>
   )
 }
 
-function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: ModesSnapshot; reload: () => void }) {
+function Editor({
+  client,
+  snapshot,
+  reload,
+}: {
+  client: MspClient
+  snapshot: ModesSnapshot
+  reload: () => void
+}) {
   const { draft, setDraft, dirty, revert } = useDraft(snapshot, readModes)
   const { saving, error, save } = useSave(reload)
   const channels = useMspPoll(readRcChannels, 100) ?? NO_CHANNELS
@@ -73,14 +85,17 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Mod
                     {box.label}
                     {active && <Badge>Active</Badge>}
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">{box.hint}</p>
+                  <p className="text-muted-foreground mt-1 text-sm">{box.hint}</p>
                 </div>
 
                 <div className="flex min-w-72 flex-1 flex-col gap-4">
                   {ranges.map((range, index) => {
                     const name = `${box.label} range ${index + 1}`
                     const update = (patch: Partial<ModeRange>) =>
-                      setRanges(boxId, ranges.map((r, i) => (i === index ? { ...r, ...patch } : r)))
+                      setRanges(
+                        boxId,
+                        ranges.map((r, i) => (i === index ? { ...r, ...patch } : r)),
+                      )
                     const live = channels[FIRST_AUX_CHANNEL + range.auxChannel]
 
                     return (
@@ -90,11 +105,14 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Mod
                           value={range.auxChannel}
                           onChange={(e) => update({ auxChannel: Number(e.target.value) })}
                         >
-                          {Array.from({ length: Math.max(auxCount, range.auxChannel + 1) }, (_, aux) => (
-                            <NativeSelectOption key={aux} value={aux}>
-                              AUX {aux + 1}
-                            </NativeSelectOption>
-                          ))}
+                          {Array.from(
+                            { length: Math.max(auxCount, range.auxChannel + 1) },
+                            (_, aux) => (
+                              <NativeSelectOption key={aux} value={aux}>
+                                AUX {aux + 1}
+                              </NativeSelectOption>
+                            ),
+                          )}
                         </NativeSelect>
 
                         <div className="relative flex-1 py-3">
@@ -112,8 +130,10 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Mod
                           {live !== undefined && (
                             <div
                               title={`AUX ${range.auxChannel + 1}: ${live}`}
-                              className="pointer-events-none absolute top-0 h-full w-0.5 bg-foreground"
-                              style={{ left: `${(Math.min(PWM_MAX, Math.max(PWM_MIN, live)) - PWM_MIN) / (PWM_MAX - PWM_MIN) * 100}%` }}
+                              className="bg-foreground pointer-events-none absolute top-0 h-full w-0.5"
+                              style={{
+                                left: `${((Math.min(PWM_MAX, Math.max(PWM_MIN, live)) - PWM_MIN) / (PWM_MAX - PWM_MIN)) * 100}%`,
+                              }}
                             />
                           )}
                         </div>
@@ -125,7 +145,12 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Mod
                           variant="ghost"
                           size="icon"
                           aria-label={`Remove ${name}`}
-                          onClick={() => setRanges(boxId, ranges.filter((_, i) => i !== index))}
+                          onClick={() =>
+                            setRanges(
+                              boxId,
+                              ranges.filter((_, i) => i !== index),
+                            )
+                          }
                         >
                           <Trash2 />
                         </Button>
@@ -152,8 +177,8 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Mod
 
       {others > 0 && (
         <Notice>
-          {others} other mode {others === 1 ? 'range is' : 'ranges are'} set up on this flight controller (not shown
-          here). {others === 1 ? 'It is' : 'They are'} left untouched.
+          {others} other mode {others === 1 ? 'range is' : 'ranges are'} set up on this flight
+          controller (not shown here). {others === 1 ? 'It is' : 'They are'} left untouched.
         </Notice>
       )}
       {error && <Notice tone="error">{error}</Notice>}

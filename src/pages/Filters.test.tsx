@@ -5,10 +5,13 @@ import { nudge, openTab, resetAppAfterEach, saveWithoutReboot } from '@/test/app
 resetAppAfterEach()
 
 /** Waits for the tab to have read the FC. */
-const slider = async (label: string) => within(await screen.findByLabelText(label)).getByRole('slider')
+const slider = async (label: string) =>
+  within(await screen.findByLabelText(label)).getByRole('slider')
 
 const notchCount = (label: string) =>
-  within(screen.getByRole('group', { name: 'Dynamic notch count' })).getByRole('button', { name: label })
+  within(screen.getByRole('group', { name: 'Dynamic notch count' })).getByRole('button', {
+    name: label,
+  })
 
 // Acceptance list: docs/tabs/filters.md
 describe('Filters tab', () => {
@@ -19,12 +22,16 @@ describe('Filters tab', () => {
     expect(screen.getByText('1.00 · 75–150 Hz + 150 Hz')).toBeInTheDocument()
     expect(await slider('RPM filter min frequency')).toHaveAttribute('aria-valuenow', '100')
     // stock firmware has 3 notches, the app offers 2 at most
-    expect(within(screen.getByRole('group', { name: 'Dynamic notch count' })).getAllByRole('button')).toHaveLength(3)
+    expect(
+      within(screen.getByRole('group', { name: 'Dynamic notch count' })).getAllByRole('button'),
+    ).toHaveLength(3)
     expect(notchCount('2')).toHaveAttribute('aria-pressed', 'true')
     expect(await slider('Dynamic notch min frequency')).toHaveAttribute('aria-valuenow', '100')
 
     expect(
-      screen.getByText(/Saving changes them: gyro lowpass 1 is turned off; the dynamic notch count goes from 3 to 2\./),
+      screen.getByText(
+        /Saving changes them: gyro lowpass 1 is turned off; the dynamic notch count goes from 3 to 2\./,
+      ),
     ).toBeInTheDocument()
     expect(screen.getByText(/Bidirectional DShot is off/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
@@ -36,7 +43,11 @@ describe('Filters tab', () => {
     expect(screen.getByText('1.2 · 600 Hz')).toBeInTheDocument()
     await nudge(user, await slider('D-term filtering'), '{ArrowLeft}')
     await user.click(notchCount('1'))
-    await nudge(user, await slider('RPM filter min frequency'), '{ArrowLeft}{ArrowLeft}{ArrowLeft}{ArrowLeft}')
+    await nudge(
+      user,
+      await slider('RPM filter min frequency'),
+      '{ArrowLeft}{ArrowLeft}{ArrowLeft}{ArrowLeft}',
+    )
     expect(screen.getByText('Min 80 Hz')).toBeInTheDocument()
     await saveWithoutReboot(user)
 

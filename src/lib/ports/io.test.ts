@@ -13,7 +13,8 @@ async function connect(fc: MockFlightController) {
   return { transport, client: new MspClient(transport) }
 }
 
-const closed = (transport: MockTransport) => new Promise<void>((resolve) => transport.onClose(resolve))
+const closed = (transport: MockTransport) =>
+  new Promise<void>((resolve) => transport.onClose(resolve))
 
 describe('ports I/O against the mock FC', () => {
   it('reads the snapshot', async () => {
@@ -29,14 +30,20 @@ describe('ports I/O against the mock FC', () => {
     const { client, transport } = await connect(fc)
     const snapshot = await readPortsSnapshot(client)
 
-    await applyPortsPlan(client, planWrites(snapshot, { ...readAssignments(snapshot), vtx: { type: 'msp', port: 51 } }))
+    await applyPortsPlan(
+      client,
+      planWrites(snapshot, { ...readAssignments(snapshot), vtx: { type: 'msp', port: 51 } }),
+    )
     const dropped = closed(transport)
     await sendReboot(client)
     await dropped
 
     const after = await readPortsSnapshot((await connect(fc)).client)
     expect(readAssignments(after).vtx).toEqual({ type: 'msp', port: 51 })
-    expect(fc.savedConfig.settings).toMatchObject({ osd_displayport_device: 'MSP', vcd_video_system: 'HD' })
+    expect(fc.savedConfig.settings).toMatchObject({
+      osd_displayport_device: 'MSP',
+      vcd_video_system: 'HD',
+    })
     // untouched: USB keeps MSP, UART3 keeps ESC telemetry
     expect(after.ports[0]?.functionMask).toBe(PORT_FUNCTION.MSP)
     expect(after.ports[3]?.functionMask).toBe(PORT_FUNCTION.ESC_SENSOR)
@@ -58,6 +65,8 @@ describe('ports I/O against the mock FC', () => {
     const { client } = await connect(new MockFlightController())
     const read = Uint8Array.from('serialrx_provider', (c) => c.charCodeAt(0))
     await expect(client.request(MSP.CLI_SETTING, read)).rejects.toBeInstanceOf(MspErrorResponse)
-    await expect(writeSetting(client, 'no_such_setting', '1')).rejects.toBeInstanceOf(MspErrorResponse)
+    await expect(writeSetting(client, 'no_such_setting', '1')).rejects.toBeInstanceOf(
+      MspErrorResponse,
+    )
   })
 })

@@ -111,7 +111,8 @@ export interface FiltersDraft {
 // ---- byte access; payloads shorter than expected read as 0 and are not extended ----
 
 const u8At = (bytes: ArrayLike<number>, offset: number): number => bytes[offset] ?? 0
-const u16At = (bytes: ArrayLike<number>, offset: number): number => u8At(bytes, offset) | (u8At(bytes, offset + 1) << 8)
+const u16At = (bytes: ArrayLike<number>, offset: number): number =>
+  u8At(bytes, offset) | (u8At(bytes, offset + 1) << 8)
 
 function setU8(bytes: Uint8Array, offset: number, value: number): void {
   if (offset < bytes.length) bytes[offset] = value
@@ -125,13 +126,18 @@ function setU16(bytes: Uint8Array, offset: number, value: number): void {
 
 // ---- slider math, as in the firmware's config/simplified_tuning.c (integer division) ----
 
-const scaleHz = (defaultHz: number, percent: number): number => Math.min(LPF_MAX_HZ, Math.floor((defaultHz * percent) / 100))
+const scaleHz = (defaultHz: number, percent: number): number =>
+  Math.min(LPF_MAX_HZ, Math.floor((defaultHz * percent) / 100))
 
 export function gyroLpf2Hz(percent: number): number {
   return scaleHz(GYRO_LPF2_HZ, percent)
 }
 
-export function dtermCutoffs(percent: number): { lpf1MinHz: number; lpf1MaxHz: number; lpf2Hz: number } {
+export function dtermCutoffs(percent: number): {
+  lpf1MinHz: number
+  lpf1MaxHz: number
+  lpf2Hz: number
+} {
   return {
     lpf1MinHz: scaleHz(DTERM_LPF1_DYN_MIN_HZ, percent),
     lpf1MaxHz: scaleHz(DTERM_LPF1_DYN_MAX_HZ, percent),
@@ -139,7 +145,8 @@ export function dtermCutoffs(percent: number): { lpf1MinHz: number; lpf1MaxHz: n
   }
 }
 
-const clampMultiplier = (percent: number): number => Math.min(MULTIPLIER_MAX, Math.max(MULTIPLIER_MIN, percent))
+const clampMultiplier = (percent: number): number =>
+  Math.min(MULTIPLIER_MAX, Math.max(MULTIPLIER_MIN, percent))
 
 /** Slider position that comes closest to a hand-set cutoff (filter slider switched off on the FC). */
 const nearestPercent = (hz: number, defaultHz: number, step: number): number =>
@@ -149,14 +156,17 @@ const nearestPercent = (hz: number, defaultHz: number, step: number): number =>
 
 export function readFilters({ filterConfig, simplified }: FiltersSnapshot): FiltersDraft {
   const gyroLpf2 = u16At(filterConfig, FC.GYRO_LPF2_STATIC)
-  const dtermLpf1 = u16At(filterConfig, FC.DTERM_LPF1_DYN_MIN) || u16At(filterConfig, FC.DTERM_LPF1_STATIC)
+  const dtermLpf1 =
+    u16At(filterConfig, FC.DTERM_LPF1_DYN_MIN) || u16At(filterConfig, FC.DTERM_LPF1_STATIC)
   /** 0 when the FC's slider is switched off (cutoffs were set by hand). */
-  const sliderPercent = (on: number, multiplier: number) => (u8At(simplified, on) !== 0 ? u8At(simplified, multiplier) : 0)
+  const sliderPercent = (on: number, multiplier: number) =>
+    u8At(simplified, on) !== 0 ? u8At(simplified, multiplier) : 0
   return {
     gyroLpf2:
       gyroLpf2 === 0
         ? 0
-        : sliderPercent(ST.GYRO_SLIDER_ON_U8, ST.GYRO_MULTIPLIER_U8) || nearestPercent(gyroLpf2, GYRO_LPF2_HZ, GYRO_SLIDER.step),
+        : sliderPercent(ST.GYRO_SLIDER_ON_U8, ST.GYRO_MULTIPLIER_U8) ||
+          nearestPercent(gyroLpf2, GYRO_LPF2_HZ, GYRO_SLIDER.step),
     dterm:
       sliderPercent(ST.DTERM_SLIDER_ON_U8, ST.DTERM_MULTIPLIER_U8) ||
       (dtermLpf1 === 0 ? 100 : nearestPercent(dtermLpf1, DTERM_LPF1_DYN_MIN_HZ, DTERM_SLIDER.step)),
@@ -179,7 +189,9 @@ export function validateFilters(draft: FiltersDraft): string[] {
   if (outside(draft.rpmMinHz, RPM_MIN_HZ))
     problems.push(`RPM filter min frequency must be ${RPM_MIN_HZ.min}–${RPM_MIN_HZ.max} Hz.`)
   if (draft.dynNotchCount > 0 && outside(draft.dynNotchMinHz, DYN_NOTCH_MIN_HZ))
-    problems.push(`Dynamic notch min frequency must be ${DYN_NOTCH_MIN_HZ.min}–${DYN_NOTCH_MIN_HZ.max} Hz.`)
+    problems.push(
+      `Dynamic notch min frequency must be ${DYN_NOTCH_MIN_HZ.min}–${DYN_NOTCH_MIN_HZ.max} Hz.`,
+    )
   if (outside(draft.dynNotchCount, { min: 0, max: DYN_NOTCH_COUNT_MAX }))
     problems.push(`Dynamic notch count must be 0–${DYN_NOTCH_COUNT_MAX}.`)
   return problems
@@ -215,7 +227,8 @@ export function buildFilterConfig(snapshot: FiltersSnapshot, draft: FiltersDraft
     FC.DTERM_NOTCH_CUTOFF,
   ])
     setU16(payload, offset, 0)
-  if (u8At(payload, FC.RPM_HARMONICS_U8) === 0) setU8(payload, FC.RPM_HARMONICS_U8, RPM_HARMONICS_DEFAULT)
+  if (u8At(payload, FC.RPM_HARMONICS_U8) === 0)
+    setU8(payload, FC.RPM_HARMONICS_U8, RPM_HARMONICS_DEFAULT)
   setU8(payload, FC.RPM_MIN_HZ_U8, draft.rpmMinHz)
   setU8(payload, FC.DYN_NOTCH_COUNT_U8, draft.dynNotchCount)
   // Not validated while the notch is off (the field is disabled), so the FC keeps the frequency it had.
@@ -227,7 +240,8 @@ export function buildFilterConfig(snapshot: FiltersSnapshot, draft: FiltersDraft
 export function buildFilterSliders(snapshot: FiltersSnapshot, draft: FiltersDraft): Uint8Array {
   const payload = Uint8Array.from(snapshot.simplified)
   const cutoffs = sharedCutoffs(draft)
-  for (const [filterConfigOffset, offset] of SHARED_CUTOFFS) setU16(payload, offset, cutoffs.get(filterConfigOffset) ?? 0)
+  for (const [filterConfigOffset, offset] of SHARED_CUTOFFS)
+    setU16(payload, offset, cutoffs.get(filterConfigOffset) ?? 0)
   setU8(payload, ST.DTERM_SLIDER_ON_U8, 1)
   setU8(payload, ST.DTERM_MULTIPLIER_U8, draft.dterm)
   setU8(payload, ST.GYRO_SLIDER_ON_U8, 1)
@@ -241,18 +255,27 @@ export function buildFilterSliders(snapshot: FiltersSnapshot, draft: FiltersDraf
 export function pinnedChanges(snapshot: FiltersSnapshot): string[] {
   const { filterConfig, simplified } = snapshot
   const draft = readFilters(snapshot)
-  const differs = (pairs: [offset: number, hz: number][]) => pairs.some(([offset, hz]) => u16At(filterConfig, offset) !== hz)
+  const differs = (pairs: [offset: number, hz: number][]) =>
+    pairs.some(([offset, hz]) => u16At(filterConfig, offset) !== hz)
   const dterm = dtermCutoffs(draft.dterm)
   const changes: string[] = []
 
-  if (u16At(filterConfig, FC.GYRO_LPF1_STATIC) !== 0 || u16At(filterConfig, FC.GYRO_LPF1_DYN_MIN) !== 0)
+  if (
+    u16At(filterConfig, FC.GYRO_LPF1_STATIC) !== 0 ||
+    u16At(filterConfig, FC.GYRO_LPF1_DYN_MIN) !== 0
+  )
     changes.push('gyro lowpass 1 is turned off')
   if (u16At(filterConfig, FC.GYRO_NOTCH1_HZ) !== 0 || u16At(filterConfig, FC.GYRO_NOTCH2_HZ) !== 0)
     changes.push('the static gyro notch filters are turned off')
-  if (u16At(filterConfig, FC.DTERM_NOTCH_HZ) !== 0) changes.push('the D-term notch filter is turned off')
+  if (u16At(filterConfig, FC.DTERM_NOTCH_HZ) !== 0)
+    changes.push('the D-term notch filter is turned off')
   if (draft.gyroLpf2 !== 0) {
-    if (u8At(filterConfig, FC.GYRO_LPF2_TYPE_U8) !== FILTER_PT1) changes.push('gyro lowpass 2 becomes a PT1 filter')
-    if (u8At(simplified, ST.GYRO_SLIDER_ON_U8) === 0 || differs([[FC.GYRO_LPF2_STATIC, gyroLpf2Hz(draft.gyroLpf2)]]))
+    if (u8At(filterConfig, FC.GYRO_LPF2_TYPE_U8) !== FILTER_PT1)
+      changes.push('gyro lowpass 2 becomes a PT1 filter')
+    if (
+      u8At(simplified, ST.GYRO_SLIDER_ON_U8) === 0 ||
+      differs([[FC.GYRO_LPF2_STATIC, gyroLpf2Hz(draft.gyroLpf2)]])
+    )
       changes.push(`gyro lowpass 2 is set to ${gyroLpf2Hz(draft.gyroLpf2)} Hz by the slider`)
   }
   if (
@@ -264,10 +287,14 @@ export function pinnedChanges(snapshot: FiltersSnapshot): string[] {
       [FC.DTERM_LPF2_STATIC, dterm.lpf2Hz],
     ])
   )
-    changes.push(`the D-term lowpass filters are set to ${dterm.lpf1MinHz}–${dterm.lpf1MaxHz} Hz and ${dterm.lpf2Hz} Hz by the slider`)
+    changes.push(
+      `the D-term lowpass filters are set to ${dterm.lpf1MinHz}–${dterm.lpf1MaxHz} Hz and ${dterm.lpf2Hz} Hz by the slider`,
+    )
   if (u8At(filterConfig, FC.RPM_HARMONICS_U8) === 0) changes.push('the RPM filter is turned on')
   if (u8At(filterConfig, FC.DYN_NOTCH_COUNT_U8) > DYN_NOTCH_COUNT_MAX)
-    changes.push(`the dynamic notch count goes from ${u8At(filterConfig, FC.DYN_NOTCH_COUNT_U8)} to ${draft.dynNotchCount}`)
+    changes.push(
+      `the dynamic notch count goes from ${u8At(filterConfig, FC.DYN_NOTCH_COUNT_U8)} to ${draft.dynNotchCount}`,
+    )
   return changes
 }
 
@@ -317,10 +344,15 @@ export function defaultFilterSliders(): number[] {
  */
 export function applyFilterSliders(simplified: ArrayLike<number>): number[] {
   const payload = Uint8Array.from(simplified)
-  const rescale = (on: number, multiplier: number, cutoffs: [offset: number, defaultHz: number][]) => {
+  const rescale = (
+    on: number,
+    multiplier: number,
+    cutoffs: [offset: number, defaultHz: number][],
+  ) => {
     if (u8At(payload, on) === 0) return
     for (const [offset, defaultHz] of cutoffs)
-      if (u16At(payload, offset) !== 0) setU16(payload, offset, scaleHz(defaultHz, u8At(payload, multiplier)))
+      if (u16At(payload, offset) !== 0)
+        setU16(payload, offset, scaleHz(defaultHz, u8At(payload, multiplier)))
   }
   rescale(ST.DTERM_SLIDER_ON_U8, ST.DTERM_MULTIPLIER_U8, [
     [ST.DTERM_LPF1_STATIC, DTERM_LPF1_DYN_MIN_HZ],
@@ -349,7 +381,8 @@ export function copySharedCutoffs(
     if (toFilterConfig) setU16(target, fc, u16At(simplified, st))
     else setU16(target, st, u16At(filterConfig, fc))
   }
-  if (toFilterConfig) setU8(target, FC.GYRO_LPF1_STATIC_U8, u16At(target, FC.GYRO_LPF1_STATIC) & 0xff)
+  if (toFilterConfig)
+    setU8(target, FC.GYRO_LPF1_STATIC_U8, u16At(target, FC.GYRO_LPF1_STATIC) & 0xff)
   return [...target]
 }
 
@@ -358,5 +391,10 @@ export function isFilterConfigRejected(payload: ArrayLike<number>): boolean {
   if (u8At(payload, FC.DYN_NOTCH_COUNT_U8) > DYN_NOTCH_COUNT_FIRMWARE_MAX) return true
   if (payload.length < FILTER_CONFIG_LENGTH) return false
   const q = u16At(payload, 51)
-  return u16At(payload, 49) > 1000 || q < 250 || q > 3000 || [53, 54, 55].some((offset) => u8At(payload, offset) > 100)
+  return (
+    u16At(payload, 49) > 1000 ||
+    q < 250 ||
+    q > 3000 ||
+    [53, 54, 55].some((offset) => u8At(payload, offset) > 100)
+  )
 }

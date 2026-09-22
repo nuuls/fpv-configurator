@@ -54,14 +54,19 @@ export function PortsPage() {
     }
   }, [client])
 
-  const dirty = snapshot !== null && draft !== null && !assignmentsEqual(readAssignments(snapshot), draft)
+  const dirty =
+    snapshot !== null && draft !== null && !assignmentsEqual(readAssignments(snapshot), draft)
   useUnsavedChanges(PATH, dirty)
 
   if (!snapshot || !draft) {
     return (
       <>
         <PageHeader title="Ports" description="What is plugged into which UART." />
-        {error ? <ErrorNotice>{error}</ErrorNotice> : <p className="text-sm text-muted-foreground">Reading ports…</p>}
+        {error ? (
+          <ErrorNotice>{error}</ErrorNotice>
+        ) : (
+          <p className="text-muted-foreground text-sm">Reading ports…</p>
+        )}
       </>
     )
   }
@@ -73,7 +78,9 @@ export function PortsPage() {
     if (!client) return
     const plan = planWrites(snapshot, draft)
     if (plan.replaced.length > 0) {
-      const what = plan.replaced.map((r) => `${portName(r.port)} is used for ${r.functions.join(', ')}`).join('. ')
+      const what = plan.replaced
+        .map((r) => `${portName(r.port)} is used for ${r.functions.join(', ')}`)
+        .join('. ')
       const ok = await confirm({
         title: 'Replace existing port function?',
         description: `${what}. Saving will remove that and use the port for the device you picked.`,
@@ -99,10 +106,15 @@ export function PortsPage() {
   const selectablePorts = snapshot.ports.filter((p) => isSelectablePort(p.identifier))
   const used = usedPorts(draft)
   const unmanagedRows = selectablePorts.filter(
-    (p) => unmanagedFunctions(p.functionMask).length > 0 && !used.some((u) => u.port === p.identifier),
+    (p) =>
+      unmanagedFunctions(p.functionMask).length > 0 && !used.some((u) => u.port === p.identifier),
   )
 
-  const portSelect = (label: string, value: number | null, onChange: (port: number | null) => void) => (
+  const portSelect = (
+    label: string,
+    value: number | null,
+    onChange: (port: number | null) => void,
+  ) => (
     <NativeSelect
       aria-label={label}
       value={value ?? ''}
@@ -110,11 +122,20 @@ export function PortsPage() {
     >
       <NativeSelectOption value="">Select port…</NativeSelectOption>
       {selectablePorts.map((p) => {
-        const takenBy = p.identifier === value ? undefined : used.find((u) => u.port === p.identifier)?.usedBy
+        const takenBy =
+          p.identifier === value ? undefined : used.find((u) => u.port === p.identifier)?.usedBy
         const other = unmanagedFunctions(p.functionMask)
-        const suffix = takenBy ? ` (used by ${takenBy})` : other.length ? ` — ${other.join(', ')}` : ''
+        const suffix = takenBy
+          ? ` (used by ${takenBy})`
+          : other.length
+            ? ` — ${other.join(', ')}`
+            : ''
         return (
-          <NativeSelectOption key={p.identifier} value={p.identifier} disabled={takenBy !== undefined}>
+          <NativeSelectOption
+            key={p.identifier}
+            value={p.identifier}
+            disabled={takenBy !== undefined}
+          >
             {portName(p.identifier) + suffix}
           </NativeSelectOption>
         )
@@ -127,13 +148,16 @@ export function PortsPage() {
 
   return (
     <>
-      <PageHeader title="Ports" description="Pick what is plugged in, then the UART it is wired to." />
+      <PageHeader
+        title="Ports"
+        description="Pick what is plugged in, then the UART it is wired to."
+      />
 
       <Card>
         <CardContent className="flex flex-col divide-y">
           <DeviceRow name="Receiver">
             {receiver.type === 'spi' ? (
-              <span className="text-sm text-muted-foreground">Built-in (SPI) — no port needed</span>
+              <span className="text-muted-foreground text-sm">Built-in (SPI) — no port needed</span>
             ) : (
               <>
                 <NativeSelect
@@ -153,7 +177,11 @@ export function PortsPage() {
                   )}
                 </NativeSelect>
                 {receiver.type !== 'none' && (
-                  <On>{portSelect('Receiver port', receiver.port, (port) => update({ receiver: { ...receiver, port } }))}</On>
+                  <On>
+                    {portSelect('Receiver port', receiver.port, (port) =>
+                      update({ receiver: { ...receiver, port } }),
+                    )}
+                  </On>
                 )}
               </>
             )}
@@ -173,7 +201,11 @@ export function PortsPage() {
               <NativeSelectOption value="smartaudio">Analog (SmartAudio)</NativeSelectOption>
               <NativeSelectOption value="tramp">Analog (Tramp)</NativeSelectOption>
             </NativeSelect>
-            {vtx.type !== 'none' && <On>{portSelect('VTX port', vtx.port, (port) => update({ vtx: { ...vtx, port } }))}</On>}
+            {vtx.type !== 'none' && (
+              <On>
+                {portSelect('VTX port', vtx.port, (port) => update({ vtx: { ...vtx, port } }))}
+              </On>
+            )}
           </DeviceRow>
 
           <DeviceRow name="GPS">
@@ -188,7 +220,11 @@ export function PortsPage() {
               <NativeSelectOption value="off">None</NativeSelectOption>
               <NativeSelectOption value="on">Connected</NativeSelectOption>
             </NativeSelect>
-            {gps.enabled && <On>{portSelect('GPS port', gps.port, (port) => update({ gps: { ...gps, port } }))}</On>}
+            {gps.enabled && (
+              <On>
+                {portSelect('GPS port', gps.port, (port) => update({ gps: { ...gps, port } }))}
+              </On>
+            )}
           </DeviceRow>
 
           <DeviceRow name="Other MSP devices">
@@ -223,10 +259,11 @@ export function PortsPage() {
       </Card>
 
       {unmanagedRows.length > 0 && (
-        <ul className="mt-4 flex flex-col gap-1 text-sm text-muted-foreground">
+        <ul className="text-muted-foreground mt-4 flex flex-col gap-1 text-sm">
           {unmanagedRows.map((p) => (
             <li key={p.identifier}>
-              {portName(p.identifier)}: {unmanagedFunctions(p.functionMask).join(', ')} (not managed here)
+              {portName(p.identifier)}: {unmanagedFunctions(p.functionMask).join(', ')} (not managed
+              here)
             </li>
           ))}
         </ul>
@@ -235,11 +272,20 @@ export function PortsPage() {
       {error && <ErrorNotice>{error}</ErrorNotice>}
 
       <div className="mt-6 flex items-center justify-end gap-3">
-        {dirty && problems.length > 0 && <p className="mr-auto text-sm text-destructive">{problems[0]}</p>}
-        <Button variant="outline" disabled={!dirty || saving} onClick={() => setDraft(readAssignments(snapshot))}>
+        {dirty && problems.length > 0 && (
+          <p className="text-destructive mr-auto text-sm">{problems[0]}</p>
+        )}
+        <Button
+          variant="outline"
+          disabled={!dirty || saving}
+          onClick={() => setDraft(readAssignments(snapshot))}
+        >
           Revert
         </Button>
-        <Button disabled={!dirty || saving || problems.length > 0} onClick={() => void handleSave()}>
+        <Button
+          disabled={!dirty || saving || problems.length > 0}
+          onClick={() => void handleSave()}
+        >
           {saving ? 'Saving…' : 'Save & Reboot'}
         </Button>
       </div>
@@ -259,7 +305,7 @@ function DeviceRow({ name, children }: { name: string; children: ReactNode }) {
 function On({ children }: { children: ReactNode }) {
   return (
     <>
-      <span className="pt-1.5 text-sm text-muted-foreground">on</span>
+      <span className="text-muted-foreground pt-1.5 text-sm">on</span>
       {children}
     </>
   )
@@ -267,7 +313,10 @@ function On({ children }: { children: ReactNode }) {
 
 function ErrorNotice({ children }: { children: ReactNode }) {
   return (
-    <p role="alert" className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+    <p
+      role="alert"
+      className="border-destructive/40 bg-destructive/10 text-destructive mt-4 rounded-md border p-3 text-sm"
+    >
       {children}
     </p>
   )

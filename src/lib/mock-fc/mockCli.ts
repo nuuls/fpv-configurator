@@ -44,16 +44,24 @@ export class MockCliSession {
     }
     const bytes = new TextEncoder().encode(output)
     const chunks: Uint8Array[] = []
-    for (let start = 0; start < bytes.length; start += CHUNK_SIZE) chunks.push(bytes.slice(start, start + CHUNK_SIZE))
+    for (let start = 0; start < bytes.length; start += CHUNK_SIZE)
+      chunks.push(bytes.slice(start, start + CHUNK_SIZE))
     return chunks
   }
 }
 
 /** Betaflight's `baudRates` table; the port config stores indexes into it. */
-const BAUD_RATES = [0, 9600, 19200, 38400, 57600, 115200, 230400, 250000, 400000, 460800, 500000, 921600, 1000000, 1500000, 2000000, 2470000]
+const BAUD_RATES = [
+  0, 9600, 19200, 38400, 57600, 115200, 230400, 250000, 400000, 460800, 500000, 921600, 1000000,
+  1500000, 2000000, 2470000,
+]
 
 /** CLI variables of `MockFcConfig.settings` that live in a PID profile. */
-const PROFILE_SETTINGS = new Set(['feedforward_smooth_factor', 'dyn_idle_min_rpm', 'anti_gravity_gain'])
+const PROFILE_SETTINGS = new Set([
+  'feedforward_smooth_factor',
+  'dyn_idle_min_rpm',
+  'anti_gravity_gain',
+])
 
 function serialLine(port: SerialPortConfig): string {
   const name = port.identifier === 20 ? 'VCP' : `UART${port.identifier - 50}`
@@ -79,18 +87,33 @@ function cliSettings(config: MockFcConfig): Record<string, string> {
  * `diff all [defaults]` like `printConfig` in the firmware's `cli.c`, for the parts of the mock's config that
  * have a CLI representation: features, serial ports, modes and `cliSettings`. One profile of each kind.
  */
-export function renderDiff(current: MockFcConfig, defaults: MockFcConfig, showDefaults: boolean): string {
+export function renderDiff(
+  current: MockFcConfig,
+  defaults: MockFcConfig,
+  showDefaults: boolean,
+): string {
   const out: string[] = []
   const section = (title: string, lines: string[]) => {
     if (lines.length > 0) out.push('', `# ${title}`, ...lines)
   }
   /** One line that differs: the default as a comment, then the line. */
-  const changed = (line: string, defaultLine: string | null) => (showDefaults && defaultLine !== null ? [`#${defaultLine}`, line] : [line])
+  const changed = (line: string, defaultLine: string | null) =>
+    showDefaults && defaultLine !== null ? [`#${defaultLine}`, line] : [line]
 
-  out.push('', '# version', '# Betaflight / STM32F405 (S405) 2026.6.2 Jun 30 2026 / 12:00:00 (e0b7bb01b) MSP API: 1.48')
+  out.push(
+    '',
+    '# version',
+    '# Betaflight / STM32F405 (S405) 2026.6.2 Jun 30 2026 / 12:00:00 (e0b7bb01b) MSP API: 1.48',
+  )
   out.push('', '# start the command batch', 'batch start')
   out.push('', '# reset configuration to default settings', 'defaults nosave')
-  out.push('', 'board_name MOCKF405', 'manufacturer_id MOCK', 'mcu_id 0034002a3133510b33323534', 'signature ')
+  out.push(
+    '',
+    'board_name MOCKF405',
+    'manufacturer_id MOCK',
+    'mcu_id 0034002a3133510b33323534',
+    'signature ',
+  )
 
   // Like `printFeature`: what got switched off first, then what is on — the default of each where it differs.
   const features = Object.entries(FEATURE)
@@ -130,7 +153,12 @@ export function renderDiff(current: MockFcConfig, defaults: MockFcConfig, showDe
     Object.entries(cliSettings(current)).flatMap(([name, value]) => {
       if (PROFILE_SETTINGS.has(name) !== inProfile) return []
       const defaultValue = defaultSettings[name]
-      return value === defaultValue ? [] : changed(`set ${name} = ${value}`, defaultValue === undefined ? null : `set ${name} = ${defaultValue}`)
+      return value === defaultValue
+        ? []
+        : changed(
+            `set ${name} = ${value}`,
+            defaultValue === undefined ? null : `set ${name} = ${defaultValue}`,
+          )
     })
   section('master', settings(false))
 

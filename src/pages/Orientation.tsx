@@ -13,7 +13,11 @@ import { useSave } from '@/hooks/useSave'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 import { readAttitude, readStatus } from '@/lib/msp/api'
 import type { MspClient } from '@/lib/msp/client'
-import { calibrateAccelerometer, readBoardAlignment, saveBoardAlignment } from '@/lib/orientation/io'
+import {
+  calibrateAccelerometer,
+  readBoardAlignment,
+  saveBoardAlignment,
+} from '@/lib/orientation/io'
 import { alignmentOptions, type BoardAlignment } from '@/lib/orientation/model'
 
 const PATH = '/orientation'
@@ -29,15 +33,30 @@ export function OrientationPage() {
   const { client, snapshot, error, reload } = useFcSnapshot(readBoardAlignment)
   return (
     <>
-      <PageHeader title="Orientation" description="How the flight controller is mounted in the frame." />
-      {client && snapshot ? <Editor client={client} snapshot={snapshot} reload={reload} /> : <LoadingState error={error} />}
+      <PageHeader
+        title="Orientation"
+        description="How the flight controller is mounted in the frame."
+      />
+      {client && snapshot ? (
+        <Editor client={client} snapshot={snapshot} reload={reload} />
+      ) : (
+        <LoadingState error={error} />
+      )}
     </>
   )
 }
 
 const toDraft = (alignment: BoardAlignment) => alignment
 
-function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: BoardAlignment; reload: () => void }) {
+function Editor({
+  client,
+  snapshot,
+  reload,
+}: {
+  client: MspClient
+  snapshot: BoardAlignment
+  reload: () => void
+}) {
   const { draft, setDraft, dirty, revert } = useDraft(snapshot, toDraft)
   const { saving, error, save } = useSave(reload)
   const attitude = useMspPoll(readAttitude, 40)
@@ -72,8 +91,8 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Boa
           <CardHeader>
             <CardTitle>Board rotation</CardTitle>
             <CardDescription>
-              Leave everything at 0° if the arrow on the flight controller points forward and the board is the right way
-              up.
+              Leave everything at 0° if the arrow on the flight controller points forward and the
+              board is the right way up.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-[auto_auto_1fr] items-center gap-x-4 gap-y-4 text-sm">
@@ -103,20 +122,26 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Boa
           <CardHeader>
             <CardTitle>Preview</CardTitle>
             <CardDescription>
-              The arrow and the orange props are the front of the quad. The board shows your selection — the small
-              grey mark is where the arrow printed on it points. The quad follows your real one live — after saving,
-              tilt and turn it and check that the model moves the same way.
+              The arrow and the orange props are the front of the quad. The board shows your
+              selection — the small grey mark is where the arrow printed on it points. The quad
+              follows your real one live — after saving, tilt and turn it and check that the model
+              moves the same way.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center gap-3">
             <BoardView alignment={draft} attitude={relative} />
             <div className="flex w-full items-center justify-between gap-4 text-sm">
-              <span className="font-mono text-muted-foreground tabular-nums">
+              <span className="text-muted-foreground font-mono tabular-nums">
                 {attitude
                   ? `roll ${attitude.roll.toFixed(0)}°  pitch ${attitude.pitch.toFixed(0)}°  heading ${attitude.yaw.toFixed(0)}°`
                   : 'waiting for attitude…'}
               </span>
-              <Button variant="outline" size="sm" disabled={!attitude} onClick={() => setHeadingZero(attitude?.yaw ?? null)}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!attitude}
+                onClick={() => setHeadingZero(attitude?.yaw ?? null)}
+              >
                 Reset heading
               </Button>
             </div>
@@ -128,8 +153,8 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Boa
         <CardHeader>
           <CardTitle>Accelerometer</CardTitle>
           <CardDescription>
-            Needed for a level horizon and Angle mode. Put the quad on a level surface, don&apos;t touch it, then
-            calibrate. Do this after the board rotation is saved.
+            Needed for a level horizon and Angle mode. Put the quad on a level surface, don&apos;t
+            touch it, then calibrate. Do this after the board rotation is saved.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-4 text-sm">

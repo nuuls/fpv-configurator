@@ -37,7 +37,8 @@ export function OsdPreview({ canvas, elements, onMove }: OsdPreviewProps) {
   const hd = canvas.cols > 30
   const aspect = hd ? 16 / 9 : 4 / 3
   // Largest font (in % of the screen's width) whose glyphs fit a cell both ways.
-  const fontCqw = 100 * Math.min(1 / (canvas.cols * GLYPH_WIDTH_EM), 1 / (aspect * canvas.rows * GLYPH_HEIGHT_EM))
+  const fontCqw =
+    100 * Math.min(1 / (canvas.cols * GLYPH_WIDTH_EM), 1 / (aspect * canvas.rows * GLYPH_HEIGHT_EM))
 
   const cellAt = (e: PointerEvent): Cell | null => {
     const rect = screen.current?.getBoundingClientRect()

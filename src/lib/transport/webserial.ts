@@ -13,7 +13,10 @@ const isSameDevice = (info: SerialPortInfo, wanted: SerialPortInfo) =>
   info.usbVendorId === wanted.usbVendorId && info.usbProductId === wanted.usbProductId
 
 /** The port to connect to without asking: the only one that looks like the last used device. Null if none or several do. */
-export function matchLastUsed<P extends { getInfo(): SerialPortInfo }>(ports: P[], lastUsed: UsbPortId | null): P | null {
+export function matchLastUsed<P extends { getInfo(): SerialPortInfo }>(
+  ports: P[],
+  lastUsed: UsbPortId | null,
+): P | null {
   if (!lastUsed) return null
   const matches = ports.filter((port) => isSameDevice(port.getInfo(), lastUsed))
   return matches.length === 1 ? (matches[0] ?? null) : null
@@ -24,7 +27,9 @@ function readLastUsed(): UsbPortId | null {
     const stored: unknown = JSON.parse(localStorage.getItem(LAST_USED_KEY) ?? 'null')
     if (typeof stored !== 'object' || stored === null) return null
     const { usbVendorId, usbProductId } = stored as Record<string, unknown>
-    return typeof usbVendorId === 'number' && typeof usbProductId === 'number' ? { usbVendorId, usbProductId } : null
+    return typeof usbVendorId === 'number' && typeof usbProductId === 'number'
+      ? { usbVendorId, usbProductId }
+      : null
   } catch {
     return null // storage blocked or garbage in it: just ask
   }
@@ -56,7 +61,8 @@ export class WebSerialTransport implements Transport {
 
   /** Shows the browser's port picker. Must be called from a user gesture. Rejects with NotFoundError if cancelled. */
   static async request(baudRate?: number): Promise<WebSerialTransport> {
-    if (!WebSerialTransport.isSupported()) throw new Error('Web Serial is not supported in this browser')
+    if (!WebSerialTransport.isSupported())
+      throw new Error('Web Serial is not supported in this browser')
     const port = await navigator.serial.requestPort()
     return new WebSerialTransport(port, baudRate)
   }
@@ -95,7 +101,10 @@ export class WebSerialTransport implements Transport {
    * browser remembers the permission, so it can be found again without showing the picker.
    * Returns null while the device isn't back yet.
    */
-  static async findGranted(previous: WebSerialTransport, baudRate?: number): Promise<WebSerialTransport | null> {
+  static async findGranted(
+    previous: WebSerialTransport,
+    baudRate?: number,
+  ): Promise<WebSerialTransport | null> {
     const wanted = previous.port.getInfo()
     const ports = await navigator.serial.getPorts()
     const match = ports.find((port) => isSameDevice(port.getInfo(), wanted))

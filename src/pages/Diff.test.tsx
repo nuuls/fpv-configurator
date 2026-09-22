@@ -5,7 +5,7 @@ import { openTab, resetAppAfterEach, saveAndReboot } from '@/test/app'
 
 resetAppAfterEach()
 
-const lines =(section: string) =>
+const lines = (section: string) =>
   within(screen.getByRole('group', { name: section }))
     .getAllByRole('listitem')
     .map((line) => line.textContent)
@@ -13,7 +13,11 @@ const lines =(section: string) =>
 describe('Diff Checker tab', () => {
   it("hides the mock FC's setup: features, serial ports and modes are no tuning", async () => {
     await openTab('Diff Checker')
-    expect(await screen.findByText(/^0 tuning differences · 8 other hidden · MOCK\/MOCKF405 · Betaflight \/ /)).toBeInTheDocument()
+    expect(
+      await screen.findByText(
+        /^0 tuning differences · 8 other hidden · MOCK\/MOCKF405 · Betaflight \/ /,
+      ),
+    ).toBeInTheDocument()
     expect(screen.getByText(/^No tuning differences/)).toBeInTheDocument()
     expect(screen.queryAllByRole('group')).toEqual([])
   })
@@ -48,7 +52,9 @@ describe('Diff Checker tab', () => {
     expect(screen.getByText(/^0 tuning differences · 8 other shown/)).toBeInTheDocument()
     expect(screen.queryByText(/^No tuning differences/)).toBeNull()
     expect(lines('serial')).toContain('serial UART2 64 115200 57600 0 115200')
-    const shown = screen.getAllByRole('group').flatMap((group) => within(group).getAllByRole('listitem'))
+    const shown = screen
+      .getAllByRole('group')
+      .flatMap((group) => within(group).getAllByRole('listitem'))
     expect(shown.length).toBeGreaterThanOrEqual(8)
 
     // stays on for the next read
@@ -66,7 +72,9 @@ describe('Diff Checker tab', () => {
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument()
     const text = await navigator.clipboard.readText()
     expect(text.startsWith('# version\n# Betaflight / ')).toBe(true)
-    expect(text).toContain('\n#serial UART2 0 115200 57600 0 115200\nserial UART2 64 115200 57600 0 115200\n')
+    expect(text).toContain(
+      '\n#serial UART2 0 115200 57600 0 115200\nserial UART2 64 115200 57600 0 115200\n',
+    )
   })
 
   it('leaves the FC talking MSP: other tabs still load afterwards', async () => {

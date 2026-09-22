@@ -5,13 +5,23 @@ import { openTab, resetAppAfterEach, saveWithoutReboot } from '@/test/app'
 
 resetAppAfterEach()
 
-const columns = () => within(screen.getByRole('table')).getAllByRole('columnheader').map((th) => th.textContent).filter(Boolean)
+const columns = () =>
+  within(screen.getByRole('table'))
+    .getAllByRole('columnheader')
+    .map((th) => th.textContent)
+    .filter(Boolean)
 
 describe('Rates tab: rate types', () => {
   it('offers every Betaflight rate type', async () => {
     await openTab('Rates')
     const options = within(await screen.findByLabelText('Rate type')).getAllByRole('option')
-    expect(options.map((o) => o.textContent)).toEqual(['Betaflight', 'Raceflight', 'KISS', 'Actual', 'Quick'])
+    expect(options.map((o) => o.textContent)).toEqual([
+      'Betaflight',
+      'Raceflight',
+      'KISS',
+      'Actual',
+      'Quick',
+    ])
     expect(columns()).toEqual(['Center sensitivity (°/s)', 'Max rate (°/s)', 'Expo'])
   })
 

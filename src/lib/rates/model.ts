@@ -55,15 +55,43 @@ export interface RatesTypeSpec {
   defaults: AxisRates
 }
 
-const degrees = (label: string, maxByte: number): FieldSpec => ({ label, unit: '°/s', decimals: 0, perByte: 10, min: 10, max: maxByte * 10, step: 10 })
-const fraction = (label: string, minByte: number, maxByte: number): FieldSpec => ({ label, unit: '', decimals: 2, perByte: 1, min: minByte, max: maxByte, step: 1 })
-const plain = (label: string, maxByte: number): FieldSpec => ({ label, unit: '', decimals: 0, perByte: 1, min: 0, max: maxByte, step: 1 })
+const degrees = (label: string, maxByte: number): FieldSpec => ({
+  label,
+  unit: '°/s',
+  decimals: 0,
+  perByte: 10,
+  min: 10,
+  max: maxByte * 10,
+  step: 10,
+})
+const fraction = (label: string, minByte: number, maxByte: number): FieldSpec => ({
+  label,
+  unit: '',
+  decimals: 2,
+  perByte: 1,
+  min: minByte,
+  max: maxByte,
+  step: 1,
+})
+const plain = (label: string, maxByte: number): FieldSpec => ({
+  label,
+  unit: '',
+  decimals: 0,
+  perByte: 1,
+  min: 0,
+  max: maxByte,
+  step: 1,
+})
 
 export const RATES_TYPES: Record<number, RatesTypeSpec> = {
   [RATES_TYPE.BETAFLIGHT]: {
     name: 'Betaflight',
     help: 'RC rate sets the overall rotation speed, super rate adds more towards full stick, RC expo softens the feel around mid-stick.',
-    fields: { rcRate: fraction('RC rate', 1, 255), rate: fraction('Super rate', 0, 100), expo: fraction('RC expo', 0, 100) },
+    fields: {
+      rcRate: fraction('RC rate', 1, 255),
+      rate: fraction('Super rate', 0, 100),
+      expo: fraction('RC expo', 0, 100),
+    },
     defaults: { rcRate: 100, rate: 70, expo: 0 },
   },
   [RATES_TYPE.RACEFLIGHT]: {
@@ -75,19 +103,31 @@ export const RATES_TYPES: Record<number, RatesTypeSpec> = {
   [RATES_TYPE.KISS]: {
     name: 'KISS',
     help: 'RC rate sets the overall rotation speed, rate adds more towards full stick, RC curve softens the feel around mid-stick.',
-    fields: { rcRate: fraction('RC rate', 1, 255), rate: fraction('Rate', 0, 99), expo: fraction('RC curve', 0, 100) },
+    fields: {
+      rcRate: fraction('RC rate', 1, 255),
+      rate: fraction('Rate', 0, 99),
+      expo: fraction('RC curve', 0, 100),
+    },
     defaults: { rcRate: 100, rate: 70, expo: 0 },
   },
   [RATES_TYPE.ACTUAL]: {
     name: 'Actual',
     help: 'Center sensitivity is how twitchy the quad feels around mid-stick, max rate is the rotation speed at full stick, expo bends the curve between the two.',
-    fields: { rcRate: degrees('Center sensitivity', 200), rate: degrees('Max rate', 200), expo: fraction('Expo', 0, 100) },
+    fields: {
+      rcRate: degrees('Center sensitivity', 200),
+      rate: degrees('Max rate', 200),
+      expo: fraction('Expo', 0, 100),
+    },
     defaults: { rcRate: 70, rate: 670, expo: 0 },
   },
   [RATES_TYPE.QUICK]: {
     name: 'Quick',
     help: 'RC rate is how twitchy the quad feels around mid-stick (1.00 is 200°/s), max rate is the rotation speed at full stick, expo bends the curve between the two.',
-    fields: { rcRate: fraction('RC rate', 1, 255), rate: degrees('Max rate', 200), expo: fraction('Expo', 0, 100) },
+    fields: {
+      rcRate: fraction('RC rate', 1, 255),
+      rate: degrees('Max rate', 200),
+      expo: fraction('Expo', 0, 100),
+    },
     defaults: { rcRate: 100, rate: 670, expo: 0 },
   },
 }
@@ -117,10 +157,15 @@ const perByte = (type: number, field: RateField) => RATES_TYPES[type]?.fields[fi
 
 export function readRates({ raw }: RatesSnapshot): RatesDraft {
   const type = raw[OFFSET.type] ?? RATES_TYPE.ACTUAL
-  const read = (field: RateField, axis: number) => (raw[OFFSET[field][axis] ?? -1] ?? 0) * perByte(type, field)
+  const read = (field: RateField, axis: number) =>
+    (raw[OFFSET[field][axis] ?? -1] ?? 0) * perByte(type, field)
   return {
     type,
-    axes: AXES.map((_, axis) => ({ rcRate: read('rcRate', axis), rate: read('rate', axis), expo: read('expo', axis) })),
+    axes: AXES.map((_, axis) => ({
+      rcRate: read('rcRate', axis),
+      rate: read('rate', axis),
+      expo: read('expo', axis),
+    })),
   }
 }
 
@@ -136,7 +181,8 @@ export function buildRcTuning(snapshot: RatesSnapshot, draft: RatesDraft): Uint8
   const payload = Uint8Array.from(snapshot.raw)
   payload[OFFSET.type] = draft.type
   draft.axes.forEach((rates, axis) => {
-    for (const field of RATE_FIELDS) payload[OFFSET[field][axis] ?? -1] = Math.round(rates[field] / perByte(draft.type, field))
+    for (const field of RATE_FIELDS)
+      payload[OFFSET[field][axis] ?? -1] = Math.round(rates[field] / perByte(draft.type, field))
   })
   return payload
 }
@@ -150,7 +196,9 @@ export function validateRates(draft: RatesDraft): string[] {
       const { min, max } = spec.fields[field]
       const value = rates[field]
       if (!Number.isFinite(value) || value < min || value > max)
-        problems.push(`${fieldName(spec.fields[field], axis)} must be between ${format(spec.fields[field], min)} and ${format(spec.fields[field], max)}.`)
+        problems.push(
+          `${fieldName(spec.fields[field], axis)} must be between ${format(spec.fields[field], min)} and ${format(spec.fields[field], max)}.`,
+        )
     }
   })
   return problems
@@ -165,7 +213,8 @@ export function fieldName(field: FieldSpec, axis: number): string {
 /** Draft units → the number the user sees. */
 export const shown = (field: FieldSpec, value: number) => value / 10 ** field.decimals
 
-const format = (field: FieldSpec, value: number) => `${shown(field, value).toFixed(field.decimals)}${field.unit}`
+const format = (field: FieldSpec, value: number) =>
+  `${shown(field, value).toFixed(field.decimals)}${field.unit}`
 
 // ---- axis sync ----
 
@@ -189,8 +238,17 @@ export function applySync(axes: AxisRates[], sync: SyncMode): AxisRates[] {
   return axes.map((rates, axis) => (followers.includes(axis) ? { ...roll } : rates))
 }
 
-export function editAxis(axes: AxisRates[], sync: SyncMode, axis: number, field: RateField, value: number): AxisRates[] {
-  return applySync(axes.map((rates, i) => (i === axis ? { ...rates, [field]: value } : rates)), sync)
+export function editAxis(
+  axes: AxisRates[],
+  sync: SyncMode,
+  axis: number,
+  field: RateField,
+  value: number,
+): AxisRates[] {
+  return applySync(
+    axes.map((rates, i) => (i === axis ? { ...rates, [field]: value } : rates)),
+    sync,
+  )
 }
 
 // ---- curve ----
@@ -202,7 +260,12 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
  * Rotation speed in °/s for a stick deflection of 0..1 — `applyBetaflightRates` … `applyQuickRates` in fc/rc.c,
  * then capped at `rate_limit`. 0 for a rate type this app doesn't know.
  */
-export function rateAt(type: number, rates: AxisRates, stick: number, limit = FALLBACK_RATE_LIMIT): number {
+export function rateAt(
+  type: number,
+  rates: AxisRates,
+  stick: number,
+  limit = FALLBACK_RATE_LIMIT,
+): number {
   // the firmware's byte values; not rounded, so a half-typed number still moves the curve smoothly
   const rcRate = rates.rcRate / perByte(type, 'rcRate')
   const rate = rates.rate / perByte(type, 'rate')
@@ -260,7 +323,9 @@ export function curveSeries({ type, axes }: RatesDraft, limits: number[]): Curve
   const series: CurveSeries[] = []
   axes.forEach((rates, axis) => {
     const limit = limits[axis] ?? FALLBACK_RATE_LIMIT
-    const twin = series.find((s) => JSON.stringify(s.rates) === JSON.stringify(rates) && s.limit === limit)
+    const twin = series.find(
+      (s) => JSON.stringify(s.rates) === JSON.stringify(rates) && s.limit === limit,
+    )
     if (twin) twin.label += ` · ${AXES[axis]}`
     else series.push({ label: AXES[axis] ?? '', axis, type, rates, limit })
   })

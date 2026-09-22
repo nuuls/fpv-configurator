@@ -30,9 +30,16 @@ const stock = (): FiltersSnapshot => ({
   bidirDshot: true,
 })
 /** Stock firmware has 3 dynamic notches; the app offers 2 at most. */
-const STOCK_DRAFT: FiltersDraft = { gyroLpf2: 100, dterm: 100, rpmMinHz: 100, dynNotchCount: 2, dynNotchMinHz: 100 }
+const STOCK_DRAFT: FiltersDraft = {
+  gyroLpf2: 100,
+  dterm: 100,
+  rpmMinHz: 100,
+  dynNotchCount: 2,
+  dynNotchMinHz: 100,
+}
 
-const u16 = (bytes: ArrayLike<number>, offset: number) => (bytes[offset] ?? 0) | ((bytes[offset + 1] ?? 0) << 8)
+const u16 = (bytes: ArrayLike<number>, offset: number) =>
+  (bytes[offset] ?? 0) | ((bytes[offset + 1] ?? 0) << 8)
 const withU16 = (bytes: number[], offset: number, value: number) =>
   bytes.map((byte, i) => (i === offset ? value & 0xff : i === offset + 1 ? value >> 8 : byte))
 
@@ -66,17 +73,27 @@ describe('filter payloads', () => {
     const snapshot = stock()
     snapshot.filterConfig = withU16(withU16(snapshot.filterConfig, 5, 400), 9, 260) // gyro notch 1 + D-term notch
     snapshot.filterConfig[25] = 2 // gyro lowpass 2: PT2
-    const payload = buildFilterConfig(snapshot, { gyroLpf2: 120, dterm: 90, rpmMinHz: 80, dynNotchCount: 1, dynNotchMinHz: 150 })
+    const payload = buildFilterConfig(snapshot, {
+      gyroLpf2: 120,
+      dterm: 90,
+      rpmMinHz: 80,
+      dynNotchCount: 1,
+      dynNotchMinHz: 150,
+    })
 
     expect(payload).toHaveLength(FILTER_CONFIG_LENGTH)
     expect(u16(payload, 22)).toBe(600) // gyro_lpf2_static_hz
     expect(payload[25]).toBe(0) // PT1
     expect([payload[0], u16(payload, 20), u16(payload, 29), u16(payload, 31)]).toEqual([0, 0, 0, 0]) // gyro lowpass 1
     expect([u16(payload, 5), u16(payload, 9), u16(payload, 13)]).toEqual([0, 0, 0]) // notches
-    expect([u16(payload, 1), u16(payload, 33), u16(payload, 35), u16(payload, 26)]).toEqual([67, 67, 135, 135]) // D-term
+    expect([u16(payload, 1), u16(payload, 33), u16(payload, 35), u16(payload, 26)]).toEqual([
+      67, 67, 135, 135,
+    ]) // D-term
     expect([payload[44], payload[48], u16(payload, 41)]).toEqual([80, 1, 150])
     // untouched: yaw lowpass, dyn notch Q + max, RPM harmonics, fade, Q, weights
-    expect([u16(payload, 3), u16(payload, 39), u16(payload, 45), payload[43]]).toEqual([100, 300, 600, 3])
+    expect([u16(payload, 3), u16(payload, 39), u16(payload, 45), payload[43]]).toEqual([
+      100, 300, 600, 3,
+    ])
     expect([u16(payload, 49), u16(payload, 51), payload[53]]).toEqual([50, 500, 100])
   })
 
@@ -86,12 +103,22 @@ describe('filter payloads', () => {
     const payload = buildFilterSliders(snapshot, { ...STOCK_DRAFT, gyroLpf2: 150, dterm: 110 })
     expect(payload).toHaveLength(SIMPLIFIED_TUNING_LENGTH)
     expect([...payload.subarray(0, 17)]).toEqual(snapshot.simplified.slice(0, 17))
-    expect([payload[17], payload[18], u16(payload, 19), u16(payload, 21), u16(payload, 23), u16(payload, 25)]).toEqual([
-      1, 110, 82, 165, 82, 165,
-    ])
-    expect([payload[35], payload[36], u16(payload, 37), u16(payload, 39), u16(payload, 41), u16(payload, 43)]).toEqual([
-      1, 150, 0, 750, 0, 0,
-    ])
+    expect([
+      payload[17],
+      payload[18],
+      u16(payload, 19),
+      u16(payload, 21),
+      u16(payload, 23),
+      u16(payload, 25),
+    ]).toEqual([1, 110, 82, 165, 82, 165])
+    expect([
+      payload[35],
+      payload[36],
+      u16(payload, 37),
+      u16(payload, 39),
+      u16(payload, 41),
+      u16(payload, 43),
+    ]).toEqual([1, 150, 0, 750, 0, 0])
   })
 
   it('switches gyro lowpass 2 off at 0 and keeps a valid multiplier', () => {
@@ -104,7 +131,11 @@ describe('filter payloads', () => {
   })
 
   it('tolerates a shorter payload from older firmware', () => {
-    const short: FiltersSnapshot = { filterConfig: stock().filterConfig.slice(0, 47), simplified: [], bidirDshot: false }
+    const short: FiltersSnapshot = {
+      filterConfig: stock().filterConfig.slice(0, 47),
+      simplified: [],
+      bidirDshot: false,
+    }
     expect(readFilters(short)).toEqual({ ...STOCK_DRAFT, dynNotchCount: 0 })
     expect(buildFilterConfig(short, STOCK_DRAFT)).toHaveLength(47)
     expect(buildFilterSliders(short, STOCK_DRAFT)).toHaveLength(0)
@@ -113,7 +144,10 @@ describe('filter payloads', () => {
 
 describe('pinned filter settings', () => {
   it('lists what saving changes on a stock quad, and nothing after the save', () => {
-    expect(pinnedChanges(stock())).toEqual(['gyro lowpass 1 is turned off', 'the dynamic notch count goes from 3 to 2'])
+    expect(pinnedChanges(stock())).toEqual([
+      'gyro lowpass 1 is turned off',
+      'the dynamic notch count goes from 3 to 2',
+    ])
     expect(saved(stock(), STOCK_DRAFT).filterConfig[48]).toBe(2)
     expect(pinnedChanges(saved(stock(), STOCK_DRAFT))).toEqual([])
     expect(pinnedChanges(saved(stock(), { ...STOCK_DRAFT, gyroLpf2: 0, dterm: 85 }))).toEqual([])
@@ -147,10 +181,16 @@ describe('pinned filter settings', () => {
 describe('validateFilters', () => {
   it('checks the firmware ranges', () => {
     expect(validateFilters(STOCK_DRAFT)).toEqual([])
-    expect(validateFilters({ ...STOCK_DRAFT, rpmMinHz: 20 })[0]).toMatch(/RPM filter min frequency must be 30–200/)
-    expect(validateFilters({ ...STOCK_DRAFT, dynNotchMinHz: 300 })[0]).toMatch(/Dynamic notch min frequency must be 20–250/)
+    expect(validateFilters({ ...STOCK_DRAFT, rpmMinHz: 20 })[0]).toMatch(
+      /RPM filter min frequency must be 30–200/,
+    )
+    expect(validateFilters({ ...STOCK_DRAFT, dynNotchMinHz: 300 })[0]).toMatch(
+      /Dynamic notch min frequency must be 20–250/,
+    )
     expect(validateFilters({ ...STOCK_DRAFT, dynNotchCount: 0, dynNotchMinHz: 300 })).toEqual([]) // notch off
-    expect(validateFilters({ ...STOCK_DRAFT, dynNotchCount: 3 })[0]).toMatch(/Dynamic notch count must be 0–2/)
+    expect(validateFilters({ ...STOCK_DRAFT, dynNotchCount: 3 })[0]).toMatch(
+      /Dynamic notch count must be 0–2/,
+    )
   })
 })
 
@@ -161,19 +201,32 @@ describe('firmware behaviour used by the mock FC', () => {
     simplified[39] = 0 // lowpass 2 disabled (u16 at 39)
     simplified[40] = 0
     const applied = applyFilterSliders(simplified)
-    expect([u16(applied, 37), u16(applied, 39), u16(applied, 41), u16(applied, 43)]).toEqual([125, 0, 125, 250])
+    expect([u16(applied, 37), u16(applied, 39), u16(applied, 41), u16(applied, 43)]).toEqual([
+      125, 0, 125, 250,
+    ])
   })
 
   it('keeps the cutoffs of both messages in step', () => {
-    const simplified = applyFilterSliders(stock().simplified.map((byte, i) => (i === 18 ? 120 : byte)))
+    const simplified = applyFilterSliders(
+      stock().simplified.map((byte, i) => (i === 18 ? 120 : byte)),
+    )
     const filterConfig = copySharedCutoffs('toFilterConfig', defaultFilterConfig(), simplified)
-    expect([u16(filterConfig, 1), u16(filterConfig, 33), u16(filterConfig, 35), u16(filterConfig, 26)]).toEqual([90, 90, 180, 180])
-    expect(copySharedCutoffs('toSimplified', defaultFilterConfig(), simplified)).toEqual(stock().simplified.map((b, i) => (i === 18 ? 120 : b)))
+    expect([
+      u16(filterConfig, 1),
+      u16(filterConfig, 33),
+      u16(filterConfig, 35),
+      u16(filterConfig, 26),
+    ]).toEqual([90, 90, 180, 180])
+    expect(copySharedCutoffs('toSimplified', defaultFilterConfig(), simplified)).toEqual(
+      stock().simplified.map((b, i) => (i === 18 ? 120 : b)),
+    )
   })
 
   it('rejects what msp.c rejects', () => {
     expect(isFilterConfigRejected(defaultFilterConfig())).toBe(false)
-    expect(isFilterConfigRejected(defaultFilterConfig().map((byte, i) => (i === 48 ? 8 : byte)))).toBe(true) // notch count
+    expect(
+      isFilterConfigRejected(defaultFilterConfig().map((byte, i) => (i === 48 ? 8 : byte))),
+    ).toBe(true) // notch count
     expect(isFilterConfigRejected(withU16(defaultFilterConfig(), 51, 100))).toBe(true) // rpm_filter_q < 250
   })
 })
@@ -189,7 +242,13 @@ describe('filters against the mock FC', () => {
     const client = await connect()
     const before = await readFiltersSnapshot(client)
     expect(before.bidirDshot).toBe(false)
-    const draft: FiltersDraft = { gyroLpf2: 130, dterm: 85, rpmMinHz: 90, dynNotchCount: 1, dynNotchMinHz: 120 }
+    const draft: FiltersDraft = {
+      gyroLpf2: 130,
+      dterm: 85,
+      rpmMinHz: 90,
+      dynNotchCount: 1,
+      dynNotchMinHz: 120,
+    }
     await saveFilters(client, before, draft)
 
     const after = await readFiltersSnapshot(client)

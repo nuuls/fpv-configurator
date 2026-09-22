@@ -61,18 +61,32 @@ export function MotorsPage() {
   return (
     <>
       <PageHeader title="Motors" description="ESC settings and motor testing." />
-      {client && snapshot ? <Editor client={client} snapshot={snapshot} reload={reload} /> : <LoadingState error={error} />}
+      {client && snapshot ? (
+        <Editor client={client} snapshot={snapshot} reload={reload} />
+      ) : (
+        <LoadingState error={error} />
+      )}
     </>
   )
 }
 
-function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: MotorsSnapshot; reload: () => void }) {
+function Editor({
+  client,
+  snapshot,
+  reload,
+}: {
+  client: MspClient
+  snapshot: MotorsSnapshot
+  reload: () => void
+}) {
   const { draft, setDraft, dirty, revert } = useDraft(snapshot, readMotors)
   const { saving, error, save } = useSave(reload)
   useUnsavedChanges(PATH, dirty)
 
   const current = readMotors(snapshot).protocol
-  const protocols = SELECTABLE_PROTOCOLS.includes(current) ? SELECTABLE_PROTOCOLS : [...SELECTABLE_PROTOCOLS, current]
+  const protocols = SELECTABLE_PROTOCOLS.includes(current)
+    ? SELECTABLE_PROTOCOLS
+    : [...SELECTABLE_PROTOCOLS, current]
   const dshot = isDshot(draft.protocol)
 
   return (
@@ -109,7 +123,9 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Mot
                 disabled={!dshot}
                 onCheckedChange={(bidirDshot) => setDraft({ ...draft, bidirDshot })}
               />
-              <span className="text-muted-foreground">RPM telemetry for RPM filtering. Needs ESC firmware that supports it.</span>
+              <span className="text-muted-foreground">
+                RPM telemetry for RPM filtering. Needs ESC firmware that supports it.
+              </span>
             </div>
 
             <label htmlFor="motor-poles" className="font-medium">
@@ -123,9 +139,11 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Mot
                 step={2}
                 value={draft.poles}
                 onValueChange={(poles) => setDraft({ ...draft, poles })}
-                className="h-9 w-20 rounded-md border bg-transparent px-3 dark:bg-input/30"
+                className="dark:bg-input/30 h-9 w-20 rounded-md border bg-transparent px-3"
               />
-              <span className="text-muted-foreground">Magnets on the motor bell. 14 for most 5&quot;, 12 for most whoops.</span>
+              <span className="text-muted-foreground">
+                Magnets on the motor bell. 14 for most 5&quot;, 12 for most whoops.
+              </span>
             </div>
 
             <label htmlFor="props-direction" className="font-medium">
@@ -156,8 +174,11 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Mot
 
       {!(draft.bidirDshot && dshot) && (
         <Notice tone="warning">
-          Bidirectional DShot is off, so the flight controller gets no motor RPM and can&apos;t use RPM filtering.{' '}
-          {dshot ? 'Turn it on unless your ESC firmware doesn’t support it.' : 'It needs a DShot ESC protocol.'}
+          Bidirectional DShot is off, so the flight controller gets no motor RPM and can&apos;t use
+          RPM filtering.{' '}
+          {dshot
+            ? 'Turn it on unless your ESC firmware doesn’t support it.'
+            : 'It needs a DShot ESC protocol.'}
         </Notice>
       )}
       {error && <Notice tone="error">{error}</Notice>}
@@ -183,7 +204,15 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Mot
  * the radio is blocked meanwhile, throttle is capped, and everything stops when the switch goes
  * off, the tab is left, or the page is closed.
  */
-function MotorTest({ client, snapshot, blocked }: { client: MspClient; snapshot: MotorsSnapshot; blocked: boolean }) {
+function MotorTest({
+  client,
+  snapshot,
+  blocked,
+}: {
+  client: MspClient
+  snapshot: MotorsSnapshot
+  blocked: boolean
+}) {
   const count = Math.min(Math.max(snapshot.motorCount, 1), 8)
   const telemetry = useMspPoll(readMotorTelemetry, 100)
   const hasRpm = snapshot.bidirDshot
@@ -249,13 +278,19 @@ function MotorTest({ client, snapshot, blocked }: { client: MspClient; snapshot:
     <Slider
       aria-label={`Motor ${motor}`}
       orientation={vertical ? 'vertical' : 'horizontal'}
-      className={vertical ? 'data-[orientation=vertical]:h-20 data-[orientation=vertical]:min-h-0' : undefined}
+      className={
+        vertical
+          ? 'data-[orientation=vertical]:h-20 data-[orientation=vertical]:min-h-0'
+          : undefined
+      }
       min={MOTOR_STOP}
       max={MOTOR_TEST_MAX}
       step={5}
       disabled={!active}
       value={[values[motor - 1] ?? MOTOR_STOP]}
-      onValueChange={([v]) => v !== undefined && apply(values.map((old, i) => (i === motor - 1 ? v : old)))}
+      onValueChange={([v]) =>
+        v !== undefined && apply(values.map((old, i) => (i === motor - 1 ? v : old)))
+      }
     />
   )
   const rpmText = (motor: number) => (hasRpm ? `${telemetry?.[motor - 1]?.rpm ?? 0} rpm` : '— rpm')
@@ -264,23 +299,53 @@ function MotorTest({ client, snapshot, blocked }: { client: MspClient; snapshot:
     <Card className={active ? 'border-destructive' : undefined}>
       <CardHeader>
         <CardTitle>Motor test</CardTitle>
-        <CardDescription>Check that each motor spins, and in the right direction. Needs a battery plugged in.</CardDescription>
+        <CardDescription>
+          Check that each motor spins, and in the right direction. Needs a battery plugged in.
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-5 text-sm">
-        <div className="flex items-center gap-3 rounded-md border border-destructive/40 bg-destructive/10 p-3">
-          <Switch id="motor-test-enable" checked={active} disabled={blocked} onCheckedChange={toggle} />
+        <div className="border-destructive/40 bg-destructive/10 flex items-center gap-3 rounded-md border p-3">
+          <Switch
+            id="motor-test-enable"
+            checked={active}
+            disabled={blocked}
+            onCheckedChange={toggle}
+          />
           <label htmlFor="motor-test-enable" className="font-medium">
             I have removed all propellers — enable motor control
           </label>
         </div>
-        {blocked && <p className="text-muted-foreground">Save or revert your changes before testing motors.</p>}
+        {blocked && (
+          <p className="text-muted-foreground">
+            Save or revert your changes before testing motors.
+          </p>
+        )}
 
         {count === 4 ? (
           <div className="relative mx-auto aspect-square w-full max-w-sm">
             {/* frame seen from above; the arrow on the body points to the front */}
-            <svg viewBox="0 0 100 100" className="absolute inset-0 size-full text-muted-foreground" aria-hidden="true">
-              <path d="M20 20 80 80M80 20 20 80" stroke="currentColor" strokeWidth={5} strokeLinecap="round" opacity={0.45} />
-              <rect x={41} y={37} width={18} height={26} rx={3} fill="var(--card)" stroke="currentColor" strokeWidth={1.5} />
+            <svg
+              viewBox="0 0 100 100"
+              className="text-muted-foreground absolute inset-0 size-full"
+              aria-hidden="true"
+            >
+              <path
+                d="M20 20 80 80M80 20 20 80"
+                stroke="currentColor"
+                strokeWidth={5}
+                strokeLinecap="round"
+                opacity={0.45}
+              />
+              <rect
+                x={41}
+                y={37}
+                width={18}
+                height={26}
+                rx={3}
+                fill="var(--card)"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              />
               <path d="m50 40 5 8h-3v9h-4v-9h-3z" fill="var(--primary)" />
             </svg>
 
@@ -292,7 +357,10 @@ function MotorTest({ client, snapshot, blocked }: { client: MspClient; snapshot:
                 <div
                   key={motor}
                   title={`Motor ${motor} · output ${output}`}
-                  className={cn('absolute flex aspect-square w-[40%] flex-col items-center justify-center gap-1.5', className)}
+                  className={cn(
+                    'absolute flex aspect-square w-[40%] flex-col items-center justify-center gap-1.5',
+                    className,
+                  )}
                 >
                   <SpinRing motor={motor} clockwise={clockwise} spinning={spinning} />
                   <span
@@ -305,7 +373,9 @@ function MotorTest({ client, snapshot, blocked }: { client: MspClient; snapshot:
                     {motor}
                   </span>
                   {motorSlider(motor, true)}
-                  <div className="relative font-mono text-xs tabular-nums">{hasRpm ? `${telemetry?.[motor - 1]?.rpm ?? 0} rpm` : output}</div>
+                  <div className="relative font-mono text-xs tabular-nums">
+                    {hasRpm ? `${telemetry?.[motor - 1]?.rpm ?? 0} rpm` : output}
+                  </div>
                 </div>
               )
             })}
@@ -355,14 +425,30 @@ const ZONE_STYLE: Record<IdleZone, { bar: string; text: string; icon: typeof Cir
 }
 
 /** `dyn_idle_min_rpm` slider with the recommended zones for the drone type painted under the track. */
-function DynamicIdle({ value, enabled, onChange }: { value: number; enabled: boolean; onChange: (value: number) => void }) {
+function DynamicIdle({
+  value,
+  enabled,
+  onChange,
+}: {
+  value: number
+  enabled: boolean
+  onChange: (value: number) => void
+}) {
   const inRange = value >= DYN_IDLE_MIN && value <= DYN_IDLE_MAX
   const zones = DYN_IDLE_ZONES[DRONE_TYPE]
   const span = DYN_IDLE_MAX - DYN_IDLE_MIN
-  const percent = (v: number) => ((Math.min(DYN_IDLE_MAX, Math.max(DYN_IDLE_MIN, v)) - DYN_IDLE_MIN) / span) * 100
+  const percent = (v: number) =>
+    ((Math.min(DYN_IDLE_MAX, Math.max(DYN_IDLE_MIN, v)) - DYN_IDLE_MIN) / span) * 100
 
   let status: { zone: IdleZone; text: string }
-  if (!inRange) status = { zone: 'warning', text: value === 0 ? 'Off — drag the slider to turn dynamic idle on' : `Set to ${value}, outside this slider` }
+  if (!inRange)
+    status = {
+      zone: 'warning',
+      text:
+        value === 0
+          ? 'Off — drag the slider to turn dynamic idle on'
+          : `Set to ${value}, outside this slider`,
+    }
   else {
     const zone = dynIdleZone(value, DRONE_TYPE)
     const low = value < zones.goodMin
@@ -382,7 +468,9 @@ function DynamicIdle({ value, enabled, onChange }: { value: number; enabled: boo
 
   return (
     <div role="group" aria-labelledby="dyn-idle-label" className="flex flex-col gap-2">
-      <div className="font-mono tabular-nums">{inRange ? `${value} (${value * 100} rpm)` : 'off'}</div>
+      <div className="font-mono tabular-nums">
+        {inRange ? `${value} (${value * 100} rpm)` : 'off'}
+      </div>
       <Slider
         aria-labelledby="dyn-idle-label"
         min={DYN_IDLE_MIN}
@@ -439,7 +527,15 @@ const RING_ARCS = [-150, 30].map((startDegrees) => {
  * The prop disc. Its rim carries the arrows for the direction the motor should spin (seen from above)
  * and turns that way while the motor is driven — no labels needed.
  */
-function SpinRing({ motor, clockwise, spinning }: { motor: number; clockwise: boolean; spinning: boolean }) {
+function SpinRing({
+  motor,
+  clockwise,
+  spinning,
+}: {
+  motor: number
+  clockwise: boolean
+  spinning: boolean
+}) {
   return (
     <svg
       role="img"
@@ -452,7 +548,14 @@ function SpinRing({ motor, clockwise, spinning }: { motor: number; clockwise: bo
         spinning && !clockwise && '[animation-direction:reverse]',
       )}
     >
-      <circle cx={50} cy={50} r={RING_RADIUS} fill="var(--card)" stroke="var(--border)" strokeWidth={2} />
+      <circle
+        cx={50}
+        cy={50}
+        r={RING_RADIUS}
+        fill="var(--card)"
+        stroke="var(--border)"
+        strokeWidth={2}
+      />
       {/* drawn clockwise; mirrored for counter-clockwise motors */}
       <g transform={clockwise ? undefined : 'translate(100 0) scale(-1 1)'}>
         {RING_ARCS.map(({ arc, head }) => (

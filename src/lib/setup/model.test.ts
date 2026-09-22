@@ -67,13 +67,20 @@ describe('PID loop frequency', () => {
   })
 
   it('formats rates', () => {
-    expect([8000, 4000, 3200, 6664].map(formatLoopRate)).toEqual(['8 kHz', '4 kHz', '3.2 kHz', '6.7 kHz'])
+    expect([8000, 4000, 3200, 6664].map(formatLoopRate)).toEqual([
+      '8 kHz',
+      '4 kHz',
+      '3.2 kHz',
+      '6.7 kHz',
+    ])
   })
 
   it('patches only pid_process_denom into MSP_SET_ADVANCED_CONFIG', () => {
     const snapshot = allGood()
     expect(readSetup(snapshot).pidDenom).toBe(1)
-    expect([...encodeSetAdvancedConfig(snapshot, { ...readSetup(snapshot), pidDenom: 2 })]).toEqual([1, 2, 0, 6, 0xe0, 0x01])
+    expect([...encodeSetAdvancedConfig(snapshot, { ...readSetup(snapshot), pidDenom: 2 })]).toEqual(
+      [1, 2, 0, 6, 0xe0, 0x01],
+    )
   })
 
   it('saves to the mock FC across a reboot', async () => {
@@ -108,12 +115,21 @@ describe('pre-flight checklist', () => {
 
   it('passes when everything is set', () => {
     const checks = preflightChecks(allGood(), readSetup(allGood()))
-    expect(checks.map((check) => check.id)).toEqual(['bidirDshot', 'accCalibrated', 'armAngle', 'beeper', 'airmode'])
+    expect(checks.map((check) => check.id)).toEqual([
+      'bidirDshot',
+      'accCalibrated',
+      'armAngle',
+      'beeper',
+      'airmode',
+    ])
     expect(checks.every((check) => check.ok && !check.pending && check.fix === null)).toBe(true)
   })
 
   it('sends bidirectional DShot and the accelerometer to their own tabs', () => {
-    const checks = preflightChecks({ ...allGood(), bidirDshot: false, accCalibrated: false }, readSetup(allGood()))
+    const checks = preflightChecks(
+      { ...allGood(), bidirDshot: false, accCalibrated: false },
+      readSetup(allGood()),
+    )
     expect(checks.filter((check) => !check.ok).map((check) => check.fix)).toEqual([
       { path: '/motors', tab: 'Motors' },
       { path: '/orientation', tab: 'Orientation' },
@@ -121,22 +137,33 @@ describe('pre-flight checklist', () => {
   })
 
   it('cannot fix a missing accelerometer', () => {
-    const [, acc] = preflightChecks({ ...allGood(), hasAccelerometer: false, accCalibrated: false }, readSetup(allGood()))
+    const [, acc] = preflightChecks(
+      { ...allGood(), hasAccelerometer: false, accCalibrated: false },
+      readSetup(allGood()),
+    )
     expect(acc).toMatchObject({ ok: false, detail: 'No accelerometer', fix: null })
   })
 
   it('wants an arm angle of exactly 180', () => {
     const snapshot = { ...allGood(), armingConfig: [5, 0, 25, 0] }
     expect(failing(snapshot)).toEqual(['armAngle'])
-    expect(preflightChecks(snapshot, readSetup(snapshot))[2]).toMatchObject({ detail: '25°', fix: 'here' })
+    expect(preflightChecks(snapshot, readSetup(snapshot))[2]).toMatchObject({
+      detail: '25°',
+      fix: 'here',
+    })
   })
 
   it('wants the beeper on for RX set and RX loss, whatever else is muted', () => {
-    const beeper = (flags: number) => ({ ...allGood(), beeperConfig: [flags & 0xff, flags >> 8, 0, 0, 1, 0, 0, 0, 0] })
+    const beeper = (flags: number) => ({
+      ...allGood(),
+      beeperConfig: [flags & 0xff, flags >> 8, 0, 0, 1, 0, 0, 0, 0],
+    })
     expect(failing(beeper(1 << 3))).toEqual([]) // only "disarming" is muted
     expect(failing(beeper(BEEPER_OFF.RX_SET))).toEqual(['beeper'])
     const both = beeper(BEEPER_OFF.RX_SET | BEEPER_OFF.RX_LOST)
-    expect(preflightChecks(both, readSetup(both))[3]?.detail).toBe('Beeper off for RX set and RX loss')
+    expect(preflightChecks(both, readSetup(both))[3]?.detail).toBe(
+      'Beeper off for RX set and RX loss',
+    )
   })
 
   it('wants the DShot beacon on for RX set and RX loss too', () => {
@@ -148,8 +175,13 @@ describe('pre-flight checklist', () => {
       fix: 'here',
     })
     const mixed = { ...allGood(), beeperConfig: [0, 0x02, 0, 0, 1, 0x02, 0, 0, 0] }
-    expect(preflightChecks(mixed, readSetup(mixed))[3]?.detail).toBe('Beeper off for RX set · DShot beacon off for RX loss')
-    expect(applyFix(readSetup(beaconOff), 'beeper')).toMatchObject({ beeperOffFlags: 0, dshotBeaconOffFlags: 0 })
+    expect(preflightChecks(mixed, readSetup(mixed))[3]?.detail).toBe(
+      'Beeper off for RX set · DShot beacon off for RX loss',
+    )
+    expect(applyFix(readSetup(beaconOff), 'beeper')).toMatchObject({
+      beeperOffFlags: 0,
+      dshotBeaconOffFlags: 0,
+    })
   })
 
   it('judges a beeper config that ends before the DShot beacon by the beeper alone', () => {
@@ -164,7 +196,11 @@ describe('pre-flight checklist', () => {
   it('reports a firmware without beeper config instead of offering a fix', () => {
     const snapshot = { ...allGood(), beeperConfig: null }
     expect(readSetup(snapshot).beeperOffFlags).toBeNull()
-    expect(preflightChecks(snapshot, readSetup(snapshot))[3]).toMatchObject({ ok: false, fix: null, detail: 'No beeper support' })
+    expect(preflightChecks(snapshot, readSetup(snapshot))[3]).toMatchObject({
+      ok: false,
+      fix: null,
+      detail: 'No beeper support',
+    })
     expect(applyFix(readSetup(snapshot), 'beeper')).toEqual(readSetup(snapshot))
   })
 
@@ -173,7 +209,12 @@ describe('pre-flight checklist', () => {
   })
 
   it('a fix passes the check, marked as pending until saved', () => {
-    const snapshot = { ...allGood(), armingConfig: [5, 0, 25, 0], beeperConfig: [0x0a, 0x02, 0, 0, 1, 0x02, 0x02, 0, 1], features: 0 }
+    const snapshot = {
+      ...allGood(),
+      armingConfig: [5, 0, 25, 0],
+      beeperConfig: [0x0a, 0x02, 0, 0, 1, 0x02, 0x02, 0, 1],
+      features: 0,
+    }
     let draft = readSetup(snapshot)
     for (const id of failing(snapshot)) draft = applyFix(draft, id)
     // 0x0a = disarming + RX loss muted: only the RX bits are cleared, in the beeper and in the DShot beacon flags
@@ -204,7 +245,9 @@ describe('pre-flight checklist', () => {
     const snapshot = { ...allGood(), armingConfig: [5, 0, 25, 1] }
     expect([...encodeSetArmingConfig(snapshot, 180)]).toEqual([5, 0, 180, 1])
     const beeper = { ...readSetup(allGood()), beeperOffFlags: 1 << 3, dshotBeaconOffFlags: 1 << 24 }
-    expect([...encodeSetBeeperConfig([0x0a, 0x02, 0, 0, 3, 0x02, 0x02, 0, 1], beeper)]).toEqual([0x08, 0, 0, 0, 3, 0, 0, 0, 1])
+    expect([...encodeSetBeeperConfig([0x0a, 0x02, 0, 0, 3, 0x02, 0x02, 0, 1], beeper)]).toEqual([
+      0x08, 0, 0, 0, 3, 0, 0, 0, 1,
+    ])
     expect(withAirmode(FEATURE.OSD, true)).toBe(FEATURE.OSD | FEATURE.AIRMODE)
     expect(withAirmode(0x80000000 | FEATURE.AIRMODE, false)).toBe(0x80000000)
   })
@@ -343,11 +386,25 @@ describe('changed outside this app', () => {
   it('marks resets in the draft and turns them into CLI lines, profile switches restored', () => {
     const snapshot = withDiff()
     let draft = withReset(readSetup(snapshot), 'profile 1: anti_gravity_gain', true)
-    expect(externalChanges(snapshot, draft).map((change) => change.reset)).toEqual([false, false, false, true, false])
-    expect(resetScript(snapshot, draft)).toEqual(['profile 1', 'set anti_gravity_gain = 80', 'profile 0'])
+    expect(externalChanges(snapshot, draft).map((change) => change.reset)).toEqual([
+      false,
+      false,
+      false,
+      true,
+      false,
+    ])
+    expect(resetScript(snapshot, draft)).toEqual([
+      'profile 1',
+      'set anti_gravity_gain = 80',
+      'profile 0',
+    ])
 
     draft = withAllResets(snapshot, draft)
-    expect(draft.resets).toEqual(['master: crashflip_motor_percent', 'profile 1: anti_gravity_gain', 'rateprofile 0: tpa_rate'])
+    expect(draft.resets).toEqual([
+      'master: crashflip_motor_percent',
+      'profile 1: anti_gravity_gain',
+      'rateprofile 0: tpa_rate',
+    ])
     expect(resetScript(snapshot, draft)).toEqual([
       'set crashflip_motor_percent = 0',
       'profile 1',
@@ -367,7 +424,13 @@ describe('changed outside this app', () => {
     const { client } = await connect(new MockFlightController())
     const snapshot = await readSetupSnapshot(client)
     expect(snapshot.externalError).toBeNull()
-    expect(externalChanges(snapshot, readSetup(snapshot)).map((change) => [change.name, change.defaultValue, change.value])).toEqual([
+    expect(
+      externalChanges(snapshot, readSetup(snapshot)).map((change) => [
+        change.name,
+        change.defaultValue,
+        change.value,
+      ]),
+    ).toEqual([
       ['crashflip_motor_percent', '0', '50'],
       ['osd_units', 'METRIC', 'IMPERIAL'],
     ])
@@ -383,7 +446,9 @@ describe('changed outside this app', () => {
     await dropped
 
     const after = await readSetupSnapshot((await connect(fc)).client)
-    expect(externalChanges(after, readSetup(after)).map((change) => change.label)).toEqual(['crashflip_motor_percent'])
+    expect(externalChanges(after, readSetup(after)).map((change) => change.label)).toEqual([
+      'crashflip_motor_percent',
+    ])
     const before = defaultMockConfig()
     expect(fc.savedConfig).toEqual({
       ...before,

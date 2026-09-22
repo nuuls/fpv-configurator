@@ -10,13 +10,13 @@ Choose where and how fast flight logs are recorded, and get the logs off the qua
 
 ## Controls
 
-| Control | Type | Betaflight setting / MSP | Values · default | Notes |
-| ------- | ---- | ------------------------ | ---------------- | ----- |
-| Log to | select | `blackbox_device` · `MSP_BLACKBOX_CONFIG` (80/81) | No logging, Onboard flash, SD card | Only storage the FC actually has is offered. "Serial port" appears only if already selected |
-| Logging rate | select | `blackbox_sample_rate` | 1/1 … 1/16, shown with Hz | Hz derived from the PID loop time (`MSP_STATUS`) |
-| Storage usage | readout | `MSP_DATAFLASH_SUMMARY` (70), `MSP_SDCARD_SUMMARY` (79) | — | |
-| Erase storage | button | `MSP_DATAFLASH_ERASE` (72) | — | Flash only. Confirmation; polls until the chip is ready |
-| Activate mass storage | button | `MSP_REBOOT` mode 2 | — | Confirmation; app disconnects and explains to replug |
+| Control               | Type    | Betaflight setting / MSP                                | Values · default                   | Notes                                                                                       |
+| --------------------- | ------- | ------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------- |
+| Log to                | select  | `blackbox_device` · `MSP_BLACKBOX_CONFIG` (80/81)       | No logging, Onboard flash, SD card | Only storage the FC actually has is offered. "Serial port" appears only if already selected |
+| Logging rate          | select  | `blackbox_sample_rate`                                  | 1/1 … 1/16, shown with Hz          | Hz derived from the PID loop time (`MSP_STATUS`)                                            |
+| Storage usage         | readout | `MSP_DATAFLASH_SUMMARY` (70), `MSP_SDCARD_SUMMARY` (79) | —                                  |                                                                                             |
+| Erase storage         | button  | `MSP_DATAFLASH_ERASE` (72)                              | —                                  | Flash only. Confirmation; polls until the chip is ready                                     |
+| Activate mass storage | button  | `MSP_REBOOT` mode 2                                     | —                                  | Confirmation; app disconnects and explains to replug                                        |
 
 ## Behaviour
 

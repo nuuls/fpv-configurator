@@ -22,7 +22,11 @@ export function normalizeDegrees(degrees: number): number {
 
 export function decodeBoardAlignment(payload: Uint8Array): BoardAlignment {
   const r = new ByteReader(payload)
-  return { roll: normalizeDegrees(r.i16()), pitch: normalizeDegrees(r.i16()), yaw: normalizeDegrees(r.i16()) }
+  return {
+    roll: normalizeDegrees(r.i16()),
+    pitch: normalizeDegrees(r.i16()),
+    yaw: normalizeDegrees(r.i16()),
+  }
 }
 
 export function encodeBoardAlignment(a: BoardAlignment): Uint8Array {

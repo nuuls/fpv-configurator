@@ -61,14 +61,16 @@ export function crc16Xmodem(bytes: Uint8Array): number {
   let crc = 0
   for (const byte of bytes) {
     crc ^= byte << 8
-    for (let bit = 0; bit < 8; bit++) crc = crc & 0x8000 ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff
+    for (let bit = 0; bit < 8; bit++)
+      crc = crc & 0x8000 ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff
   }
   return crc
 }
 
 export function encodeFourWayFrame(frame: FourWayFrame): Uint8Array {
   const { params } = frame
-  if (params.length < 1 || params.length > 256) throw new RangeError('4-way frames carry 1–256 parameter bytes')
+  if (params.length < 1 || params.length > 256)
+    throw new RangeError('4-way frames carry 1–256 parameter bytes')
   const isResponse = frame.direction === 'response'
   const out = new Uint8Array(5 + params.length + (isResponse ? 1 : 0) + 2)
   out[0] = isResponse ? ESCAPE_INTERFACE : ESCAPE_HOST
@@ -186,7 +188,13 @@ export class FourWayClient {
   /** Resolves with the response frame; rejects on timeout or when the ack isn't OK. */
   request(command: number, params: ArrayLike<number> = [0], address = 0): Promise<FourWayFrame> {
     if (this.pending) return Promise.reject(new Error('4-way request already in flight'))
-    const bytes = encodeFourWayFrame({ direction: 'request', command, address, params: Uint8Array.from(params), ack: 0 })
+    const bytes = encodeFourWayFrame({
+      direction: 'request',
+      command,
+      address,
+      params: Uint8Array.from(params),
+      ack: 0,
+    })
 
     return new Promise<FourWayFrame>((resolve, reject) => {
       const timer = setTimeout(() => {

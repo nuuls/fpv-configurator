@@ -26,13 +26,13 @@ value on one line, a sentence on what it does, then its control.
 
 ## Controls
 
-| Control | Type | Betaflight setting / MSP | Values · default | Notes |
-| ------- | ---- | ------------------------ | ---------------- | ----- |
-| Gyro lowpass 2 | slider | `simplified_gyro_filter_multiplier` → `gyro_lpf2_static_hz` = 500 Hz × slider · `MSP_SIMPLIFIED_TUNING` (140/141) + `MSP_FILTER_CONFIG` (92/93) | 0–2.0, step 0.1 · 1.0 | 0 = filter off (`gyro_lpf2_static_hz = 0`). Resulting cutoff shown next to the value |
-| D-term filtering | slider | `simplified_dterm_filter_multiplier` → `dterm_lpf1_dyn_min/max_hz`, `dterm_lpf1_static_hz`, `dterm_lpf2_static_hz` | 0.50–1.50, step 0.05 · 1.0 | Range widens if the FC's value is outside. Resulting cutoffs shown |
-| RPM filter min frequency | slider | `rpm_filter_min_hz` · `MSP_FILTER_CONFIG` byte 44 | 30–200 Hz, step 5 · 100 | |
-| Dynamic notch count | button group | `dyn_notch_count` · byte 48 | Off, 1–2 · app recommends 1 (firmware default 3) | The firmware takes up to 7; a higher count on the FC shows as 2 and the pinned-filters warning says saving lowers it |
-| Dynamic notch min frequency | slider | `dyn_notch_min_hz` · bytes 41–42 | 20–250 Hz, step 5 · 100 | Disabled while the count is Off |
+| Control                     | Type         | Betaflight setting / MSP                                                                                                                        | Values · default                                 | Notes                                                                                                                |
+| --------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| Gyro lowpass 2              | slider       | `simplified_gyro_filter_multiplier` → `gyro_lpf2_static_hz` = 500 Hz × slider · `MSP_SIMPLIFIED_TUNING` (140/141) + `MSP_FILTER_CONFIG` (92/93) | 0–2.0, step 0.1 · 1.0                            | 0 = filter off (`gyro_lpf2_static_hz = 0`). Resulting cutoff shown next to the value                                 |
+| D-term filtering            | slider       | `simplified_dterm_filter_multiplier` → `dterm_lpf1_dyn_min/max_hz`, `dterm_lpf1_static_hz`, `dterm_lpf2_static_hz`                              | 0.50–1.50, step 0.05 · 1.0                       | Range widens if the FC's value is outside. Resulting cutoffs shown                                                   |
+| RPM filter min frequency    | slider       | `rpm_filter_min_hz` · `MSP_FILTER_CONFIG` byte 44                                                                                               | 30–200 Hz, step 5 · 100                          |                                                                                                                      |
+| Dynamic notch count         | button group | `dyn_notch_count` · byte 48                                                                                                                     | Off, 1–2 · app recommends 1 (firmware default 3) | The firmware takes up to 7; a higher count on the FC shows as 2 and the pinned-filters warning says saving lowers it |
+| Dynamic notch min frequency | slider       | `dyn_notch_min_hz` · bytes 41–42                                                                                                                | 20–250 Hz, step 5 · 100                          | Disabled while the count is Off                                                                                      |
 
 Pinned on every save ("No other filters"): gyro lowpass 1 off (`gyro_lpf1_static_hz`, `gyro_lpf1_dyn_min/max_hz` = 0),
 `gyro_lpf2_type = PT1`, static gyro notches 1 + 2 and the D-term notch off, both filter sliders on

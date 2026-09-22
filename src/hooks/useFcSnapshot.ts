@@ -14,7 +14,10 @@ export interface FcSnapshot<T> {
 /** Reads a tab's config from the FC once per connection. `read` must be a stable (module-level) function. */
 export function useFcSnapshot<T>(read: (client: MspClient) => Promise<T>): FcSnapshot<T> {
   const client = useConnectionStore((s) => s.client)
-  const [state, setState] = useState<{ snapshot: T | null; error: string | null }>({ snapshot: null, error: null })
+  const [state, setState] = useState<{ snapshot: T | null; error: string | null }>({
+    snapshot: null,
+    error: null,
+  })
   const [generation, setGeneration] = useState(0)
 
   useEffect(() => {
@@ -24,7 +27,10 @@ export function useFcSnapshot<T>(read: (client: MspClient) => Promise<T>): FcSna
       (snapshot) => !cancelled && setState({ snapshot, error: null }),
       (cause: unknown) =>
         !cancelled &&
-        setState({ snapshot: null, error: `Could not read from the flight controller: ${describeError(cause)}` }),
+        setState({
+          snapshot: null,
+          error: `Could not read from the flight controller: ${describeError(cause)}`,
+        }),
     )
     return () => {
       cancelled = true

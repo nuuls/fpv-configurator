@@ -69,7 +69,9 @@ export class MspClient {
     this.timeoutMs = options.timeoutMs ?? 1000
     this.parser = new MspParser((frame) => this.handleFrame(frame))
     this.unsubscribe = [
-      transport.onData((chunk) => (this.rawListener ? this.rawListener(chunk) : this.parser.push(chunk))),
+      transport.onData((chunk) =>
+        this.rawListener ? this.rawListener(chunk) : this.parser.push(chunk),
+      ),
       transport.onClose(() => this.dispose()),
     ]
   }
@@ -91,7 +93,8 @@ export class MspClient {
       if (this.closed) throw new MspDisconnectedError()
       try {
         return await session({
-          request: (code, payload, options = {}) => this.send(code, payload, options.timeoutMs ?? this.timeoutMs),
+          request: (code, payload, options = {}) =>
+            this.send(code, payload, options.timeoutMs ?? this.timeoutMs),
           write: (data) => this.transport.write(data),
           onData: (listener) => {
             this.rawListener = listener
@@ -117,7 +120,11 @@ export class MspClient {
     this.settle()?.reject(new MspDisconnectedError())
   }
 
-  private send(code: number, payload: Uint8Array | undefined, timeoutMs: number): Promise<Uint8Array> {
+  private send(
+    code: number,
+    payload: Uint8Array | undefined,
+    timeoutMs: number,
+  ): Promise<Uint8Array> {
     if (this.closed) return Promise.reject(new MspDisconnectedError())
 
     return new Promise<Uint8Array>((resolve, reject) => {

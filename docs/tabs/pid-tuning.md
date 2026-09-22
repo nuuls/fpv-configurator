@@ -10,22 +10,22 @@ Three sliders and one stick-feel choice. The firmware's own slider math ("simpli
 
 ## Controls
 
-| Control | Type | Betaflight setting / MSP | Values · default | Notes |
-| ------- | ---- | ------------------------ | ---------------- | ----- |
-| Damping | slider | `simplified_d_gain` · `MSP_SIMPLIFIED_TUNING` (140/141) | 0.50–1.50, step 0.05 · 1.0 | Range widens if the FC's value is outside |
-| Pitch gains | slider | `simplified_pitch_pi_gain` + `simplified_roll_pitch_ratio`, both set to the slider value | same | A master multiplier for pitch only, see Decisions |
-| Master multiplier | slider | `simplified_master_multiplier` | same | |
-| Resulting PIDs | view-only table | `MSP_CALCULATE_SIMPLIFIED_PID` (142) | P, I, D, FF per axis | Recalculated by the FC as the sliders move |
-| Stick feel | 3 preset cards | see below | Direct, Light smoothing, Strong smoothing | "Custom" note when the FC matches none |
+| Control           | Type            | Betaflight setting / MSP                                                                 | Values · default                          | Notes                                             |
+| ----------------- | --------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------- |
+| Damping           | slider          | `simplified_d_gain` · `MSP_SIMPLIFIED_TUNING` (140/141)                                  | 0.50–1.50, step 0.05 · 1.0                | Range widens if the FC's value is outside         |
+| Pitch gains       | slider          | `simplified_pitch_pi_gain` + `simplified_roll_pitch_ratio`, both set to the slider value | same                                      | A master multiplier for pitch only, see Decisions |
+| Master multiplier | slider          | `simplified_master_multiplier`                                                           | same                                      |                                                   |
+| Resulting PIDs    | view-only table | `MSP_CALCULATE_SIMPLIFIED_PID` (142)                                                     | P, I, D, FF per axis                      | Recalculated by the FC as the sliders move        |
+| Stick feel        | 3 preset cards  | see below                                                                                | Direct, Light smoothing, Strong smoothing | "Custom" note when the FC matches none            |
 
 Pinned on every save: `simplified_pids_mode = RPY`, I / PI sliders = 1.0,
 Dynamic D (`simplified_d_max_gain`) = 0. Filter sliders in the same message are passed through untouched.
 
-| Preset | `rc_smoothing` | `rc_smoothing_auto_factor` (+`_throttle`) | FF slider | `feedforward_smooth_factor` |
-| ------ | -------------- | ------------------------------------------- | --------- | --------------------------- |
-| Direct | OFF | — | 1.0 | 65 (default) |
-| Light smoothing | ON | 25 | 1.0 | 65 (default) |
-| Strong smoothing | ON | 30 | 0.5 | **80 — placeholder, SPEC says TBD** |
+| Preset           | `rc_smoothing` | `rc_smoothing_auto_factor` (+`_throttle`) | FF slider | `feedforward_smooth_factor`         |
+| ---------------- | -------------- | ----------------------------------------- | --------- | ----------------------------------- |
+| Direct           | OFF            | —                                         | 1.0       | 65 (default)                        |
+| Light smoothing  | ON             | 25                                        | 1.0       | 65 (default)                        |
+| Strong smoothing | ON             | 30                                        | 0.5       | **80 — placeholder, SPEC says TBD** |
 
 ## Behaviour
 

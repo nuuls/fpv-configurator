@@ -49,7 +49,9 @@ export function SetupPage() {
 
   if (!fcInfo) return null
 
-  const loopOptions = snapshot ? pidLoopOptions(fcInfo.board.gyroSampleRateHz, readSetup(snapshot).pidDenom) : []
+  const loopOptions = snapshot
+    ? pidLoopOptions(fcInfo.board.gyroSampleRateHz, readSetup(snapshot).pidDenom)
+    : []
   const checks = snapshot && draft ? preflightChecks(snapshot, draft) : null
   const external = snapshot && draft ? externalChanges(snapshot, draft) : null
   const sensors = status ? SENSOR_NAMES.filter((_, bit) => status.sensors & (1 << bit)) : []
@@ -87,14 +89,18 @@ export function SetupPage() {
                 label="PID loop frequency"
                 value={
                   draft && loopOptions.length > 0 ? (
-                    <div role="group" aria-label="PID loop frequency" className="inline-flex font-sans">
+                    <div
+                      role="group"
+                      aria-label="PID loop frequency"
+                      className="inline-flex font-sans"
+                    >
                       {loopOptions.map(({ denom, hz }) => (
                         <Button
                           key={denom}
                           size="sm"
                           variant={draft.pidDenom === denom ? 'default' : 'outline'}
                           aria-pressed={draft.pidDenom === denom}
-                          className="rounded-none first:rounded-l-md last:rounded-r-md not-first:-ml-px"
+                          className="rounded-none not-first:-ml-px first:rounded-l-md last:rounded-r-md"
                           onClick={() => setDraft({ ...draft, pidDenom: denom })}
                         >
                           {formatLoopRate(hz)}
@@ -121,17 +127,21 @@ export function SetupPage() {
           <CardContent>
             {checks && draft ? (
               <>
-                <p className="mb-2 text-sm text-muted-foreground" aria-live="polite">
+                <p className="text-muted-foreground mb-2 text-sm" aria-live="polite">
                   {checklistSummary(checks)}
                 </p>
                 <ul aria-label="Pre-flight checklist" className="divide-y text-sm">
                   {checks.map((check) => (
-                    <CheckRow key={check.id} check={check} onFix={() => setDraft(applyFix(draft, check.id))} />
+                    <CheckRow
+                      key={check.id}
+                      check={check}
+                      onFix={() => setDraft(applyFix(draft, check.id))}
+                    />
                   ))}
                 </ul>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">{readError ? '—' : 'Reading…'}</p>
+              <p className="text-muted-foreground text-sm">{readError ? '—' : 'Reading…'}</p>
             )}
           </CardContent>
         </Card>
@@ -141,8 +151,9 @@ export function SetupPage() {
             <div className="grid gap-1.5">
               <CardTitle>Changed outside this app</CardTitle>
               <CardDescription>
-                Settings that are not at their Betaflight default and that no tab of this app manages — changed in Betaflight Configurator
-                or the CLI. Reset puts the default back.
+                Settings that are not at their Betaflight default and that no tab of this app
+                manages — changed in Betaflight Configurator or the CLI. Reset puts the default
+                back.
               </CardDescription>
             </div>
             {external && snapshot && draft && external.some((change) => change.key !== null) && (
@@ -168,7 +179,9 @@ export function SetupPage() {
                       <ExternalRow
                         key={`${change.section}: ${change.label}`}
                         change={change}
-                        onReset={(reset) => change.key !== null && setDraft(withReset(draft, change.key, reset))}
+                        onReset={(reset) =>
+                          change.key !== null && setDraft(withReset(draft, change.key, reset))
+                        }
                       />
                     ))}
                   </ul>
@@ -209,13 +222,19 @@ function checklistSummary(checks: PreflightCheck[]): string {
 function CheckRow({ check, onFix }: { check: PreflightCheck; onFix: () => void }) {
   const Icon = check.ok ? CircleCheck : TriangleAlert
   return (
-    <li aria-label={check.label} className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 py-1.5">
+    <li
+      aria-label={check.label}
+      className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 py-1.5"
+    >
       <Icon
         aria-hidden
-        className={cn('size-4 shrink-0', !check.ok ? 'text-warning' : check.pending ? 'text-primary' : 'text-success')}
+        className={cn(
+          'size-4 shrink-0',
+          !check.ok ? 'text-warning' : check.pending ? 'text-primary' : 'text-success',
+        )}
       />
       <span>{check.label}</span>
-      <span className="ml-auto font-mono text-muted-foreground tabular-nums">
+      <span className="text-muted-foreground ml-auto font-mono tabular-nums">
         {check.detail}
         {check.pending && ' · not saved yet'}
       </span>
@@ -235,7 +254,8 @@ function CheckRow({ check, onFix }: { check: PreflightCheck; onFix: () => void }
 }
 
 function externalSummary(snapshot: SetupSnapshot, changes: ExternalChange[]): string {
-  if (snapshot.externalError) return `Could not read the flight controller's diff: ${snapshot.externalError}`
+  if (snapshot.externalError)
+    return `Could not read the flight controller's diff: ${snapshot.externalError}`
   if (changes.length === 0) return 'Nothing was changed outside this app.'
   const count = changes.length === 1 ? '1 change' : `${changes.length} changes`
   const resets = changes.filter((change) => change.reset).length
@@ -246,10 +266,21 @@ function externalSummary(snapshot: SetupSnapshot, changes: ExternalChange[]): st
  * `crashflip_motor_percent  0 → 50 [Reset]`, coloured like the Diff Checker: the default is what it was, the FC's
  * value what it is. Marked for reset the sides swap — the value is what it was, the default what it will be.
  */
-function ExternalRow({ change, onReset }: { change: ExternalChange; onReset: (reset: boolean) => void }) {
+function ExternalRow({
+  change,
+  onReset,
+}: {
+  change: ExternalChange
+  onReset: (reset: boolean) => void
+}) {
   return (
-    <li aria-label={change.label} className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 py-1.5">
-      {change.section !== change.name && <span className="text-muted-foreground font-mono text-xs">{change.section}</span>}
+    <li
+      aria-label={change.label}
+      className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 py-1.5"
+    >
+      {change.section !== change.name && (
+        <span className="text-muted-foreground font-mono text-xs">{change.section}</span>
+      )}
       <code className="break-all">{change.name}</code>
       {change.value !== null && (
         <code className="ml-auto break-all">
@@ -274,11 +305,18 @@ function ExternalRow({ change, onReset }: { change: ExternalChange; onReset: (re
         </code>
       )}
       {change.key !== null ? (
-        <Button size="sm" variant="outline" className={change.value === null ? 'ml-auto' : ''} onClick={() => onReset(!change.reset)}>
+        <Button
+          size="sm"
+          variant="outline"
+          className={change.value === null ? 'ml-auto' : ''}
+          onClick={() => onReset(!change.reset)}
+        >
           {change.reset ? 'Keep' : 'Reset'}
         </Button>
       ) : (
-        <span className="text-muted-foreground ml-auto text-xs">Only in Betaflight Configurator</span>
+        <span className="text-muted-foreground ml-auto text-xs">
+          Only in Betaflight Configurator
+        </span>
       )}
     </li>
   )
@@ -291,7 +329,7 @@ function Rows({ children }: { children: ReactNode }) {
 function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
     <>
-      <dt className="self-center text-muted-foreground">{label}</dt>
+      <dt className="text-muted-foreground self-center">{label}</dt>
       <dd className="text-right font-mono tabular-nums">{value}</dd>
     </>
   )

@@ -20,7 +20,8 @@ export type Mat3 = readonly [Vec3, Vec3, Vec3]
 const rad = (degrees: number) => (degrees * Math.PI) / 180
 
 function multiply(a: Mat3, b: Mat3): Mat3 {
-  const cell = (r: 0 | 1 | 2, c: 0 | 1 | 2) => a[r][0] * b[0][c] + a[r][1] * b[1][c] + a[r][2] * b[2][c]
+  const cell = (r: 0 | 1 | 2, c: 0 | 1 | 2) =>
+    a[r][0] * b[0][c] + a[r][1] * b[1][c] + a[r][2] * b[2][c]
   return [
     [cell(0, 0), cell(0, 1), cell(0, 2)],
     [cell(1, 0), cell(1, 1), cell(1, 2)],
@@ -37,9 +38,21 @@ export function rotate(m: Mat3, [x, y, z]: Vec3): Vec3 {
 }
 
 // Right-handed rotations about the view axes.
-const aboutX = (a: number): Mat3 => [[1, 0, 0], [0, Math.cos(a), -Math.sin(a)], [0, Math.sin(a), Math.cos(a)]]
-const aboutY = (a: number): Mat3 => [[Math.cos(a), 0, Math.sin(a)], [0, 1, 0], [-Math.sin(a), 0, Math.cos(a)]]
-const aboutZ = (a: number): Mat3 => [[Math.cos(a), -Math.sin(a), 0], [Math.sin(a), Math.cos(a), 0], [0, 0, 1]]
+const aboutX = (a: number): Mat3 => [
+  [1, 0, 0],
+  [0, Math.cos(a), -Math.sin(a)],
+  [0, Math.sin(a), Math.cos(a)],
+]
+const aboutY = (a: number): Mat3 => [
+  [Math.cos(a), 0, Math.sin(a)],
+  [0, 1, 0],
+  [-Math.sin(a), 0, Math.cos(a)],
+]
+const aboutZ = (a: number): Mat3 => [
+  [Math.cos(a), -Math.sin(a), 0],
+  [Math.sin(a), Math.cos(a), 0],
+  [0, 0, 1],
+]
 
 /** Body → world rotation for Betaflight roll/pitch/yaw in degrees. Also used for board alignment angles. */
 export function betaflightRotation(roll: number, pitch: number, yaw: number): Mat3 {
@@ -82,7 +95,12 @@ function ring(cx: number, cy: number, z: number, radius: number, segments = 28):
   })
 }
 
-const square = (half: number, z: number): Vec3[] => [[-half, half, z], [half, half, z], [half, -half, z], [-half, -half, z]]
+const square = (half: number, z: number): Vec3[] => [
+  [-half, half, z],
+  [half, half, z],
+  [half, -half, z],
+  [-half, -half, z],
+]
 
 const MODEL: Face[] = [
   { part: 'arm', onBoard: false, points: bar([-MOTOR, -MOTOR, 0], [MOTOR, MOTOR, 0], 0.05) },
@@ -94,12 +112,28 @@ const MODEL: Face[] = [
   { part: 'prop-rear', onBoard: false, points: ring(MOTOR, -MOTOR, 0.06, 0.34) },
   { part: 'board', onBoard: true, points: square(0.24, 0) },
   // small mark at the edge the board's own printed arrow points to: turns with the alignment
-  { part: 'board-mark', onBoard: true, points: [[0, 0.23, 0.001], [0.05, 0.17, 0.001], [-0.05, 0.17, 0.001]] },
+  {
+    part: 'board-mark',
+    onBoard: true,
+    points: [
+      [0, 0.23, 0.001],
+      [0.05, 0.17, 0.001],
+      [-0.05, 0.17, 0.001],
+    ],
+  },
   // the quad's forward direction, drawn over the board: part of the frame, so it never turns with the alignment
   {
     part: 'arrow',
     onBoard: false,
-    points: [[0, 0.15, ARROW_Z], [0.12, -0.01, ARROW_Z], [0.045, -0.01, ARROW_Z], [0.045, -0.16, ARROW_Z], [-0.045, -0.16, ARROW_Z], [-0.045, -0.01, ARROW_Z], [-0.12, -0.01, ARROW_Z]],
+    points: [
+      [0, 0.15, ARROW_Z],
+      [0.12, -0.01, ARROW_Z],
+      [0.045, -0.01, ARROW_Z],
+      [0.045, -0.16, ARROW_Z],
+      [-0.045, -0.16, ARROW_Z],
+      [-0.045, -0.01, ARROW_Z],
+      [-0.12, -0.01, ARROW_Z],
+    ],
   },
 ]
 
@@ -128,7 +162,10 @@ export function project(world: Vec3): { x: number; y: number; depth: number } {
  * Polygons to draw, farthest first. `attitude` = live FC angles (yaw already zeroed by the caller),
  * `alignment` = how the board is mounted in the frame.
  */
-export function renderQuad(attitude: { roll: number; pitch: number; yaw: number }, alignment: BoardAlignment): Polygon[] {
+export function renderQuad(
+  attitude: { roll: number; pitch: number; yaw: number },
+  alignment: BoardAlignment,
+): Polygon[] {
   const frame = betaflightRotation(attitude.roll, attitude.pitch, attitude.yaw)
   const board = betaflightRotation(alignment.roll, alignment.pitch, alignment.yaw)
 
@@ -156,7 +193,11 @@ export function renderQuad(attitude: { roll: number; pitch: number; yaw: number 
   // depth instead — the sort is stable and the model lists the board first, so they are painted right after it.
   const boardDepth = polygons.find((p) => p.part === 'board')?.depth
   return polygons
-    .map((p) => ((p.part === 'arrow' || p.part === 'board-mark') && boardDepth !== undefined ? { ...p, depth: boardDepth } : p))
+    .map((p) =>
+      (p.part === 'arrow' || p.part === 'board-mark') && boardDepth !== undefined
+        ? { ...p, depth: boardDepth }
+        : p,
+    )
     .sort((a, b) => b.depth - a.depth)
 }
 

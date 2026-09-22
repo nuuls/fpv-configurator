@@ -31,14 +31,29 @@ export function BlackboxPage() {
   return (
     <>
       <PageHeader title="Blackbox" description="Flight log recording and storage." />
-      {client && snapshot ? <Editor client={client} snapshot={snapshot} reload={reload} /> : <LoadingState error={error} />}
+      {client && snapshot ? (
+        <Editor client={client} snapshot={snapshot} reload={reload} />
+      ) : (
+        <LoadingState error={error} />
+      )}
     </>
   )
 }
 
-const toDraft = (s: BlackboxSnapshot) => ({ device: s.config.device, sampleRate: s.config.sampleRate })
+const toDraft = (s: BlackboxSnapshot) => ({
+  device: s.config.device,
+  sampleRate: s.config.sampleRate,
+})
 
-function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: BlackboxSnapshot; reload: () => void }) {
+function Editor({
+  client,
+  snapshot,
+  reload,
+}: {
+  client: MspClient
+  snapshot: BlackboxSnapshot
+  reload: () => void
+}) {
   const rebootToMassStorage = useConnectionStore((s) => s.rebootToMassStorage)
   const { draft, setDraft, dirty, revert } = useDraft(snapshot, toDraft)
   const { saving, error, save } = useSave(reload)
@@ -53,7 +68,9 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Bla
     { value: BLACKBOX_DEVICE.NONE, label: 'No logging' },
     ...(flash.supported ? [{ value: BLACKBOX_DEVICE.FLASH, label: 'Onboard flash' }] : []),
     ...(sdcard.supported ? [{ value: BLACKBOX_DEVICE.SDCARD, label: 'SD card' }] : []),
-    ...(config.device === BLACKBOX_DEVICE.SERIAL ? [{ value: BLACKBOX_DEVICE.SERIAL, label: 'Serial port (external logger)' }] : []),
+    ...(config.device === BLACKBOX_DEVICE.SERIAL
+      ? [{ value: BLACKBOX_DEVICE.SERIAL, label: 'Serial port (external logger)' }]
+      : []),
   ]
   const storageReady = flash.supported ? flash.ready : sdcard.state === SDCARD_STATE.READY
 
@@ -150,12 +167,20 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Bla
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
             {flash.supported && (
-              <Button variant="outline" disabled={busy !== null || dirty || !flash.ready} onClick={() => void handleErase()}>
+              <Button
+                variant="outline"
+                disabled={busy !== null || dirty || !flash.ready}
+                onClick={() => void handleErase()}
+              >
                 {busy === 'erasing' ? 'Erasing…' : 'Erase storage'}
               </Button>
             )}
             {(flash.supported || sdcard.supported) && (
-              <Button variant="outline" disabled={busy !== null || dirty || !storageReady} onClick={() => void handleMassStorage()}>
+              <Button
+                variant="outline"
+                disabled={busy !== null || dirty || !storageReady}
+                onClick={() => void handleMassStorage()}
+              >
                 Activate mass storage
               </Button>
             )}

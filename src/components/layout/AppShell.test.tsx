@@ -12,7 +12,10 @@ describe('sidebar drawer (small screens)', () => {
     render(<App />)
     const toggle = screen.getByRole('button', { name: 'Toggle navigation' })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    expect(toggle).toHaveAttribute('aria-controls', screen.getByRole('navigation', { name: 'Tabs' }).id)
+    expect(toggle).toHaveAttribute(
+      'aria-controls',
+      screen.getByRole('navigation', { name: 'Tabs' }).id,
+    )
 
     await user.click(toggle)
     expect(toggle).toHaveAttribute('aria-expanded', 'true')

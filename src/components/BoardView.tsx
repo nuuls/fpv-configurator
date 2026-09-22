@@ -8,8 +8,14 @@ const LEVEL: Attitude = { roll: 0, pitch: 0, yaw: 0 }
 const STYLE: Record<Part, { fill: string; stroke: string }> = {
   arm: { fill: 'var(--muted-foreground)', stroke: 'none' },
   plate: { fill: 'var(--muted)', stroke: 'var(--muted-foreground)' },
-  'prop-front': { fill: 'color-mix(in oklab, var(--primary) 18%, transparent)', stroke: 'var(--primary)' },
-  'prop-rear': { fill: 'color-mix(in oklab, var(--muted-foreground) 15%, transparent)', stroke: 'var(--muted-foreground)' },
+  'prop-front': {
+    fill: 'color-mix(in oklab, var(--primary) 18%, transparent)',
+    stroke: 'var(--primary)',
+  },
+  'prop-rear': {
+    fill: 'color-mix(in oklab, var(--muted-foreground) 15%, transparent)',
+    stroke: 'var(--muted-foreground)',
+  },
   board: { fill: 'var(--card)', stroke: 'var(--primary)' },
   'board-mark': { fill: 'var(--muted-foreground)', stroke: 'none' },
   arrow: { fill: 'var(--primary)', stroke: 'none' },
@@ -75,7 +81,11 @@ function useSmoothed(target: Attitude): Attitude {
           pitch: current.pitch + angleDelta(current.pitch, latest.current.pitch) * 0.35,
           yaw: current.yaw + angleDelta(current.yaw, latest.current.yaw) * 0.35,
         }
-        const settled = Math.abs(next.roll - current.roll) + Math.abs(next.pitch - current.pitch) + Math.abs(next.yaw - current.yaw) < 0.01
+        const settled =
+          Math.abs(next.roll - current.roll) +
+            Math.abs(next.pitch - current.pitch) +
+            Math.abs(next.yaw - current.yaw) <
+          0.01
         return settled ? current : next
       })
       frame = requestAnimationFrame(step)

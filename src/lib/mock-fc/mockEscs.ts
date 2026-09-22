@@ -41,7 +41,10 @@ function block(length: number, values: Record<number, number | number[]>): numbe
 const SILABS_CODE = new Array<number>(0x100).fill(0x02)
 
 /** Bluejay's default startup melody, which shares the flash page with the settings (`Eep_Pgm_Beep_Melody`). */
-const BLUEJAY_MELODY = [2, 58, 4, 32, 52, 66, 13, 0, 69, 45, 13, 0, 52, 66, 13, 0, 78, 39, 211, 0, 69, 45, 208, 25, 52, 25, 0]
+const BLUEJAY_MELODY = [
+  2, 58, 4, 32, 52, 66, 13, 0, 69, 45, 13, 0, 52, 66, 13, 0, 78, 39, 211, 0, 69, 45, 208, 25, 52,
+  25, 0,
+]
 
 /** Bluejay 0.21.0 (settings layout 208) on a Z-H-30 EFM8BB21 board, built for 48 kHz unless told otherwise. */
 export function mockBluejayEsc(options: { reversed?: boolean; pwmKhz?: number } = {}): MockEsc {
@@ -125,16 +128,29 @@ export function mockAm32Esc(): MockEsc {
 
 /** A 4-in-1 Bluejay ESC: four ESCs that are set up alike, motors 2 and 3 reversed. */
 export function defaultMockEscs(): MockEsc[] {
-  return [mockBluejayEsc(), mockBluejayEsc({ reversed: true }), mockBluejayEsc({ reversed: true }), mockBluejayEsc()]
+  return [
+    mockBluejayEsc(),
+    mockBluejayEsc({ reversed: true }),
+    mockBluejayEsc({ reversed: true }),
+    mockBluejayEsc(),
+  ]
 }
 
 /** Two Bluejay ESCs (the second reversed and built for 24 kHz), a BLHeli_S and an AM32: every supported firmware. */
 export function mixedMockEscs(): MockEsc[] {
-  return [mockBluejayEsc(), mockBluejayEsc({ reversed: true, pwmKhz: 24 }), mockBlheliSEsc(), mockAm32Esc()]
+  return [
+    mockBluejayEsc(),
+    mockBluejayEsc({ reversed: true, pwmKhz: 24 }),
+    mockBlheliSEsc(),
+    mockAm32Esc(),
+  ]
 }
 
 /** cmd_DevicePageErase takes a page number: × 512 on SiLabs, × 1024 on ARM (`serial_4way.c`). */
-const ERASE_UNIT: Record<number, number> = { [INTERFACE_MODE.SILABS_BLB]: 512, [INTERFACE_MODE.ARM_BLB]: 1024 }
+const ERASE_UNIT: Record<number, number> = {
+  [INTERFACE_MODE.SILABS_BLB]: 512,
+  [INTERFACE_MODE.ARM_BLB]: 1024,
+}
 
 /**
  * The FC side of the BLHeli 4-way interface (Betaflight `serial_4way.c`). Every erase and write that reaches it
@@ -201,7 +217,8 @@ export class MockFourWayInterface {
           this.selected = null
           const index = request.params[0] ?? 0
           const esc = this.escs[index]
-          const booted = esc && this.now() - (this.highSince[index] ?? 0) >= (esc.bootMs ?? MOCK_ESC_BOOT_MS)
+          const booted =
+            esc && this.now() - (this.highSince[index] ?? 0) >= (esc.bootMs ?? MOCK_ESC_BOOT_MS)
           if (!esc) ack = FOURWAY_ACK.INVALID_CHANNEL
           else if (!esc.powered || !booted) ack = FOURWAY_ACK.GENERAL_ERROR
           else {
@@ -218,7 +235,8 @@ export class MockFourWayInterface {
         }
         case FOURWAY_CMD.DEVICE_PAGE_ERASE: {
           const unit = this.selected && ERASE_UNIT[this.selected.interfaceMode]
-          if (!unit || !this.erase((request.params[0] ?? 0) * unit, unit)) ack = FOURWAY_ACK.GENERAL_ERROR
+          if (!unit || !this.erase((request.params[0] ?? 0) * unit, unit))
+            ack = FOURWAY_ACK.GENERAL_ERROR
           break
         }
         case FOURWAY_CMD.DEVICE_WRITE:
@@ -276,12 +294,18 @@ export class MockFourWayInterface {
     if (!found || !this.selected) return false
     // SiLabs flash can only clear bits, so a write without an erase leaves garbage. The AM32 bootloader erases first.
     const erasesItself = this.selected.interfaceMode === INTERFACE_MODE.ARM_BLB
-    data.forEach((byte, i) => (found.bytes[found.offset + i] = erasesItself ? byte : (found.bytes[found.offset + i] ?? 0xff) & byte))
+    data.forEach(
+      (byte, i) =>
+        (found.bytes[found.offset + i] = erasesItself
+          ? byte
+          : (found.bytes[found.offset + i] ?? 0xff) & byte),
+    )
     this.log(FOURWAY_CMD.DEVICE_WRITE, address, data.length)
     return true
   }
 
   private log(command: number, address: number, length: number): void {
-    if (this.selected) this.flashChanges.push({ esc: this.escs.indexOf(this.selected), command, address, length })
+    if (this.selected)
+      this.flashChanges.push({ esc: this.escs.indexOf(this.selected), command, address, length })
   }
 }

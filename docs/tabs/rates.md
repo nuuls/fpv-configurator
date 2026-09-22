@@ -22,14 +22,14 @@ Set how fast the quad rotates for a given stick movement — one profile, one ra
 
 ## Controls
 
-| Control | Type | Betaflight setting / MSP | Values · default | Notes |
-| ------- | ---- | ------------------------ | ---------------- | ----- |
-| Rate type | select | `rates_type` · `MSP_RC_TUNING` (111/204) byte 22 | Betaflight · Raceflight · KISS · Actual · Quick · default Actual | Picking a type resets the matrix to that type's defaults, see _Rate types_. A type this app doesn't know is listed as "(not supported)" |
-| Axes | select | — (editing aid, not stored) | Sync all · Sync pitch and roll · Sync disabled | Starts at the most linked mode the FC's values allow — "Sync all" for stock values |
-| First column | 3 numbers | `roll/pitch/yaw_rc_rate` | per rate type, see _Rate types_ | Label, unit and range follow the rate type |
-| Second column | 3 numbers | `roll/pitch/yaw_srate` | per rate type | ″ |
-| Third column | 3 numbers | `roll/pitch/yaw_expo` | per rate type | ″ |
-| Rate curve | line chart | computed (`applyBetaflightRates` … `applyQuickRates` in `fc/rc.c`), capped at `rate_limit` | °/s over 0–100 % stick | One line per *distinct* axis setting, legend with max rate, hover for exact values |
+| Control       | Type       | Betaflight setting / MSP                                                                   | Values · default                                                 | Notes                                                                                                                                   |
+| ------------- | ---------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Rate type     | select     | `rates_type` · `MSP_RC_TUNING` (111/204) byte 22                                           | Betaflight · Raceflight · KISS · Actual · Quick · default Actual | Picking a type resets the matrix to that type's defaults, see _Rate types_. A type this app doesn't know is listed as "(not supported)" |
+| Axes          | select     | — (editing aid, not stored)                                                                | Sync all · Sync pitch and roll · Sync disabled                   | Starts at the most linked mode the FC's values allow — "Sync all" for stock values                                                      |
+| First column  | 3 numbers  | `roll/pitch/yaw_rc_rate`                                                                   | per rate type, see _Rate types_                                  | Label, unit and range follow the rate type                                                                                              |
+| Second column | 3 numbers  | `roll/pitch/yaw_srate`                                                                     | per rate type                                                    | ″                                                                                                                                       |
+| Third column  | 3 numbers  | `roll/pitch/yaw_expo`                                                                      | per rate type                                                    | ″                                                                                                                                       |
+| Rate curve    | line chart | computed (`applyBetaflightRates` … `applyQuickRates` in `fc/rc.c`), capped at `rate_limit` | °/s over 0–100 % stick                                           | One line per _distinct_ axis setting, legend with max rate, hover for exact values                                                      |
 
 ### Rate types
 
@@ -37,13 +37,13 @@ The three numbers per axis are the same three firmware bytes for every type; lab
 (`ratesSettingLimits` in `fc/controlrate_profile.c`) and meaning differ. Defaults are Betaflight Configurator's.
 °/s columns are stored / 10 (step 10), two-decimal columns × 100 (step 0.01), Acro+ and Raceflight's expo as they are.
 
-| Rate type | `rc_rate` column · default | `srate` column · default | `expo` column · default |
-| --------- | -------------------------- | ------------------------ | ----------------------- |
-| Betaflight | RC rate 0.01–2.55 · 1.00 | Super rate 0.00–1.00 · 0.70 | RC expo 0.00–1.00 · 0.00 |
-| Raceflight | Rate (°/s) 10–2000 · 370 | Acro+ 0–255 · 80 | Expo 0–100 · 50 |
-| KISS | RC rate 0.01–2.55 · 1.00 | Rate 0.00–0.99 · 0.70 | RC curve 0.00–1.00 · 0.00 |
-| Actual | Center sensitivity (°/s) 10–2000 · 70 | Max rate (°/s) 10–2000 · 670 | Expo 0.00–1.00 · 0.00 |
-| Quick | RC rate 0.01–2.55 · 1.00 | Max rate (°/s) 10–2000 · 670 | Expo 0.00–1.00 · 0.00 |
+| Rate type  | `rc_rate` column · default            | `srate` column · default     | `expo` column · default   |
+| ---------- | ------------------------------------- | ---------------------------- | ------------------------- |
+| Betaflight | RC rate 0.01–2.55 · 1.00              | Super rate 0.00–1.00 · 0.70  | RC expo 0.00–1.00 · 0.00  |
+| Raceflight | Rate (°/s) 10–2000 · 370              | Acro+ 0–255 · 80             | Expo 0–100 · 50           |
+| KISS       | RC rate 0.01–2.55 · 1.00              | Rate 0.00–0.99 · 0.70        | RC curve 0.00–1.00 · 0.00 |
+| Actual     | Center sensitivity (°/s) 10–2000 · 70 | Max rate (°/s) 10–2000 · 670 | Expo 0.00–1.00 · 0.00     |
+| Quick      | RC rate 0.01–2.55 · 1.00              | Max rate (°/s) 10–2000 · 670 | Expo 0.00–1.00 · 0.00     |
 
 ## Behaviour
 

@@ -21,10 +21,10 @@ _ASCII sketch, or `![sketch](../refs/<file>.png)`. Rough is fine — it shows gr
 
 One row per thing the user can see or change.
 
-| Control | Type | Betaflight setting / MSP | Values · default | Notes |
-| ------- | ---- | ------------------------ | ---------------- | ----- |
-| _Receiver protocol_ | _select_ | _`serialrx_provider` · `MSP_RX_CONFIG`_ | _CRSF, SBUS, … · CRSF_ | _needs reboot_ |
-| _Channel bars_ | _live readout_ | _`MSP_RC` @ 20 Hz_ | _1000–2000 µs_ | _read-only_ |
+| Control             | Type           | Betaflight setting / MSP                | Values · default       | Notes          |
+| ------------------- | -------------- | --------------------------------------- | ---------------------- | -------------- |
+| _Receiver protocol_ | _select_       | _`serialrx_provider` · `MSP_RX_CONFIG`_ | _CRSF, SBUS, … · CRSF_ | _needs reboot_ |
+| _Channel bars_      | _live readout_ | _`MSP_RC` @ 20 Hz_                      | _1000–2000 µs_         | _read-only_    |
 
 Type: `live readout` · `toggle` · `select` · `number` · `slider` · `button`.
 

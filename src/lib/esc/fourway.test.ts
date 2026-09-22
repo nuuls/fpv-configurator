@@ -48,7 +48,13 @@ describe('4-way frames', () => {
   })
 
   it('writes 256 parameter bytes as length 0 and refuses empty frames', () => {
-    const frame: FourWayFrame = { direction: 'response', command: 0x3a, address: 0, params: new Uint8Array(256), ack: 0 }
+    const frame: FourWayFrame = {
+      direction: 'response',
+      command: 0x3a,
+      address: 0,
+      params: new Uint8Array(256),
+      ack: 0,
+    }
     expect(encodeFourWayFrame(frame)[4]).toBe(0)
     expect(() => encodeFourWayFrame({ ...frame, params: new Uint8Array(0) })).toThrow(RangeError)
   })
@@ -56,8 +62,20 @@ describe('4-way frames', () => {
   it('parses frames split across chunks, skips noise and handles 256 byte reads', () => {
     const frames: Array<[FourWayFrame, boolean]> = []
     const parser = new FourWayParser('response', (frame, crcOk) => frames.push([frame, crcOk]))
-    const small = encodeFourWayFrame({ direction: 'response', command: 0x37, address: 0x1234, params: Uint8Array.of(1, 2, 3), ack: 0x0f })
-    const big = encodeFourWayFrame({ direction: 'response', command: 0x3a, address: 0, params: new Uint8Array(256).fill(7), ack: 0 })
+    const small = encodeFourWayFrame({
+      direction: 'response',
+      command: 0x37,
+      address: 0x1234,
+      params: Uint8Array.of(1, 2, 3),
+      ack: 0x0f,
+    })
+    const big = encodeFourWayFrame({
+      direction: 'response',
+      command: 0x3a,
+      address: 0,
+      params: new Uint8Array(256).fill(7),
+      ack: 0,
+    })
 
     parser.push(Uint8Array.of(0x00, 0x55)) // line noise before the escape byte
     parser.push(small.subarray(0, 4))
@@ -66,7 +84,13 @@ describe('4-way frames', () => {
 
     expect(frames).toHaveLength(2)
     expect(frames[0]).toEqual([
-      { direction: 'response', command: 0x37, address: 0x1234, params: Uint8Array.of(1, 2, 3), ack: 0x0f },
+      {
+        direction: 'response',
+        command: 0x37,
+        address: 0x1234,
+        params: Uint8Array.of(1, 2, 3),
+        ack: 0x0f,
+      },
       true,
     ])
     expect(frames[1]?.[0].params).toHaveLength(256)
@@ -75,7 +99,13 @@ describe('4-way frames', () => {
   it('flags a corrupted frame', () => {
     const results: boolean[] = []
     const parser = new FourWayParser('request', (_, crcOk) => results.push(crcOk))
-    const bytes = encodeFourWayFrame({ direction: 'request', command: 0x30, address: 0, params: Uint8Array.of(0), ack: 0 })
+    const bytes = encodeFourWayFrame({
+      direction: 'request',
+      command: 0x30,
+      address: 0,
+      params: Uint8Array.of(0),
+      ack: 0,
+    })
     bytes[5] = 0xaa
     parser.push(bytes)
     expect(results).toEqual([false])
@@ -91,7 +121,15 @@ function fakeLink() {
     onData: (listener) => data.on(listener),
   }
   const respond = (command: number, params: number[], ack: number) =>
-    data.emit(encodeFourWayFrame({ direction: 'response', command, address: 0, params: Uint8Array.from(params), ack }))
+    data.emit(
+      encodeFourWayFrame({
+        direction: 'response',
+        command,
+        address: 0,
+        params: Uint8Array.from(params),
+        ack,
+      }),
+    )
   return { link, written, respond }
 }
 

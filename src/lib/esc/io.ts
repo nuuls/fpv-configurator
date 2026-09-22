@@ -19,7 +19,9 @@ import {
 export class PassthroughStuckError extends Error {
   override name = 'PassthroughStuckError'
   constructor() {
-    super('The flight controller did not leave the ESC passthrough. Unplug it, plug it back in and connect again.')
+    super(
+      'The flight controller did not leave the ESC passthrough. Unplug it, plug it back in and connect again.',
+    )
   }
 }
 
@@ -99,7 +101,12 @@ export class EscWriteError extends Error {
  * and compared. ESCs whose block didn't change — or already holds the draft, after a failed attempt — are
  * left alone. Stops at the first ESC that fails.
  */
-export function writeEscs(client: MspClient, reports: EscReport[], draft: EscDraft, options: ReadEscsOptions = {}): Promise<EscReport[]> {
+export function writeEscs(
+  client: MspClient,
+  reports: EscReport[],
+  draft: EscDraft,
+  options: ReadEscsOptions = {},
+): Promise<EscReport[]> {
   return passthrough(client, options, async (fourWay, _count, sleep) => {
     const written = [...reports]
     for (const [index, report] of reports.entries()) {
@@ -113,10 +120,17 @@ export function writeEscs(client: MspClient, reports: EscReport[], draft: EscDra
   })
 }
 
-async function writeEsc(fourWay: FourWayClient, index: number, esc: ReadableEsc, block: Uint8Array, sleep: Sleep): Promise<ReadableEsc> {
+async function writeEsc(
+  fourWay: FourWayClient,
+  index: number,
+  esc: ReadableEsc,
+  block: Uint8Array,
+  sleep: Sleep,
+): Promise<ReadableEsc> {
   const fail = (what: string) => new EscWriteError(`ESC ${index + 1}: ${what}`)
   const { plan } = esc
-  if (block.length !== esc.block.length) throw fail('the new settings are not the size of the ones that were read.')
+  if (block.length !== esc.block.length)
+    throw fail('the new settings are not the size of the ones that were read.')
   try {
     const info = decodeDeviceInfo(await connect(fourWay, index, sleep))
     try {
@@ -124,23 +138,32 @@ async function writeEsc(fourWay: FourWayClient, index: number, esc: ReadableEsc,
       if (!found || found.mcu !== plan.mcu || found.settingsAddress !== plan.settingsAddress) {
         throw fail('this is not the ESC that was read. Read the ESCs again.')
       }
-      const read = async () => (await fourWay.request(FOURWAY_CMD.DEVICE_READ, [block.length], plan.settingsAddress)).params
+      const read = async () =>
+        (await fourWay.request(FOURWAY_CMD.DEVICE_READ, [block.length], plan.settingsAddress))
+          .params
       const current = await read()
       if (sameBytes(current, block)) return withBlock(esc, current)
-      if (!sameBytes(current, esc.block)) throw fail('its settings changed since they were read. Read the ESCs again.')
+      if (!sameBytes(current, esc.block))
+        throw fail('its settings changed since they were read. Read the ESCs again.')
 
       // SiLabs flash only takes a write after an erase; the AM32 bootloader erases the page by itself.
-      if (plan.erasePage !== null) await fourWay.request(FOURWAY_CMD.DEVICE_PAGE_ERASE, [plan.erasePage])
+      if (plan.erasePage !== null)
+        await fourWay.request(FOURWAY_CMD.DEVICE_PAGE_ERASE, [plan.erasePage])
       await fourWay.request(FOURWAY_CMD.DEVICE_WRITE, block, plan.settingsAddress)
       const readBack = await read()
-      if (!sameBytes(readBack, block)) throw fail('the settings it reads back are not the ones that were written. Read the ESCs again and check them.')
+      if (!sameBytes(readBack, block))
+        throw fail(
+          'the settings it reads back are not the ones that were written. Read the ESCs again and check them.',
+        )
       return withBlock(esc, readBack)
     } finally {
       await fourWay.request(FOURWAY_CMD.DEVICE_RESET, [index]).catch(ignoreAckError)
     }
   } catch (cause) {
     if (!(cause instanceof FourWayAckError)) throw cause
-    throw fail('no answer, or it refused the settings. Check the battery, then read the ESCs again.')
+    throw fail(
+      'no answer, or it refused the settings. Check the battery, then read the ESCs again.',
+    )
   }
 }
 
@@ -173,7 +196,9 @@ async function readEsc(fourWay: FourWayClient, index: number, sleep: Sleep): Pro
       const settings = await read(plan.settingsAddress, plan.settingsLength)
       // Old AM32 builds have no file name there, and their bootloader may refuse the address.
       const fileName =
-        plan.fileNameAddress === null ? null : await read(plan.fileNameAddress, FILE_NAME_LENGTH).catch(ignoreAckError)
+        plan.fileNameAddress === null
+          ? null
+          : await read(plan.fileNameAddress, FILE_NAME_LENGTH).catch(ignoreAckError)
       const codeProbe =
         plan.codeProbeAddress !== null && needsCodeProbe(settings)
           ? await read(plan.codeProbeAddress, CODE_PROBE_LENGTH).catch(ignoreAckError)
@@ -185,7 +210,10 @@ async function readEsc(fourWay: FourWayClient, index: number, sleep: Sleep): Pro
     }
   } catch (cause) {
     if (!(cause instanceof FourWayAckError)) throw cause
-    return { status: 'missing', description: 'No answer from this ESC. Check the battery and the motor signal wire.' }
+    return {
+      status: 'missing',
+      description: 'No answer from this ESC. Check the battery and the motor signal wire.',
+    }
   }
 }
 

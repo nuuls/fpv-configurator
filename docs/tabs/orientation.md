@@ -10,17 +10,17 @@ Tell the FC how it is mounted in the frame (SPEC §2 "FC Orientation").
 
 ## Controls
 
-| Control | Type | Betaflight setting / MSP | Values · default | Notes |
-| ------- | ---- | ------------------------ | ---------------- | ----- |
-| Yaw / Roll / Pitch | 3 selects | `align_board_yaw/roll/pitch` · `MSP_BOARD_ALIGNMENT_CONFIG` (38/39) | 0–315° in 45° steps · 0 | A non-45° value already on the FC is offered as an extra option |
-| 3D preview | view | board (+ its edge mark) = the selection; quad and arrow = live `MSP_ATTITUDE` (roll, pitch **and yaw**) @ 25 Hz, eased per animation frame | — | Software projection → SVG (`src/lib/orientation/view3d.ts`), no library |
-| Reset heading | button | — | — | Makes the current heading "nose away from the viewer". Done automatically when the tab opens |
-| Calibrate accelerometer | button | `MSP_ACC_CALIBRATION` (205) | — | Immediate action, not part of Save. See Behaviour |
-| Angle readout | readout | `MSP_ATTITUDE` | roll / pitch / heading in degrees | Raw FC values |
+| Control                 | Type      | Betaflight setting / MSP                                                                                                                   | Values · default                  | Notes                                                                                        |
+| ----------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------- | -------------------------------------------------------------------------------------------- |
+| Yaw / Roll / Pitch      | 3 selects | `align_board_yaw/roll/pitch` · `MSP_BOARD_ALIGNMENT_CONFIG` (38/39)                                                                        | 0–315° in 45° steps · 0           | A non-45° value already on the FC is offered as an extra option                              |
+| 3D preview              | view      | board (+ its edge mark) = the selection; quad and arrow = live `MSP_ATTITUDE` (roll, pitch **and yaw**) @ 25 Hz, eased per animation frame | —                                 | Software projection → SVG (`src/lib/orientation/view3d.ts`), no library                      |
+| Reset heading           | button    | —                                                                                                                                          | —                                 | Makes the current heading "nose away from the viewer". Done automatically when the tab opens |
+| Calibrate accelerometer | button    | `MSP_ACC_CALIBRATION` (205)                                                                                                                | —                                 | Immediate action, not part of Save. See Behaviour                                            |
+| Angle readout           | readout   | `MSP_ATTITUDE`                                                                                                                             | roll / pitch / heading in degrees | Raw FC values                                                                                |
 
 ## Behaviour
 
-- **Save & Reboot**. The live frame reflects the *saved* alignment, so verification happens after saving:
+- **Save & Reboot**. The live frame reflects the _saved_ alignment, so verification happens after saving:
   tilt the quad, the model must move the same way.
 - Yaw is shown relative to the heading at the moment the tab was opened / "Reset heading" was pressed — without
   a compass the FC's absolute heading is arbitrary.

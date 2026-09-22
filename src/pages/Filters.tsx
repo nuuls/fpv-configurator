@@ -41,13 +41,28 @@ export function FiltersPage() {
   const { client, snapshot, error, reload } = useFcSnapshot(readFiltersSnapshot)
   return (
     <>
-      <PageHeader title="Filters" description="The few filters a quad with RPM filtering needs. Everything else is off." />
-      {client && snapshot ? <Editor client={client} snapshot={snapshot} reload={reload} /> : <LoadingState error={error} />}
+      <PageHeader
+        title="Filters"
+        description="The few filters a quad with RPM filtering needs. Everything else is off."
+      />
+      {client && snapshot ? (
+        <Editor client={client} snapshot={snapshot} reload={reload} />
+      ) : (
+        <LoadingState error={error} />
+      )}
     </>
   )
 }
 
-function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: FiltersSnapshot; reload: () => void }) {
+function Editor({
+  client,
+  snapshot,
+  reload,
+}: {
+  client: MspClient
+  snapshot: FiltersSnapshot
+  reload: () => void
+}) {
   const { draft, setDraft, dirty, revert } = useDraft(snapshot, readFilters)
   const { saving, error, save } = useSave(reload)
   useUnsavedChanges(PATH, dirty)
@@ -62,13 +77,19 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Fil
         <Card>
           <CardHeader>
             <CardTitle>Lowpass filters</CardTitle>
-            <CardDescription>Further right filters less: less delay, but more noise reaches the motors.</CardDescription>
+            <CardDescription>
+              Further right filters less: less delay, but more noise reaches the motors.
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col divide-y">
             <FilterSection
               title="Gyro lowpass 2"
               description="PT1 filter on the gyro signal, 500 Hz at 1.0. All the way left switches it off."
-              readout={draft.gyroLpf2 === 0 ? 'Off' : `${(draft.gyroLpf2 / 100).toFixed(1)} · ${gyroLpf2Hz(draft.gyroLpf2)} Hz`}
+              readout={
+                draft.gyroLpf2 === 0
+                  ? 'Off'
+                  : `${(draft.gyroLpf2 / 100).toFixed(1)} · ${gyroLpf2Hz(draft.gyroLpf2)} Hz`
+              }
             >
               <FilterSlider
                 label="Gyro lowpass 2"
@@ -96,7 +117,9 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Fil
         <Card>
           <CardHeader>
             <CardTitle>Notch filters</CardTitle>
-            <CardDescription>Narrow filters that cut noise out at the frequencies where it sits.</CardDescription>
+            <CardDescription>
+              Narrow filters that cut noise out at the frequencies where it sits.
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col divide-y">
             <FilterSection
@@ -126,7 +149,12 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Fil
                 />
               </div>
               <div className="flex flex-col gap-3">
-                <div className={cn('flex items-baseline justify-between gap-4 text-sm', notchOff && 'opacity-50')}>
+                <div
+                  className={cn(
+                    'flex items-baseline justify-between gap-4 text-sm',
+                    notchOff && 'opacity-50',
+                  )}
+                >
                   <span className="font-medium">Min frequency</span>
                   <span className="font-mono tabular-nums">{draft.dynNotchMinHz} Hz</span>
                 </div>
@@ -146,8 +174,8 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Fil
 
       {!snapshot.bidirDshot && (
         <Notice tone="warning">
-          Bidirectional DShot is off, so the RPM filter isn&apos;t running — and these filter settings rely on it. Turn
-          it on in the{' '}
+          Bidirectional DShot is off, so the RPM filter isn&apos;t running — and these filter
+          settings rely on it. Turn it on in the{' '}
           <Link to="/motors" className="underline">
             Motors
           </Link>{' '}
@@ -156,7 +184,8 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Fil
       )}
       {pinned.length > 0 && (
         <Notice tone="warning">
-          This quad uses filter settings this app doesn&apos;t show. Saving changes them: {pinned.join('; ')}.
+          This quad uses filter settings this app doesn&apos;t show. Saving changes them:{' '}
+          {pinned.join('; ')}.
         </Notice>
       )}
       {error && <Notice tone="error">{error}</Notice>}
@@ -192,9 +221,11 @@ function FilterSection({ title, description, readout, children }: FilterSectionP
       <div className="flex flex-col gap-1">
         <div className="flex items-baseline justify-between gap-4">
           <h3 className="font-medium">{title}</h3>
-          {readout !== undefined && <span className="font-mono text-sm tabular-nums">{readout}</span>}
+          {readout !== undefined && (
+            <span className="font-mono text-sm tabular-nums">{readout}</span>
+          )}
         </div>
-        <p className="text-sm text-muted-foreground">{description}</p>
+        <p className="text-muted-foreground text-sm">{description}</p>
       </div>
       {children}
     </section>
@@ -213,7 +244,13 @@ interface FilterSliderProps {
   onChange: (value: number) => void
 }
 
-function FilterSlider({ label, ends = FILTERING_ENDS, value, onChange, ...range }: FilterSliderProps) {
+function FilterSlider({
+  label,
+  ends = FILTERING_ENDS,
+  value,
+  onChange,
+  ...range
+}: FilterSliderProps) {
   return (
     <div>
       <Slider
@@ -223,7 +260,7 @@ function FilterSlider({ label, ends = FILTERING_ENDS, value, onChange, ...range 
         value={[Math.min(range.max, Math.max(range.min, value))]}
         onValueChange={([next]) => next !== undefined && onChange(next)}
       />
-      <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+      <div className="text-muted-foreground mt-2 flex justify-between text-xs">
         <span>{ends[0]}</span>
         <span>{ends[1]}</span>
       </div>

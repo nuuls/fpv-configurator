@@ -33,16 +33,16 @@ Coloured like `git diff`: a section is a "file"; in a line the default is marked
 
 ## Controls
 
-| Control | Type | Betaflight setting / MSP | Values · default | Notes |
-| ------- | ---- | ------------------------ | ---------------- | ----- |
-| Read again | button | CLI `diff all defaults` | — | The tab also reads once when it is opened |
-| Copy full diff | button | — | — | The **complete** CLI output as it came (setup included), to paste into a bug report |
-| Show hidden differences | switch | — | off / on · off | On: the view shows the complete diff — every section, the lines that aren't a `set` included. Not remembered when the tab is left |
-| Summary | readout | `# version`, `board_name`, `manufacturer_id` lines | — | Number of tuning differences · how many other differences are hidden ("N other shown" while the switch is on) · board · firmware |
-| Legend | readout | — | — | Red "Betaflight default" → green "this flight controller"; only while there are differences |
-| Section block | readout | CLI headings `master`, `profile N`, `rateprofile N` | — | Only sections with tuning differences — with the switch on every section the CLI printed (`feature`, `serial`, `aux`, …); every PID / rate profile (`all`). Header: heading · number of differences |
-| Command line | readout | `serial …` + `#serial …` | — | Only with the switch on: a line that isn't a `set`, as the CLI printed it — a `#…` default line red, a current line green; they don't pair up |
-| Setting line | readout | `set name = value` + `#set name = default` | — | One line: `set name = default → value`, the default marked red, the value green; only the green value if the FC printed no default. Long values wrap |
+| Control                 | Type    | Betaflight setting / MSP                            | Values · default | Notes                                                                                                                                                                                               |
+| ----------------------- | ------- | --------------------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Read again              | button  | CLI `diff all defaults`                             | —                | The tab also reads once when it is opened                                                                                                                                                           |
+| Copy full diff          | button  | —                                                   | —                | The **complete** CLI output as it came (setup included), to paste into a bug report                                                                                                                 |
+| Show hidden differences | switch  | —                                                   | off / on · off   | On: the view shows the complete diff — every section, the lines that aren't a `set` included. Not remembered when the tab is left                                                                   |
+| Summary                 | readout | `# version`, `board_name`, `manufacturer_id` lines  | —                | Number of tuning differences · how many other differences are hidden ("N other shown" while the switch is on) · board · firmware                                                                    |
+| Legend                  | readout | —                                                   | —                | Red "Betaflight default" → green "this flight controller"; only while there are differences                                                                                                         |
+| Section block           | readout | CLI headings `master`, `profile N`, `rateprofile N` | —                | Only sections with tuning differences — with the switch on every section the CLI printed (`feature`, `serial`, `aux`, …); every PID / rate profile (`all`). Header: heading · number of differences |
+| Command line            | readout | `serial …` + `#serial …`                            | —                | Only with the switch on: a line that isn't a `set`, as the CLI printed it — a `#…` default line red, a current line green; they don't pair up                                                       |
+| Setting line            | readout | `set name = value` + `#set name = default`          | —                | One line: `set name = default → value`, the default marked red, the value green; only the green value if the FC printed no default. Long values wrap                                                |
 
 ## Behaviour
 

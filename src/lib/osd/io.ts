@@ -24,10 +24,16 @@ export async function readOsdSnapshot(client: MspClient): Promise<OsdSnapshot> {
 }
 
 /** Writes only what changed, one message per element. Takes effect immediately, no reboot. */
-export async function saveOsd(client: MspClient, snapshot: OsdSnapshot, draft: OsdDraft): Promise<void> {
+export async function saveOsd(
+  client: MspClient,
+  snapshot: OsdSnapshot,
+  draft: OsdDraft,
+): Promise<void> {
   for (const write of planOsdWrites(snapshot, draft)) {
     const payload =
-      'timer' in write ? encodeSetOsdTimer(write.timer, write.config) : encodeSetOsdElement(write.element, write.position)
+      'timer' in write
+        ? encodeSetOsdTimer(write.timer, write.config)
+        : encodeSetOsdElement(write.element, write.position)
     await client.request(MSP.SET_OSD_CONFIG, payload)
   }
   await saveToEeprom(client)

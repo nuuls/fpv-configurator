@@ -32,7 +32,10 @@ export async function openTab(name: string): Promise<UserEvent> {
 export async function saveAndReboot(user: UserEvent): Promise<void> {
   await user.click(screen.getByRole('button', { name: 'Save & Reboot' }))
   await screen.findByText('Rebooting flight controller…')
-  await waitFor(() => expect(screen.queryByText('Rebooting flight controller…')).toBeNull(), AFTER_REBOOT)
+  await waitFor(
+    () => expect(screen.queryByText('Rebooting flight controller…')).toBeNull(),
+    AFTER_REBOOT,
+  )
 }
 
 /** Clicks Save and waits until the tab has re-read the FC (nothing left to revert). */

@@ -47,7 +47,15 @@ export function OsdPage() {
   )
 }
 
-function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: OsdSnapshot; reload: () => void }) {
+function Editor({
+  client,
+  snapshot,
+  reload,
+}: {
+  client: MspClient
+  snapshot: OsdSnapshot
+  reload: () => void
+}) {
   const { draft, setDraft, dirty, revert } = useDraft(snapshot, toDraft)
   const { saving, error, save } = useSave(reload)
   useUnsavedChanges(PATH, dirty)
@@ -64,7 +72,8 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Osd
     <>
       {!config.deviceDetected && (
         <Notice tone="warning">
-          The flight controller hasn&apos;t detected an OSD device (yet). You can still set everything up here.
+          The flight controller hasn&apos;t detected an OSD device (yet). You can still set
+          everything up here.
         </Notice>
       )}
 
@@ -72,7 +81,9 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Osd
         <Card>
           <CardHeader>
             <CardTitle>Elements</CardTitle>
-            <CardDescription>Switch on what you want to see. X and Y count characters from the top left.</CardDescription>
+            <CardDescription>
+              Switch on what you want to see. X and Y count characters from the top left.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ul className="flex flex-col gap-3 text-sm">
@@ -85,13 +96,17 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Osd
                     <Switch
                       id={id}
                       checked={el.shown}
-                      onCheckedChange={(on) => setDraft(setElementShown(draft, def.index, on, canvas))}
+                      onCheckedChange={(on) =>
+                        setDraft(setElementShown(draft, def.index, on, canvas))
+                      }
                     />
                     <div className="mr-auto">
                       <label htmlFor={id} className="font-medium">
                         {def.label}
                       </label>
-                      {def.hint && el.shown && <p className="text-xs text-muted-foreground">{def.hint}</p>}
+                      {def.hint && el.shown && (
+                        <p className="text-muted-foreground text-xs">{def.hint}</p>
+                      )}
                     </div>
                     {el.shown &&
                       (['x', 'y'] as const).map((axis) => (
@@ -102,7 +117,9 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Osd
                           max={(axis === 'x' ? canvas.cols : canvas.rows) - 1}
                           step={1}
                           value={el[axis]}
-                          onValueChange={(value) => setDraft(setElementCell(draft, def.index, { [axis]: value }))}
+                          onValueChange={(value) =>
+                            setDraft(setElementCell(draft, def.index, { [axis]: value }))
+                          }
                           className={CELL_INPUT}
                         />
                       ))}
@@ -111,8 +128,9 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Osd
               })}
             </ul>
             {!snapshot.gpsConfigured && (
-              <p className="mt-4 text-xs text-muted-foreground">
-                GPS elements (satellites, speed, position, home, …) are listed once a GPS is set up in the Ports tab.
+              <p className="text-muted-foreground mt-4 text-xs">
+                GPS elements (satellites, speed, position, home, …) are listed once a GPS is set up
+                in the Ports tab.
               </p>
             )}
           </CardContent>
@@ -122,8 +140,9 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Osd
           <CardHeader>
             <CardTitle>Preview</CardTitle>
             <CardDescription>
-              Drag elements into place, or select one and use the arrow keys. {canvas.cols} × {canvas.rows} characters (
-              {VIDEO_SYSTEM_NAMES[config.videoSystem] ?? 'unknown'} video). Values are examples.
+              Drag elements into place, or select one and use the arrow keys. {canvas.cols} ×{' '}
+              {canvas.rows} characters ({VIDEO_SYSTEM_NAMES[config.videoSystem] ?? 'unknown'}{' '}
+              video). Values are examples.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -141,12 +160,17 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Osd
 
       {others.length > 0 && (
         <Notice>
-          {others.length === 1 ? '1 other element is' : `${others.length} other elements are`} switched on that this app
-          doesn&apos;t manage ({others.map(elementName).join(', ')}).{' '}
+          {others.length === 1 ? '1 other element is' : `${others.length} other elements are`}{' '}
+          switched on that this app doesn&apos;t manage ({others.map(elementName).join(', ')}).{' '}
           {draft.hideOthers ? (
             <strong>Will be switched off when you save.</strong>
           ) : (
-            <Button variant="outline" size="sm" className="ml-1" onClick={() => setDraft({ ...draft, hideOthers: true })}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-1"
+              onClick={() => setDraft({ ...draft, hideOthers: true })}
+            >
               Hide other elements
             </Button>
           )}

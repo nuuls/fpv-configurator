@@ -32,7 +32,10 @@ const ERASE_POLL_MS = 500
 const ERASE_TIMEOUT_MS = 120_000
 
 /** Erases the onboard flash and resolves once the chip reports ready again (can take a minute). */
-export async function eraseDataflash(client: MspClient, pollMs = ERASE_POLL_MS): Promise<DataflashSummary> {
+export async function eraseDataflash(
+  client: MspClient,
+  pollMs = ERASE_POLL_MS,
+): Promise<DataflashSummary> {
   await client.request(MSP.DATAFLASH_ERASE)
   const deadline = Date.now() + ERASE_TIMEOUT_MS
   for (;;) {

@@ -23,8 +23,8 @@ export function WelcomePage() {
         {!serialSupported && (
           <CardContent>
             <Notice>
-              This browser doesn&apos;t support Web Serial. Use a Chromium-based browser (Chrome, Edge, Brave) to
-              connect to real hardware. The mock FC works everywhere.
+              This browser doesn&apos;t support Web Serial. Use a Chromium-based browser (Chrome,
+              Edge, Brave) to connect to real hardware. The mock FC works everywhere.
             </Notice>
           </CardContent>
         )}
@@ -46,8 +46,8 @@ function Notice({ tone = 'info', children }: { tone?: 'info' | 'error'; children
     <div
       className={
         tone === 'error'
-          ? 'flex gap-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive'
-          : 'flex gap-3 rounded-md border bg-muted/50 p-3 text-sm text-muted-foreground'
+          ? 'border-destructive/40 bg-destructive/10 text-destructive flex gap-3 rounded-md border p-3 text-sm'
+          : 'bg-muted/50 text-muted-foreground flex gap-3 rounded-md border p-3 text-sm'
       }
     >
       <CircleAlert className="mt-0.5 size-4 shrink-0" />

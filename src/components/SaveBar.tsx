@@ -15,7 +15,7 @@ interface SaveBarProps {
 export function SaveBar({ dirty, saving, problem, reboot, onRevert, onSave }: SaveBarProps) {
   return (
     <div className="mt-6 flex items-center justify-end gap-3">
-      {dirty && problem && <p className="mr-auto text-sm text-destructive">{problem}</p>}
+      {dirty && problem && <p className="text-destructive mr-auto text-sm">{problem}</p>}
       <Button variant="outline" disabled={!dirty || saving} onClick={onRevert}>
         Revert
       </Button>

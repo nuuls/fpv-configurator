@@ -57,10 +57,28 @@ const SILABS_MCUS: Record<number, { mcu: string; settingsAddress: number }> = {
  * AM32 bootloader signature = flash size code << 8 | 0x06. 128 k parts take addresses shifted right by 2 — newer
  * bootloaders report their own flash map instead (AM32 configurator "v3 devinfo"), so those are only read.
  */
-const AM32_MCUS: Record<number, { mcu: string; settingsAddress: number; fileNameAddress: number; writable: boolean }> = {
-  0x1f06: { mcu: 'ARM, 32 k flash', settingsAddress: 0x7c00, fileNameAddress: 0x7c00 - 32, writable: true },
-  0x3506: { mcu: 'ARM, 64 k flash', settingsAddress: 0xf800, fileNameAddress: 0xf800 - 32, writable: true },
-  0x2b06: { mcu: 'ARM, 128 k flash', settingsAddress: 0x1f800 >> 2, fileNameAddress: (0x1f800 - 32) >> 2, writable: false },
+const AM32_MCUS: Record<
+  number,
+  { mcu: string; settingsAddress: number; fileNameAddress: number; writable: boolean }
+> = {
+  0x1f06: {
+    mcu: 'ARM, 32 k flash',
+    settingsAddress: 0x7c00,
+    fileNameAddress: 0x7c00 - 32,
+    writable: true,
+  },
+  0x3506: {
+    mcu: 'ARM, 64 k flash',
+    settingsAddress: 0xf800,
+    fileNameAddress: 0xf800 - 32,
+    writable: true,
+  },
+  0x2b06: {
+    mcu: 'ARM, 128 k flash',
+    settingsAddress: 0x1f800 >> 2,
+    fileNameAddress: (0x1f800 - 32) >> 2,
+    writable: false,
+  },
 }
 
 /** Signal pins the AM32 bootloader is built for (PA2, PB4, PA6); anything else on an ARM is BLHeli_32. */
@@ -83,7 +101,13 @@ export function readPlan(info: EscDeviceInfo): EscReadPlan | null {
   if (info.interfaceMode === INTERFACE_MODE.ARM_BLB) {
     const mcu = AM32_MCUS[info.signature]
     if (!mcu || !AM32_PIN_CODES.includes(info.bootByte)) return null
-    return { family: 'arm', ...mcu, settingsLength: AM32_LAYOUT_SIZE, codeProbeAddress: null, erasePage: null }
+    return {
+      family: 'arm',
+      ...mcu,
+      settingsLength: AM32_LAYOUT_SIZE,
+      codeProbeAddress: null,
+      erasePage: null,
+    }
   }
   return null
 }
@@ -128,7 +152,13 @@ export type EscReport =
       editable: boolean
     }
   /** A firmware we know, in a version this app doesn't work with. `description` says what to do about it. */
-  | { status: 'unsupported'; firmware: EscFirmware; version: string; hardware: string; description: string }
+  | {
+      status: 'unsupported'
+      firmware: EscFirmware
+      version: string
+      hardware: string
+      description: string
+    }
   | { status: 'unknown'; description: string }
   | { status: 'missing'; description: string }
 
@@ -138,7 +168,15 @@ type Format = (raw: number) => string | null
 export type EscControl =
   | { kind: 'select'; options: { raw: number; label: string }[] }
   | { kind: 'switch' }
-  | { kind: 'number'; min: number; max: number; step: number; unit: string; scale: number; offset: number }
+  | {
+      kind: 'number'
+      min: number
+      max: number
+      step: number
+      unit: string
+      scale: number
+      offset: number
+    }
 
 export interface EscSettingDef {
   key: string
@@ -174,16 +212,29 @@ export function rawToNumber(control: Extract<EscControl, { kind: 'number' }>, ra
 }
 
 /** The byte for a typed number: limited to the control's range, then to the nearest value the ESC can store. */
-export function numberToRaw(control: Extract<EscControl, { kind: 'number' }>, value: number): number {
+export function numberToRaw(
+  control: Extract<EscControl, { kind: 'number' }>,
+  value: number,
+): number {
   const limited = Math.min(control.max, Math.max(control.min, value))
   return Math.min(255, Math.max(0, Math.round((limited - control.offset) / control.scale)))
 }
 
 type Editable = Pick<EscSettingDef, 'format' | 'control'>
 
-function number(range: { min: number; max: number; step?: number; unit?: string; scale?: number; offset?: number }): Editable {
+function number(range: {
+  min: number
+  max: number
+  step?: number
+  unit?: string
+  scale?: number
+  offset?: number
+}): Editable {
   const control = { kind: 'number', step: 1, unit: '', scale: 1, offset: 0, ...range } as const
-  return { control, format: (raw) => `${rawToNumber(control, raw)}${control.unit && ` ${control.unit}`}` }
+  return {
+    control,
+    format: (raw) => `${rawToNumber(control, raw)}${control.unit && ` ${control.unit}`}`,
+  }
 }
 
 function select(names: Record<number, string>): Editable {
@@ -193,21 +244,62 @@ function select(names: Record<number, string>): Editable {
 
 const toggle: Editable = { control: { kind: 'switch' }, format: onOff }
 
-const DIRECTION = oneOf({ 1: 'Normal', 2: 'Reversed', 3: 'Bidirectional (3D)', 4: 'Bidirectional (3D), reversed' })
+const DIRECTION = oneOf({
+  1: 'Normal',
+  2: 'Reversed',
+  3: 'Bidirectional (3D)',
+  4: 'Bidirectional (3D), reversed',
+})
 const DEMAG = oneOf({ 1: 'Off', 2: 'Low', 3: 'High' })
-const BEACON_DELAY = oneOf({ 1: '1 minute', 2: '2 minutes', 3: '5 minutes', 4: '10 minutes', 5: 'Never' })
+const BEACON_DELAY = oneOf({
+  1: '1 minute',
+  2: '2 minutes',
+  3: '5 minutes',
+  4: '10 minutes',
+  5: 'Never',
+})
 const TEMPERATURE_PROTECTION: Format = (raw) =>
   raw === 0 ? 'Off' : raw <= 7 ? `${70 + raw * 10} °C` : `Unknown (${raw})`
 
-const BLHELI_S_STARTUP_POWER = ['0.031', '0.047', '0.063', '0.094', '0.125', '0.188', '0.25', '0.38', '0.50', '0.75', '1.00', '1.25', '1.50']
+const BLHELI_S_STARTUP_POWER = [
+  '0.031',
+  '0.047',
+  '0.063',
+  '0.094',
+  '0.125',
+  '0.188',
+  '0.25',
+  '0.38',
+  '0.50',
+  '0.75',
+  '1.00',
+  '1.25',
+  '1.50',
+]
 
 const BLHELI_S_SETTINGS: EscSettingDef[] = [
   { key: 'direction', label: 'Motor direction', offset: 0x0b, perMotor: true, format: DIRECTION },
-  { key: 'startupPower', label: 'Startup power', offset: 0x09, format: (raw) => BLHELI_S_STARTUP_POWER[raw - 1] ?? `Unknown (${raw})` },
-  { key: 'timing', label: 'Motor timing', offset: 0x15, format: oneOf({ 1: 'Low', 2: 'Medium low', 3: 'Medium', 4: 'Medium high', 5: 'High' }) },
+  {
+    key: 'startupPower',
+    label: 'Startup power',
+    offset: 0x09,
+    format: (raw) => BLHELI_S_STARTUP_POWER[raw - 1] ?? `Unknown (${raw})`,
+  },
+  {
+    key: 'timing',
+    label: 'Motor timing',
+    offset: 0x15,
+    format: oneOf({ 1: 'Low', 2: 'Medium low', 3: 'Medium', 4: 'Medium high', 5: 'High' }),
+  },
   { key: 'demag', label: 'Demag compensation', offset: 0x1f, format: DEMAG },
   { key: 'temperature', label: 'Temperature protection', offset: 0x23, to: 32, format: onOff },
-  { key: 'temperature', label: 'Temperature protection', offset: 0x23, from: 33, format: TEMPERATURE_PROTECTION },
+  {
+    key: 'temperature',
+    label: 'Temperature protection',
+    offset: 0x23,
+    from: 33,
+    format: TEMPERATURE_PROTECTION,
+  },
   { key: 'lowRpmProtection', label: 'Low RPM power protection', offset: 0x24, format: onOff },
   { key: 'brakeOnStop', label: 'Brake on stop', offset: 0x27, format: onOff },
   { key: 'beepStrength', label: 'Beep strength', offset: 0x1b, format: plain },
@@ -248,11 +340,27 @@ const BLUEJAY_SETTINGS: EscSettingDef[] = [
     key: 'timing',
     label: 'Motor timing',
     offset: 0x15,
-    ...select({ 1: '0° (low)', 2: '7.5° (medium low)', 3: '15° (medium)', 4: '22.5° (medium high)', 5: '30° (high)' }),
+    ...select({
+      1: '0° (low)',
+      2: '7.5° (medium low)',
+      3: '15° (medium)',
+      4: '22.5° (medium high)',
+      5: '30° (high)',
+    }),
   },
   { key: 'demag', label: 'Demag compensation', offset: 0x1f, format: DEMAG },
-  { key: 'rampupPower', label: 'Rampup power', offset: 0x09, format: (raw) => (raw === 0 ? 'Off' : raw <= 13 ? `${raw}x` : `Unknown (${raw})`) },
-  { key: 'temperature', label: 'Temperature protection', offset: 0x23, format: TEMPERATURE_PROTECTION },
+  {
+    key: 'rampupPower',
+    label: 'Rampup power',
+    offset: 0x09,
+    format: (raw) => (raw === 0 ? 'Off' : raw <= 13 ? `${raw}x` : `Unknown (${raw})`),
+  },
+  {
+    key: 'temperature',
+    label: 'Temperature protection',
+    offset: 0x23,
+    format: TEMPERATURE_PROTECTION,
+  },
   { key: 'brakeOnStop', label: 'Brake on stop', offset: 0x27, format: onOff },
   { key: 'brakingStrength', label: 'Braking strength', offset: 0x10, format: plain },
   { key: 'powerRating', label: 'Power rating', offset: 0x29, format: oneOf({ 1: '1S', 2: '2S+' }) },
@@ -263,7 +371,9 @@ const BLUEJAY_SETTINGS: EscSettingDef[] = [
 ]
 
 /** Raw 10–42 is (raw − 10) × 0.9375°; 0–3 is the format of old configurators, ×7.5° (`loadEEpromSettings`). */
-const AM32_TIMING = Object.fromEntries(Array.from({ length: 33 }, (_, step) => [step + 10, `${trim(step * 0.9375)}°`]))
+const AM32_TIMING = Object.fromEntries(
+  Array.from({ length: 33 }, (_, step) => [step + 10, `${trim(step * 0.9375)}°`]),
+)
 const am32Timing = select(AM32_TIMING)
 
 const noCarBraking = (raw: (key: string) => number) => raw('rcCarReversing') === 0
@@ -273,12 +383,37 @@ const noCarBraking = (raw: (key: string) => number) => raw('rcCarReversing') ===
  * from the AM32 configurator (`pages/configurator.vue`) — all of its settings except the startup tune.
  */
 const AM32_SETTINGS: EscSettingDef[] = [
-  { key: 'protocol', label: 'Signal protocol', offset: 46, group: 'Essentials', ...select({ 0: 'Auto', 1: 'DShot', 2: 'Servo', 3: 'Serial', 4: 'EDT ARM' }) },
-  { key: 'disableStickCalibration', label: 'Disable stick calibration', offset: 7, group: 'Essentials', ...toggle },
+  {
+    key: 'protocol',
+    label: 'Signal protocol',
+    offset: 46,
+    group: 'Essentials',
+    ...select({ 0: 'Auto', 1: 'DShot', 2: 'Servo', 3: 'Serial', 4: 'EDT ARM' }),
+  },
+  {
+    key: 'disableStickCalibration',
+    label: 'Disable stick calibration',
+    offset: 7,
+    group: 'Essentials',
+    ...toggle,
+  },
 
-  { key: 'direction', label: 'Motor direction', offset: 17, perMotor: true, group: 'Motor', ...select({ 0: 'Normal', 1: 'Reversed' }) },
+  {
+    key: 'direction',
+    label: 'Motor direction',
+    offset: 17,
+    perMotor: true,
+    group: 'Motor',
+    ...select({ 0: 'Normal', 1: 'Reversed' }),
+  },
   { key: 'bidirectional', label: 'Bidirectional (3D) mode', offset: 18, group: 'Motor', ...toggle },
-  { key: 'variablePwm', label: 'PWM type', offset: 21, group: 'Motor', ...select({ 0: 'Fixed', 1: 'Variable', 2: 'By RPM' }) },
+  {
+    key: 'variablePwm',
+    label: 'PWM type',
+    offset: 21,
+    group: 'Motor',
+    ...select({ 0: 'Fixed', 1: 'Variable', 2: 'By RPM' }),
+  },
   {
     key: 'pwmFrequency',
     label: 'PWM frequency',
@@ -298,20 +433,68 @@ const AM32_SETTINGS: EscSettingDef[] = [
     ...am32Timing,
     format: (raw) => (raw <= 3 ? `${raw * 7.5}°` : am32Timing.format(raw)),
   },
-  { key: 'startupPower', label: 'Startup power', offset: 25, group: 'Motor', ...number({ min: 50, max: 150, unit: '%' }) },
-  { key: 'motorKv', label: 'Motor KV', offset: 26, group: 'Motor', ...number({ min: 20, max: 10220, step: 40, scale: 40, offset: 20 }) },
-  { key: 'motorPoles', label: 'Motor poles', offset: 27, group: 'Motor', ...number({ min: 2, max: 36 }) },
+  {
+    key: 'startupPower',
+    label: 'Startup power',
+    offset: 25,
+    group: 'Motor',
+    ...number({ min: 50, max: 150, unit: '%' }),
+  },
+  {
+    key: 'motorKv',
+    label: 'Motor KV',
+    offset: 26,
+    group: 'Motor',
+    ...number({ min: 20, max: 10220, step: 40, scale: 40, offset: 20 }),
+  },
+  {
+    key: 'motorPoles',
+    label: 'Motor poles',
+    offset: 27,
+    group: 'Motor',
+    ...number({ min: 2, max: 36 }),
+  },
   { key: 'complementaryPwm', label: 'Complementary PWM', offset: 20, group: 'Motor', ...toggle },
-  { key: 'stuckRotorProtection', label: 'Stuck rotor protection', offset: 22, group: 'Motor', ...toggle },
+  {
+    key: 'stuckRotorProtection',
+    label: 'Stuck rotor protection',
+    offset: 22,
+    group: 'Motor',
+    ...toggle,
+  },
   { key: 'stallProtection', label: 'Stall protection', offset: 29, group: 'Motor', ...toggle },
   { key: 'hallSensors', label: 'Use hall sensors', offset: 39, group: 'Motor', ...toggle },
   { key: 'telemetry', label: '30 ms telemetry', offset: 31, group: 'Motor', ...toggle },
-  { key: 'beepVolume', label: 'Beep volume', offset: 30, group: 'Motor', ...number({ min: 0, max: 11 }) },
+  {
+    key: 'beepVolume',
+    label: 'Beep volume',
+    offset: 30,
+    group: 'Motor',
+    ...number({ min: 0, max: 11 }),
+  },
 
-  { key: 'maxRamp', label: 'Ramp rate', offset: 5, group: 'Extended settings', ...number({ min: 0.1, max: 20, step: 0.1, scale: 0.1, unit: '% duty cycle per ms' }) },
-  { key: 'minimumDutyCycle', label: 'Minimum duty cycle', offset: 6, group: 'Extended settings', ...number({ min: 0, max: 25, step: 0.5, scale: 0.5, unit: '%' }) },
+  {
+    key: 'maxRamp',
+    label: 'Ramp rate',
+    offset: 5,
+    group: 'Extended settings',
+    ...number({ min: 0.1, max: 20, step: 0.1, scale: 0.1, unit: '% duty cycle per ms' }),
+  },
+  {
+    key: 'minimumDutyCycle',
+    label: 'Minimum duty cycle',
+    offset: 6,
+    group: 'Extended settings',
+    ...number({ min: 0, max: 25, step: 0.5, scale: 0.5, unit: '%' }),
+  },
 
-  { key: 'lowVoltageCutoff', label: 'Low voltage cutoff', offset: 36, group: 'Limits', ...select({ 0: 'Off', 1: 'Per cell', 2: 'Absolute' }) },
+  {
+    key: 'lowVoltageCutoff',
+    label: 'Low voltage cutoff',
+    offset: 36,
+    group: 'Limits',
+    ...select({ 0: 'Off', 1: 'Per cell', 2: 'Absolute' }),
+  },
   {
     key: 'lowVoltageThreshold',
     label: 'Cutoff voltage per cell',
@@ -349,11 +532,35 @@ const AM32_SETTINGS: EscSettingDef[] = [
   },
 
   // Only used while the current limit is on.
-  { key: 'currentP', label: 'Current P', offset: 9, group: 'Current control', ...number({ min: 0, max: 255 }) },
-  { key: 'currentI', label: 'Current I', offset: 10, group: 'Current control', ...number({ min: 0, max: 255 }) },
-  { key: 'currentD', label: 'Current D', offset: 11, group: 'Current control', ...number({ min: 0, max: 255 }) },
+  {
+    key: 'currentP',
+    label: 'Current P',
+    offset: 9,
+    group: 'Current control',
+    ...number({ min: 0, max: 255 }),
+  },
+  {
+    key: 'currentI',
+    label: 'Current I',
+    offset: 10,
+    group: 'Current control',
+    ...number({ min: 0, max: 255 }),
+  },
+  {
+    key: 'currentD',
+    label: 'Current D',
+    offset: 11,
+    group: 'Current control',
+    ...number({ min: 0, max: 255 }),
+  },
 
-  { key: 'sineStartup', label: 'Sinusoidal startup', offset: 19, group: 'Sinusoidal startup', ...toggle },
+  {
+    key: 'sineStartup',
+    label: 'Sinusoidal startup',
+    offset: 19,
+    group: 'Sinusoidal startup',
+    ...toggle,
+  },
   {
     key: 'sineModeRange',
     label: 'Sine mode range',
@@ -371,8 +578,20 @@ const AM32_SETTINGS: EscSettingDef[] = [
     ...number({ min: 1, max: 10 }),
   },
 
-  { key: 'brakeOnStop', label: 'Brake on stop', offset: 28, group: 'Brake', ...select({ 0: 'Off', 1: 'On', 2: 'Active brake' }) },
-  { key: 'rcCarReversing', label: 'Car type reverse braking', offset: 38, group: 'Brake', ...toggle },
+  {
+    key: 'brakeOnStop',
+    label: 'Brake on stop',
+    offset: 28,
+    group: 'Brake',
+    ...select({ 0: 'Off', 1: 'On', 2: 'Active brake' }),
+  },
+  {
+    key: 'rcCarReversing',
+    label: 'Car type reverse braking',
+    offset: 38,
+    group: 'Brake',
+    ...toggle,
+  },
   {
     key: 'brakeStrength',
     label: 'Brake strength',
@@ -381,7 +600,14 @@ const AM32_SETTINGS: EscSettingDef[] = [
     enabled: (raw) => raw('brakeOnStop') !== 0 && noCarBraking(raw),
     ...number({ min: 1, max: 10 }),
   },
-  { key: 'runningBrakeLevel', label: 'Running brake level', offset: 42, group: 'Brake', enabled: noCarBraking, ...number({ min: 1, max: 10 }) },
+  {
+    key: 'runningBrakeLevel',
+    label: 'Running brake level',
+    offset: 42,
+    group: 'Brake',
+    enabled: noCarBraking,
+    ...number({ min: 1, max: 10 }),
+  },
   {
     key: 'activeBrakePower',
     label: 'Active brake power',
@@ -392,13 +618,41 @@ const AM32_SETTINGS: EscSettingDef[] = [
     ...number({ min: 0, max: 5, unit: '% duty cycle' }),
   },
 
-  { key: 'servoLow', label: 'Servo low threshold', offset: 32, group: 'Servo input', ...number({ min: 750, max: 1250, step: 2, scale: 2, offset: 750, unit: 'µs' }) },
-  { key: 'servoHigh', label: 'Servo high threshold', offset: 33, group: 'Servo input', ...number({ min: 1750, max: 2250, step: 2, scale: 2, offset: 1750, unit: 'µs' }) },
-  { key: 'servoNeutral', label: 'Servo neutral', offset: 34, group: 'Servo input', ...number({ min: 1374, max: 1629, offset: 1374, unit: 'µs' }) },
-  { key: 'servoDeadBand', label: 'Servo dead band', offset: 35, group: 'Servo input', ...number({ min: 0, max: 100 }) },
+  {
+    key: 'servoLow',
+    label: 'Servo low threshold',
+    offset: 32,
+    group: 'Servo input',
+    ...number({ min: 750, max: 1250, step: 2, scale: 2, offset: 750, unit: 'µs' }),
+  },
+  {
+    key: 'servoHigh',
+    label: 'Servo high threshold',
+    offset: 33,
+    group: 'Servo input',
+    ...number({ min: 1750, max: 2250, step: 2, scale: 2, offset: 1750, unit: 'µs' }),
+  },
+  {
+    key: 'servoNeutral',
+    label: 'Servo neutral',
+    offset: 34,
+    group: 'Servo input',
+    ...number({ min: 1374, max: 1629, offset: 1374, unit: 'µs' }),
+  },
+  {
+    key: 'servoDeadBand',
+    label: 'Servo dead band',
+    offset: 35,
+    group: 'Servo input',
+    ...number({ min: 0, max: 100 }),
+  },
 ]
 
-const SETTINGS: Record<EscFirmware, EscSettingDef[]> = { BLHeli_S: BLHELI_S_SETTINGS, Bluejay: BLUEJAY_SETTINGS, AM32: AM32_SETTINGS }
+const SETTINGS: Record<EscFirmware, EscSettingDef[]> = {
+  BLHeli_S: BLHELI_S_SETTINGS,
+  Bluejay: BLUEJAY_SETTINGS,
+  AM32: AM32_SETTINGS,
+}
 
 /** Layout revisions the tables above were checked against; anything else is shown without settings. */
 const KNOWN_LAYOUTS: Record<EscFirmware, [from: number, to: number]> = {
@@ -422,14 +676,19 @@ function decodeText(bytes: Uint8Array): string {
   return text.trim()
 }
 
-function listSettings(defs: EscSettingDef[], bytes: Uint8Array, layoutRevision: number): EscSetting[] {
+function listSettings(
+  defs: EscSettingDef[],
+  bytes: Uint8Array,
+  layoutRevision: number,
+): EscSetting[] {
   const settings: EscSetting[] = []
   for (const def of defs) {
     if (layoutRevision < (def.from ?? 0) || layoutRevision > (def.to ?? Infinity)) continue
     const raw = bytes[def.offset]
     if (raw === undefined) continue // shorter block than expected
     const value = def.format(raw)
-    if (value !== null) settings.push({ key: def.key, label: def.label, value, perMotor: def.perMotor ?? false })
+    if (value !== null)
+      settings.push({ key: def.key, label: def.label, value, perMotor: def.perMotor ?? false })
   }
   return settings
 }
@@ -443,7 +702,13 @@ function warningsFor(firmware: EscFirmware, bytes: Uint8Array): string[] {
   ]
 }
 
-function report(firmware: EscFirmware, version: string, hardware: string, layoutRevision: number, raw: EscRawRead): EscReport {
+function report(
+  firmware: EscFirmware,
+  version: string,
+  hardware: string,
+  layoutRevision: number,
+  raw: EscRawRead,
+): EscReport {
   const [from, to] = KNOWN_LAYOUTS[firmware]
   const known = layoutRevision >= from && layoutRevision <= to
   const defs = SETTINGS[firmware]
@@ -454,7 +719,9 @@ function report(firmware: EscFirmware, version: string, hardware: string, layout
     hardware,
     layoutRevision,
     settings: known ? listSettings(defs, raw.settings, layoutRevision) : [],
-    note: known ? null : `Settings layout ${layoutRevision} is not known to this app — the settings can't be shown.`,
+    note: known
+      ? null
+      : `Settings layout ${layoutRevision} is not known to this app — the settings can't be shown.`,
     warnings: known ? warningsFor(firmware, raw.settings) : [],
     block: raw.settings,
     plan: raw.plan,
@@ -482,7 +749,10 @@ export function describeUnsupported(info: EscDeviceInfo): EscReport {
       : info.interfaceMode === INTERFACE_MODE.SILABS_BLB
         ? 'SiLabs ESC with an unknown MCU'
         : 'Atmel / SimonK ESC'
-  return { status: 'unknown', description: `${what} (signature ${hex(info.signature)}). Not supported.` }
+  return {
+    status: 'unknown',
+    description: `${what} (signature ${hex(info.signature)}). Not supported.`,
+  }
 }
 
 /** Bluejay version = main.sub plus the patch level it keeps in brackets in its name: "Bluejay (.1 RC2)". */
@@ -510,7 +780,11 @@ export function needsCodeProbe(settings: Uint8Array): boolean {
 export function describeEsc(raw: EscRawRead): EscReport {
   const { settings: bytes, plan } = raw
   const erased = bytes.length === 0 || bytes.every((byte) => byte === 0xff)
-  if (erased) return { status: 'unknown', description: `No ESC firmware found (${plan.mcu}, settings are empty).` }
+  if (erased)
+    return {
+      status: 'unknown',
+      description: `No ESC firmware found (${plan.mcu}, settings are empty).`,
+    }
 
   if (plan.family === 'arm') {
     const layoutRevision = bytes[1] ?? 0
@@ -553,10 +827,19 @@ export function describeEsc(raw: EscRawRead): EscReport {
     }
     return report('Bluejay', version, hardware, layoutRevision, raw)
   }
-  if (name !== '') return { status: 'unknown', description: `Unknown ESC firmware "${name}" ${main}.${sub} (${hardware}).` }
+  if (name !== '')
+    return {
+      status: 'unknown',
+      description: `Unknown ESC firmware "${name}" ${main}.${sub} (${hardware}).`,
+    }
   // Blank name: BLHeli_S — or one of its closed-source forks, which keep their settings to themselves.
-  if (containsJescMarker(raw.codeProbe)) return { status: 'unknown', description: `JESC ${main}.${sub} (${hardware}). Not supported.` }
-  if (main === 16 && (sub === 8 || sub === 9)) return { status: 'unknown', description: `BLHeli_M ${main}.${sub} (${hardware}). Not supported.` }
+  if (containsJescMarker(raw.codeProbe))
+    return { status: 'unknown', description: `JESC ${main}.${sub} (${hardware}). Not supported.` }
+  if (main === 16 && (sub === 8 || sub === 9))
+    return {
+      status: 'unknown',
+      description: `BLHeli_M ${main}.${sub} (${hardware}). Not supported.`,
+    }
   return report('BLHeli_S', `${main}.${sub}`, hardware, layoutRevision, raw)
 }
 
@@ -591,30 +874,47 @@ export type ReadableEsc = Extract<EscReport, { status: 'ok' }>
 export function combineReports(reports: EscReport[]): EscOverview {
   const escs = reports.filter((report): report is ReadableEsc => report.status === 'ok')
   const first = escs[0]
-  if (!first || reports.length < 2 || escs.length < reports.length) return { view: 'separate', reason: null }
+  if (!first || reports.length < 2 || escs.length < reports.length)
+    return { view: 'separate', reason: null }
 
   const sameFirmware = escs.every(
-    (esc) => esc.firmware === first.firmware && esc.version === first.version && esc.layoutRevision === first.layoutRevision,
+    (esc) =>
+      esc.firmware === first.firmware &&
+      esc.version === first.version &&
+      esc.layoutRevision === first.layoutRevision,
   )
-  if (!sameFirmware) return { view: 'separate', reason: "The ESCs don't all run the same firmware, so they are listed one by one." }
+  if (!sameFirmware)
+    return {
+      view: 'separate',
+      reason: "The ESCs don't all run the same firmware, so they are listed one by one.",
+    }
   if (!escs.every((esc) => esc.hardware === first.hardware)) {
-    return { view: 'separate', reason: 'The ESCs are not all the same hardware, so they are listed one by one.' }
+    return {
+      view: 'separate',
+      reason: 'The ESCs are not all the same hardware, so they are listed one by one.',
+    }
   }
 
   // Same firmware and layout: the same rows — unless a value hides one (`format` returning null).
   const rows = new Map<string, EscSetting>()
-  for (const esc of escs) for (const setting of esc.settings) if (!rows.has(setting.key)) rows.set(setting.key, setting)
+  for (const esc of escs)
+    for (const setting of esc.settings) if (!rows.has(setting.key)) rows.set(setting.key, setting)
 
   const settings: CombinedEscSetting[] = []
   const differing: string[] = []
   for (const { key, label, perMotor } of rows.values()) {
-    const values = escs.map((esc) => esc.settings.find((setting) => setting.key === key)?.value ?? '—')
+    const values = escs.map(
+      (esc) => esc.settings.find((setting) => setting.key === key)?.value ?? '—',
+    )
     const same = values.every((value) => value === values[0])
     if (!same && !perMotor) differing.push(label)
     settings.push({ key, label, values: same ? values.slice(0, 1) : values })
   }
   if (differing.length > 0) {
-    return { view: 'separate', reason: `The ESCs are not set up alike (${differing.join(', ')}), so they are listed one by one.` }
+    return {
+      view: 'separate',
+      reason: `The ESCs are not set up alike (${differing.join(', ')}), so they are listed one by one.`,
+    }
   }
   return {
     view: 'combined',
@@ -637,7 +937,10 @@ export function differingSettings(reports: EscReport[]): Set<string>[] {
     const differing = new Set<string>()
     if (current.status !== 'ok') return differing
     const reference = reports.find(
-      (other) => other.status === 'ok' && other.firmware === current.firmware && other.layoutRevision === current.layoutRevision,
+      (other) =>
+        other.status === 'ok' &&
+        other.firmware === current.firmware &&
+        other.layoutRevision === current.layoutRevision,
     )
     if (!reference || reference === current || reference.status !== 'ok') return differing
     for (const setting of current.settings) {
@@ -653,7 +956,9 @@ export function differingSettings(reports: EscReport[]): Set<string>[] {
 export type EscDraft = (number[] | null)[]
 
 export function toEscDraft(reports: EscReport[]): EscDraft {
-  return reports.map((report) => (report.status === 'ok' && report.editable ? Array.from(report.block) : null))
+  return reports.map((report) =>
+    report.status === 'ok' && report.editable ? Array.from(report.block) : null,
+  )
 }
 
 /** ESCs that are edited as one: same firmware (the supported version of it), so the same settings. */
@@ -685,8 +990,15 @@ export function draftRaw(draft: EscDraft, esc: number, def: EscSettingDef): numb
 }
 
 /** Patches one byte into the blocks of these ESCs — nothing else of a block ever changes. */
-export function setDraftRaw(draft: EscDraft, escs: number[], def: EscSettingDef, raw: number): EscDraft {
-  return draft.map((block, index) => (block && escs.includes(index) ? block.with(def.offset, raw & 0xff) : block))
+export function setDraftRaw(
+  draft: EscDraft,
+  escs: number[],
+  def: EscSettingDef,
+  raw: number,
+): EscDraft {
+  return draft.map((block, index) =>
+    block && escs.includes(index) ? block.with(def.offset, raw & 0xff) : block,
+  )
 }
 
 /** Labels of the group's shared settings that are not the same on all of its ESCs. */
@@ -694,7 +1006,11 @@ export function unevenSettings(draft: EscDraft, group: EscGroup): string[] {
   const first = group.escs[0]
   if (first === undefined) return []
   return group.settings
-    .filter((def) => !def.perMotor && group.escs.some((esc) => draftRaw(draft, esc, def) !== draftRaw(draft, first, def)))
+    .filter(
+      (def) =>
+        !def.perMotor &&
+        group.escs.some((esc) => draftRaw(draft, esc, def) !== draftRaw(draft, first, def)),
+    )
     .map((def) => def.label)
 }
 
@@ -712,6 +1028,9 @@ export function changedEscs(reports: EscReport[], draft: EscDraft): number[] {
   return reports.flatMap((report, index) => {
     const block = draft[index]
     if (report.status !== 'ok' || !block) return []
-    return block.length === report.block.length && block.every((byte, i) => byte === report.block[i]) ? [] : [index]
+    return block.length === report.block.length &&
+      block.every((byte, i) => byte === report.block[i])
+      ? []
+      : [index]
   })
 }

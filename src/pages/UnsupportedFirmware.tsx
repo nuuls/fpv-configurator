@@ -10,8 +10,8 @@ export function UnsupportedFirmwarePage({ fcInfo }: { fcInfo: FcInfo }) {
         <CardHeader>
           <CardTitle>Unsupported firmware: {formatFirmware(fcInfo)}</CardTitle>
           <CardDescription>
-            This app only works with Betaflight 2026.x. Flash a current Betaflight release with Betaflight
-            Configurator, then connect again.
+            This app only works with Betaflight 2026.x. Flash a current Betaflight release with
+            Betaflight Configurator, then connect again.
           </CardDescription>
         </CardHeader>
       </Card>

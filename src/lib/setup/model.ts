@@ -2,7 +2,14 @@
  * PID loop frequency, pre-flight checklist and the settings changed outside this app, on the Setup tab —
  * docs/tabs/setup.md. Layouts: Betaflight 2026.6 msp.c.
  */
-import { canReset, changeKey, parseFlag, resetCommands, type DiffEntry, type DiffReport } from '@/lib/diff/model'
+import {
+  canReset,
+  changeKey,
+  parseFlag,
+  resetCommands,
+  type DiffEntry,
+  type DiffReport,
+} from '@/lib/diff/model'
 import { ByteReader, ByteWriter } from '@/lib/msp/bytes'
 import { FEATURE } from '@/lib/msp/messages'
 
@@ -129,7 +136,9 @@ export function applyFix(draft: SetupDraft, id: CheckId): SetupDraft {
             ...draft,
             beeperOffFlags: (draft.beeperOffFlags & ~BEEPER_OFF_REQUIRED) >>> 0,
             dshotBeaconOffFlags:
-              draft.dshotBeaconOffFlags === null ? null : (draft.dshotBeaconOffFlags & ~BEEPER_OFF_REQUIRED) >>> 0,
+              draft.dshotBeaconOffFlags === null
+                ? null
+                : (draft.dshotBeaconOffFlags & ~BEEPER_OFF_REQUIRED) >>> 0,
           }
     case 'airmode':
       return { ...draft, airmode: true }
@@ -142,7 +151,10 @@ export function applyFix(draft: SetupDraft, id: CheckId): SetupDraft {
 export function preflightChecks(snapshot: SetupSnapshot, draft: SetupDraft): PreflightCheck[] {
   const saved = readSetup(snapshot)
   const muted = (flags: number) =>
-    [flags & BEEPER_OFF.RX_SET ? 'RX set' : null, flags & BEEPER_OFF.RX_LOST ? 'RX loss' : null].filter((m) => m !== null)
+    [
+      flags & BEEPER_OFF.RX_SET ? 'RX set' : null,
+      flags & BEEPER_OFF.RX_LOST ? 'RX loss' : null,
+    ].filter((m) => m !== null)
   const armAngleOk = (d: SetupDraft) => d.armAngle === ARM_ANGLE_ANY
   const beeperMuted = (d: SetupDraft) =>
     [
@@ -168,10 +180,17 @@ export function preflightChecks(snapshot: SetupSnapshot, draft: SetupDraft): Pre
     {
       id: 'accCalibrated',
       label: 'Accelerometer is calibrated',
-      detail: !snapshot.hasAccelerometer ? 'No accelerometer' : snapshot.accCalibrated ? 'Calibrated' : 'Not calibrated',
+      detail: !snapshot.hasAccelerometer
+        ? 'No accelerometer'
+        : snapshot.accCalibrated
+          ? 'Calibrated'
+          : 'Not calibrated',
       ok: snapshot.hasAccelerometer && snapshot.accCalibrated,
       pending: false,
-      fix: snapshot.accCalibrated || !snapshot.hasAccelerometer ? null : { path: '/orientation', tab: 'Orientation' },
+      fix:
+        snapshot.accCalibrated || !snapshot.hasAccelerometer
+          ? null
+          : { path: '/orientation', tab: 'Orientation' },
     },
     {
       id: 'armAngle',
@@ -239,7 +258,9 @@ export function externalChanges(snapshot: SetupSnapshot, draft: SetupDraft): Ext
   return changes
 }
 
-function describe(entry: DiffEntry): Pick<ExternalChange, 'label' | 'name' | 'value' | 'defaultValue'> {
+function describe(
+  entry: DiffEntry,
+): Pick<ExternalChange, 'label' | 'name' | 'value' | 'defaultValue'> {
   if (entry.kind === 'setting')
     return {
       label: entry.name,
@@ -248,7 +269,8 @@ function describe(entry: DiffEntry): Pick<ExternalChange, 'label' | 'name' | 'va
       defaultValue: entry.defaultValue,
     }
   const flag = parseFlag(entry.line)
-  if (flag) return { label: entry.line, name: flag.command, value: flag.flag, defaultValue: flag.opposite }
+  if (flag)
+    return { label: entry.line, name: flag.command, value: flag.flag, defaultValue: flag.opposite }
   return { label: entry.line, name: entry.line, value: null, defaultValue: null }
 }
 
@@ -263,13 +285,17 @@ export function withReset(draft: SetupDraft, key: string, reset: boolean): Setup
 
 /** Draft with every resettable external change marked. */
 export function withAllResets(snapshot: SetupSnapshot, draft: SetupDraft): SetupDraft {
-  const keys = externalChanges(snapshot, draft).flatMap((change) => (change.key === null ? [] : [change.key]))
+  const keys = externalChanges(snapshot, draft).flatMap((change) =>
+    change.key === null ? [] : [change.key],
+  )
   return { ...draft, resets: keys }
 }
 
 /** The CLI lines that carry out the draft's resets; empty when there are none. */
 export function resetScript(snapshot: SetupSnapshot, draft: SetupDraft): string[] {
-  return snapshot.external && draft.resets.length > 0 ? resetCommands(snapshot.external, new Set(draft.resets)) : []
+  return snapshot.external && draft.resets.length > 0
+    ? resetCommands(snapshot.external, new Set(draft.resets))
+    : []
 }
 
 // ---- MSP_SET_ARMING_CONFIG (62) / MSP_SET_BEEPER_CONFIG (185): read-modify-write ----
@@ -283,9 +309,13 @@ export function encodeSetArmingConfig(snapshot: SetupSnapshot, armAngle: number)
 export function encodeSetBeeperConfig(beeperConfig: number[], draft: SetupDraft): Uint8Array {
   // beeper_off_flags:u32, dshotBeaconTone:u8 (stays as it is), dshotBeaconOffFlags:u32
   const payload = Uint8Array.from(beeperConfig)
-  if (draft.beeperOffFlags !== null) payload.set(new ByteWriter().u32(draft.beeperOffFlags).toBytes())
+  if (draft.beeperOffFlags !== null)
+    payload.set(new ByteWriter().u32(draft.beeperOffFlags).toBytes())
   if (draft.dshotBeaconOffFlags !== null)
-    payload.set(new ByteWriter().u32(draft.dshotBeaconOffFlags).toBytes(), BEEPER_CONFIG_DSHOT_BEACON_OFF_FLAGS_OFFSET)
+    payload.set(
+      new ByteWriter().u32(draft.dshotBeaconOffFlags).toBytes(),
+      BEEPER_CONFIG_DSHOT_BEACON_OFF_FLAGS_OFFSET,
+    )
   return payload
 }
 

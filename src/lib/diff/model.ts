@@ -100,7 +100,12 @@ export function parseDiff(output: string): DiffReport {
   const add = (entry: DiffEntry) => (section ?? open('other')).entries.push(entry)
   /** A `#set` that wasn't followed by its `set`. */
   const flushDefault = () => {
-    if (pendingDefault) add({ kind: 'command', line: `set ${pendingDefault.name} = ${pendingDefault.value}`, isDefault: true })
+    if (pendingDefault)
+      add({
+        kind: 'command',
+        line: `set ${pendingDefault.name} = ${pendingDefault.value}`,
+        isDefault: true,
+      })
     pendingDefault = null
   }
 
@@ -171,7 +176,15 @@ const TUNING_SECTION = /^(profile|rateprofile) \d+$/
  * RC smoothing and deadband, the RPM limiter, and what the PID loop and the RPM filter run on. `dshot_idle_value`
  * is the older name of `motor_idle`.
  */
-const TUNING_SETTING_PREFIXES = ['gyro_lpf', 'gyro_notch', 'dyn_notch_', 'rpm_filter_', 'rpm_limit', 'simplified_', 'rc_smoothing']
+const TUNING_SETTING_PREFIXES = [
+  'gyro_lpf',
+  'gyro_notch',
+  'dyn_notch_',
+  'rpm_filter_',
+  'rpm_limit',
+  'simplified_',
+  'rc_smoothing',
+]
 const TUNING_SETTINGS = new Set([
   'gyro_hardware_lpf',
   'pid_process_denom',
@@ -188,7 +201,11 @@ const TUNING_SETTINGS = new Set([
 function isTuningEntry(section: DiffSection, entry: DiffEntry): boolean {
   if (entry.kind !== 'setting') return false
   if (TUNING_SECTION.test(section.title)) return true
-  return section.title === 'master' && (TUNING_SETTINGS.has(entry.name) || TUNING_SETTING_PREFIXES.some((prefix) => entry.name.startsWith(prefix)))
+  return (
+    section.title === 'master' &&
+    (TUNING_SETTINGS.has(entry.name) ||
+      TUNING_SETTING_PREFIXES.some((prefix) => entry.name.startsWith(prefix)))
+  )
 }
 
 /**
@@ -197,7 +214,10 @@ function isTuningEntry(section: DiffSection, entry: DiffEntry): boolean {
  */
 export function tuningOnly(report: DiffReport): DiffReport {
   const sections = report.sections
-    .map((section) => ({ ...section, entries: section.entries.filter((entry) => isTuningEntry(section, entry)) }))
+    .map((section) => ({
+      ...section,
+      entries: section.entries.filter((entry) => isTuningEntry(section, entry)),
+    }))
     .filter((section) => section.entries.length > 0)
   return { ...report, sections }
 }
@@ -299,7 +319,10 @@ const NOT_COUNTED_SETTINGS = new Set([
 ])
 
 function isManaged(entry: DiffEntry): boolean {
-  if (entry.kind === 'setting') return MANAGED_SETTINGS.has(entry.name) || MANAGED_SETTING_PATTERNS.some((p) => p.test(entry.name))
+  if (entry.kind === 'setting')
+    return (
+      MANAGED_SETTINGS.has(entry.name) || MANAGED_SETTING_PATTERNS.some((p) => p.test(entry.name))
+    )
   const flag = parseFlag(entry.line)
   if (flag) return flag.command === 'feature' || MANAGED_BEEPS.has(flag.flag.replace(/^-/, ''))
   return MANAGED_COMMANDS.has(entry.line.split(' ')[0] ?? '')
@@ -318,7 +341,8 @@ export function externalOnly(report: DiffReport): DiffReport {
     .map((section) => ({
       ...section,
       entries: section.entries.filter(
-        (entry) => !isManaged(entry) && isCounted(entry) && (entry.kind === 'setting' || !entry.isDefault),
+        (entry) =>
+          !isManaged(entry) && isCounted(entry) && (entry.kind === 'setting' || !entry.isDefault),
       ),
     }))
     .filter((section) => section.entries.length > 0)
@@ -331,7 +355,9 @@ export function changeKey(section: DiffSection, entry: DiffEntry): string {
 }
 
 /** `feature TELEMETRY` ↔ `feature -TELEMETRY`, `beeper -GYRO_CALIBRATED` ↔ `beeper GYRO_CALIBRATED`. */
-export function parseFlag(line: string): { command: string; flag: string; opposite: string } | null {
+export function parseFlag(
+  line: string,
+): { command: string; flag: string; opposite: string } | null {
   const match = /^(feature|beeper|beacon) (-?)(\w+)$/.exec(line)
   if (!match) return null
   const [, command = '', off, name = ''] = match
@@ -343,7 +369,8 @@ export function parseFlag(line: string): { command: string; flag: string; opposi
  * default, or the command isn't a `set` or a flag (`resource`, `led`, `map`, … stay as they are).
  */
 export function resetLine(entry: DiffEntry): string | null {
-  if (entry.kind === 'setting') return entry.defaultValue === null ? null : `set ${entry.name} = ${entry.defaultValue}`
+  if (entry.kind === 'setting')
+    return entry.defaultValue === null ? null : `set ${entry.name} = ${entry.defaultValue}`
   const flag = entry.isDefault ? null : parseFlag(entry.line)
   return flag && `${flag.command} ${flag.opposite}`
 }
@@ -367,7 +394,10 @@ export function resetCommands(report: DiffReport, keys: ReadonlySet<string>): st
   const switched = new Set<string>()
   for (const section of report.sections) {
     const resets = section.entries.flatMap((entry) => {
-      const line = canReset(report, section, entry) && keys.has(changeKey(section, entry)) ? resetLine(entry) : null
+      const line =
+        canReset(report, section, entry) && keys.has(changeKey(section, entry))
+          ? resetLine(entry)
+          : null
       return line === null ? [] : [line]
     })
     if (resets.length === 0) continue

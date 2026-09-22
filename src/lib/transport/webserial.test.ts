@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { matchLastUsed } from './webserial'
 
-const port = (usbVendorId?: number, usbProductId?: number) => ({ getInfo: () => ({ usbVendorId, usbProductId }) })
+const port = (usbVendorId?: number, usbProductId?: number) => ({
+  getInfo: () => ({ usbVendorId, usbProductId }),
+})
 const stm32 = { usbVendorId: 0x0483, usbProductId: 0x5740 }
 
 describe('matchLastUsed', () => {

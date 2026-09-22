@@ -59,7 +59,10 @@ export async function readSerialConfig(client: MspClient): Promise<SerialPortCon
   return decodeSerialConfig(await client.request(MSP.COMMON_SERIAL_CONFIG))
 }
 
-export async function writeSerialConfig(client: MspClient, ports: SerialPortConfig[]): Promise<void> {
+export async function writeSerialConfig(
+  client: MspClient,
+  ports: SerialPortConfig[],
+): Promise<void> {
   await client.request(MSP.COMMON_SET_SERIAL_CONFIG, encodeSerialConfig(ports))
 }
 

@@ -9,7 +9,10 @@ import { useConnectionStore } from '@/stores/connection'
  * `read` must be a stable function (module-level, e.g. `readAttitude` from `lib/msp/api`).
  * Polls never overlap: the next read is scheduled `intervalMs` after the previous one settles.
  */
-export function useMspPoll<T>(read: (client: MspClient) => Promise<T>, intervalMs: number): T | null {
+export function useMspPoll<T>(
+  read: (client: MspClient) => Promise<T>,
+  intervalMs: number,
+): T | null {
   const client = useConnectionStore((s) => s.client)
   const [result, setResult] = useState<{ client: MspClient; value: T } | null>(null)
 

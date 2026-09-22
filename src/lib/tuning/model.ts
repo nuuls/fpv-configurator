@@ -55,7 +55,8 @@ const STRONG_FF_SMOOTH_FACTOR = 80
 export const SMOOTHING_PRESETS: Record<SmoothingPreset, SmoothingDefinition> = {
   direct: {
     label: 'Direct',
-    description: 'No RC smoothing, full feedforward. Most connected feel; needs a clean, fast link.',
+    description:
+      'No RC smoothing, full feedforward. Most connected feel; needs a clean, fast link.',
     rcSmoothing: false,
     autoFactor: 30,
     feedforwardGain: 100,
@@ -71,7 +72,8 @@ export const SMOOTHING_PRESETS: Record<SmoothingPreset, SmoothingDefinition> = {
   },
   strong: {
     label: 'Strong smoothing',
-    description: 'More RC smoothing (30), smoother and halved feedforward. Flowing freestyle and HD footage.',
+    description:
+      'More RC smoothing (30), smoother and halved feedforward. Flowing freestyle and HD footage.',
     rcSmoothing: true,
     autoFactor: 30,
     feedforwardGain: 50,
@@ -108,7 +110,10 @@ export interface AxisPids {
 const RX_CONFIG_AUTO_FACTOR_OFFSET = 30
 const RX_CONFIG_RC_SMOOTHING_OFFSET = 31
 
-export function decodeRcSmoothing(rxConfig: Uint8Array): { rcSmoothing: boolean; rcSmoothingAutoFactor: number } {
+export function decodeRcSmoothing(rxConfig: Uint8Array): {
+  rcSmoothing: boolean
+  rcSmoothingAutoFactor: number
+} {
   return {
     rcSmoothingAutoFactor: rxConfig[RX_CONFIG_AUTO_FACTOR_OFFSET] ?? 30,
     rcSmoothing: (rxConfig[RX_CONFIG_RC_SMOOTHING_OFFSET] ?? 1) !== 0,
@@ -166,7 +171,8 @@ export function buildSimplifiedTuning(snapshot: TuningSnapshot, draft: TuningDra
   payload[OFFSET.D_GAIN] = draft.damping
   payload[OFFSET.ROLL_PITCH_RATIO] = draft.pitch
   payload[OFFSET.PITCH_PI_GAIN] = draft.pitch
-  if (draft.smoothing !== 'custom') payload[OFFSET.FEEDFORWARD_GAIN] = SMOOTHING_PRESETS[draft.smoothing].feedforwardGain
+  if (draft.smoothing !== 'custom')
+    payload[OFFSET.FEEDFORWARD_GAIN] = SMOOTHING_PRESETS[draft.smoothing].feedforwardGain
   return payload
 }
 

@@ -44,13 +44,28 @@ export function RatesPage() {
   const { client, snapshot, error, reload } = useFcSnapshot(readRatesSnapshot)
   return (
     <>
-      <PageHeader title="Rates" description="How fast the quad rotates for a given stick movement." />
-      {client && snapshot ? <Editor client={client} snapshot={snapshot} reload={reload} /> : <LoadingState error={error} />}
+      <PageHeader
+        title="Rates"
+        description="How fast the quad rotates for a given stick movement."
+      />
+      {client && snapshot ? (
+        <Editor client={client} snapshot={snapshot} reload={reload} />
+      ) : (
+        <LoadingState error={error} />
+      )}
     </>
   )
 }
 
-function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: RatesSnapshot; reload: () => void }) {
+function Editor({
+  client,
+  snapshot,
+  reload,
+}: {
+  client: MspClient
+  snapshot: RatesSnapshot
+  reload: () => void
+}) {
   const { draft, setDraft, dirty, revert } = useDraft(snapshot, readRates)
   const { saving, error, save } = useSave(reload)
   // Sync is a way of editing, not a setting on the FC: start with whatever the current values allow.
@@ -85,18 +100,29 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Rat
             <div className="flex flex-wrap gap-4">
               <label className="flex items-center gap-3 text-sm font-medium">
                 Rate type
-                <NativeSelect value={draft.type} onChange={(e) => changeType(Number(e.target.value))}>
+                <NativeSelect
+                  value={draft.type}
+                  onChange={(e) => changeType(Number(e.target.value))}
+                >
                   {Object.entries(RATES_TYPES).map(([type, { name }]) => (
                     <NativeSelectOption key={type} value={type}>
                       {name}
                     </NativeSelectOption>
                   ))}
-                  {!RATES_TYPES[fcType] && <NativeSelectOption value={fcType}>{ratesTypeName(fcType)} (not supported)</NativeSelectOption>}
+                  {!RATES_TYPES[fcType] && (
+                    <NativeSelectOption value={fcType}>
+                      {ratesTypeName(fcType)} (not supported)
+                    </NativeSelectOption>
+                  )}
                 </NativeSelect>
               </label>
               <label className="flex items-center gap-3 text-sm font-medium">
                 Axes
-                <NativeSelect value={sync} disabled={!spec} onChange={(e) => changeSync(e.target.value as SyncMode)}>
+                <NativeSelect
+                  value={sync}
+                  disabled={!spec}
+                  onChange={(e) => changeSync(e.target.value as SyncMode)}
+                >
                   {(Object.keys(SYNC_LABELS) as SyncMode[]).map((mode) => (
                     <NativeSelectOption key={mode} value={mode}>
                       {SYNC_LABELS[mode]}
@@ -109,7 +135,7 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Rat
             {spec ? (
               <table className="w-full border-separate border-spacing-x-2 border-spacing-y-2 text-sm">
                 <thead>
-                  <tr className="text-left text-muted-foreground">
+                  <tr className="text-muted-foreground text-left">
                     <th />
                     {RATE_FIELDS.map((field) => (
                       <th key={field} scope="col" className="font-normal">
@@ -122,7 +148,9 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Rat
                 <tbody>
                   {AXES.map((axisName, axis) => (
                     <tr key={axisName}>
-                      <th scope="row" className="pr-2 text-left font-medium">{axisName}</th>
+                      <th scope="row" className="pr-2 text-left font-medium">
+                        {axisName}
+                      </th>
                       {RATE_FIELDS.map((field) => {
                         const fieldSpec = spec.fields[field]
                         return (
@@ -137,10 +165,16 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Rat
                               onValueChange={(value) =>
                                 setDraft({
                                   ...draft,
-                                  axes: editAxis(draft.axes, sync, axis, field, Math.round(value * 10 ** fieldSpec.decimals)),
+                                  axes: editAxis(
+                                    draft.axes,
+                                    sync,
+                                    axis,
+                                    field,
+                                    Math.round(value * 10 ** fieldSpec.decimals),
+                                  ),
                                 })
                               }
-                              className="h-9 w-full min-w-20 rounded-md border bg-transparent px-3 tabular-nums disabled:opacity-50 dark:bg-input/30"
+                              className="dark:bg-input/30 h-9 w-full min-w-20 rounded-md border bg-transparent px-3 tabular-nums disabled:opacity-50"
                             />
                           </td>
                         )
@@ -151,9 +185,9 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Rat
               </table>
             ) : (
               <Notice>
-                This quad uses a rate type this app doesn&apos;t know ({ratesTypeName(fcType)}). Pick another rate type to
-                switch — that starts from the new type&apos;s default rates, because the numbers of different rate types
-                aren&apos;t comparable.
+                This quad uses a rate type this app doesn&apos;t know ({ratesTypeName(fcType)}).
+                Pick another rate type to switch — that starts from the new type&apos;s default
+                rates, because the numbers of different rate types aren&apos;t comparable.
               </Notice>
             )}
           </CardContent>
@@ -167,7 +201,7 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Rat
             {spec ? (
               <RateCurveChart series={curveSeries(draft, rateLimits(snapshot))} />
             ) : (
-              <p className="text-sm text-muted-foreground">Not available for this rate type.</p>
+              <p className="text-muted-foreground text-sm">Not available for this rate type.</p>
             )}
           </CardContent>
         </Card>

@@ -49,13 +49,28 @@ export function PidTuningPage() {
   const { client, snapshot, error, reload } = useFcSnapshot(readTuningSnapshot)
   return (
     <>
-      <PageHeader title="PID Tuning" description="Three sliders and a stick-feel preset. The rest is handled for you." />
-      {client && snapshot ? <Editor client={client} snapshot={snapshot} reload={reload} /> : <LoadingState error={error} />}
+      <PageHeader
+        title="PID Tuning"
+        description="Three sliders and a stick-feel preset. The rest is handled for you."
+      />
+      {client && snapshot ? (
+        <Editor client={client} snapshot={snapshot} reload={reload} />
+      ) : (
+        <LoadingState error={error} />
+      )}
     </>
   )
 }
 
-function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: TuningSnapshot; reload: () => void }) {
+function Editor({
+  client,
+  snapshot,
+  reload,
+}: {
+  client: MspClient
+  snapshot: TuningSnapshot
+  reload: () => void
+}) {
   const { draft, setDraft, dirty, revert } = useDraft(snapshot, readTuning)
   const { saving, error, save } = useSave(reload)
   const pids = usePidPreview(client, snapshot, draft)
@@ -75,7 +90,9 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Tun
               <div key={key}>
                 <div className="flex items-baseline justify-between">
                   <span className="text-sm font-medium">{label}</span>
-                  <span className="font-mono text-sm tabular-nums">{(draft[key] / 100).toFixed(2)}</span>
+                  <span className="font-mono text-sm tabular-nums">
+                    {(draft[key] / 100).toFixed(2)}
+                  </span>
                 </div>
                 <Slider
                   aria-label={label}
@@ -83,9 +100,11 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Tun
                   {...sliderBounds(readTuning(snapshot)[key])}
                   step={SLIDER_STEP}
                   value={[draft[key]]}
-                  onValueChange={([value]) => value !== undefined && setDraft({ ...draft, [key]: value })}
+                  onValueChange={([value]) =>
+                    value !== undefined && setDraft({ ...draft, [key]: value })
+                  }
                 />
-                <p className="text-sm text-muted-foreground">{hint}</p>
+                <p className="text-muted-foreground text-sm">{hint}</p>
               </div>
             ))}
           </CardContent>
@@ -94,7 +113,9 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Tun
         <Card>
           <CardHeader>
             <CardTitle>Resulting PIDs</CardTitle>
-            <CardDescription>Calculated by the flight controller from the sliders. View only.</CardDescription>
+            <CardDescription>
+              Calculated by the flight controller from the sliders. View only.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <table className="w-full text-right font-mono text-sm tabular-nums">
@@ -130,7 +151,8 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Tun
         <CardHeader>
           <CardTitle>Stick feel</CardTitle>
           <CardDescription>
-            How much the stick signal is smoothed. Betaflight adapts to your radio link&apos;s packet rate by itself.
+            How much the stick signal is smoothed. Betaflight adapts to your radio link&apos;s
+            packet rate by itself.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3">
@@ -144,19 +166,19 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Tun
                 aria-pressed={selected}
                 onClick={() => setDraft({ ...draft, smoothing: key })}
                 className={cn(
-                  'rounded-lg border p-4 text-left transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                  'hover:bg-accent focus-visible:ring-ring/50 rounded-lg border p-4 text-left transition-colors outline-none focus-visible:ring-[3px]',
                   selected && 'border-primary bg-primary/10 hover:bg-primary/10',
                 )}
               >
                 <div className="font-medium">{preset.label}</div>
-                <p className="mt-1 text-sm text-muted-foreground">{preset.description}</p>
+                <p className="text-muted-foreground mt-1 text-sm">{preset.description}</p>
               </button>
             )
           })}
           {draft.smoothing === 'custom' && (
-            <p className="text-sm text-muted-foreground md:col-span-3">
-              This quad has custom smoothing settings that match none of the presets. They stay as they are unless you
-              pick one.
+            <p className="text-muted-foreground text-sm md:col-span-3">
+              This quad has custom smoothing settings that match none of the presets. They stay as
+              they are unless you pick one.
             </p>
           )}
         </CardContent>
@@ -164,8 +186,9 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Tun
 
       {hasHiddenTuning(snapshot) && (
         <Notice tone="warning">
-          This quad uses tuning values this app doesn&apos;t show (other sliders, Dynamic D, or manually entered PIDs).
-          Saving resets those to the app&apos;s defaults: other sliders at 1.0 and Dynamic D off.
+          This quad uses tuning values this app doesn&apos;t show (other sliders, Dynamic D, or
+          manually entered PIDs). Saving resets those to the app&apos;s defaults: other sliders at
+          1.0 and Dynamic D off.
         </Notice>
       )}
       {error && <Notice tone="error">{error}</Notice>}
@@ -181,7 +204,11 @@ function Editor({ client, snapshot, reload }: { client: MspClient; snapshot: Tun
 }
 
 /** Asks the FC for the PIDs the draft would produce, a moment after the sliders stop moving. */
-function usePidPreview(client: MspClient, snapshot: TuningSnapshot, draft: TuningDraft): AxisPids[] | null {
+function usePidPreview(
+  client: MspClient,
+  snapshot: TuningSnapshot,
+  draft: TuningDraft,
+): AxisPids[] | null {
   const [pids, setPids] = useState<AxisPids[] | null>(null)
   const { master, damping, pitch, smoothing } = draft
 

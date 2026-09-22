@@ -41,7 +41,16 @@ describe('encode', () => {
 
   it('encodes a v1 request with payload', () => {
     const frame = encodeV1(200, Uint8Array.from([0xdc, 0x05]))
-    expect([...frame]).toEqual([0x24, 0x4d, 0x3c, 0x02, 0xc8, 0xdc, 0x05, 0x02 ^ 0xc8 ^ 0xdc ^ 0x05])
+    expect([...frame]).toEqual([
+      0x24,
+      0x4d,
+      0x3c,
+      0x02,
+      0xc8,
+      0xdc,
+      0x05,
+      0x02 ^ 0xc8 ^ 0xdc ^ 0x05,
+    ])
   })
 
   it('encodes a v2 request (reference frame from the MSPv2 spec)', () => {
@@ -95,12 +104,20 @@ describe('MspParser', () => {
   })
 
   it('handles back-to-back frames in one chunk', () => {
-    const chunk = concat(encodeV1(1, payload, 'response'), encodeV2(2, payload, 'response'), encodeV1(3))
+    const chunk = concat(
+      encodeV1(1, payload, 'response'),
+      encodeV2(2, payload, 'response'),
+      encodeV1(3),
+    )
     expect(parse(chunk).frames.map((f) => f.code)).toEqual([1, 2, 3])
   })
 
   it('skips garbage between frames', () => {
-    const chunk = concat(ascii('boot log $ noise\r\n$$'), encodeV1(1, payload, 'response'), ascii('#'))
+    const chunk = concat(
+      ascii('boot log $ noise\r\n$$'),
+      encodeV1(1, payload, 'response'),
+      ascii('#'),
+    )
     const { frames, errors } = parse(chunk)
     expect(frames.map((f) => f.code)).toEqual([1])
     expect(errors).toEqual([])

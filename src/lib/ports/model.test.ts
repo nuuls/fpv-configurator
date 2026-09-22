@@ -78,7 +78,9 @@ describe('readAssignments', () => {
   })
 
   it('reports a built-in SPI receiver and non-CRSF serial receivers', () => {
-    expect(readAssignments(snapshot((s) => void (s.features |= FEATURE.RX_SPI))).receiver.type).toBe('spi')
+    expect(
+      readAssignments(snapshot((s) => void (s.features |= FEATURE.RX_SPI))).receiver.type,
+    ).toBe('spi')
     expect(readAssignments(snapshot((s) => void (s.serialRxProvider = 2))).receiver).toEqual({
       type: 'other',
       port: UART2,
@@ -89,7 +91,9 @@ describe('readAssignments', () => {
 describe('configuredGpsPort', () => {
   it('needs both the GPS port function and the GPS feature', () => {
     expect(configuredGpsPort(snapshot())).toBeNull()
-    expect(configuredGpsPort(snapshot((s) => void (s.ports[4]!.functionMask = PORT_FUNCTION.GPS)))).toBeNull()
+    expect(
+      configuredGpsPort(snapshot((s) => void (s.ports[4]!.functionMask = PORT_FUNCTION.GPS))),
+    ).toBeNull()
     expect(configuredGpsPort(snapshot((s) => void (s.features |= FEATURE.GPS)))).toBeNull()
     const both = snapshot((s) => {
       s.ports[4]!.functionMask = PORT_FUNCTION.GPS
@@ -143,7 +147,10 @@ describe('planWrites', () => {
     const digital = snapshot((s) => {
       s.ports[1]!.functionMask = PORT_FUNCTION.MSP | PORT_FUNCTION.VTX_MSP
     })
-    const plan = planWrites(digital, { ...readAssignments(digital), vtx: { type: 'smartaudio', port: UART1 } })
+    const plan = planWrites(digital, {
+      ...readAssignments(digital),
+      vtx: { type: 'smartaudio', port: UART1 },
+    })
     expect(maskOf(plan.ports, UART1)).toBe(PORT_FUNCTION.VTX_SMARTAUDIO)
     expect(plan.settings.map((w) => w.value)).toEqual(['AUTO', 'AUTO'])
   })
@@ -157,7 +164,10 @@ describe('planWrites', () => {
 
   it('switches a non-CRSF receiver to CRSF', () => {
     const sbus = snapshot((s) => void (s.serialRxProvider = 2))
-    const plan = planWrites(sbus, { ...readAssignments(sbus), receiver: { type: 'crsf', port: UART2 } })
+    const plan = planWrites(sbus, {
+      ...readAssignments(sbus),
+      receiver: { type: 'crsf', port: UART2 },
+    })
     expect(plan.settings).toEqual([{ name: 'serialrx_provider', value: 'CRSF' }])
   })
 

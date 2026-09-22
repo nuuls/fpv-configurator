@@ -55,7 +55,12 @@ export function decodeFcVersion(payload: Uint8Array): FcVersion {
 }
 
 export function encodeFcVersion(v: FcVersion): Uint8Array {
-  return new ByteWriter().u8(v.major).u8(v.minor).u8(v.patch).pascalString(v.versionString).toBytes()
+  return new ByteWriter()
+    .u8(v.major)
+    .u8(v.minor)
+    .u8(v.patch)
+    .pascalString(v.versionString)
+    .toBytes()
 }
 
 // ---- MSP_BOARD_INFO (4) ----

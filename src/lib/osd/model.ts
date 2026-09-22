@@ -31,7 +31,11 @@ export function elementIndex(firmwareName: string): number {
 export function elementName(index: number): string {
   const name = FIRMWARE_ELEMENTS[index]
   if (!name) return `Element ${index}`
-  const words = name.replace(/^ITEM_/, '').toLowerCase().split('_').join(' ')
+  const words = name
+    .replace(/^ITEM_/, '')
+    .toLowerCase()
+    .split('_')
+    .join(' ')
   return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
@@ -57,7 +61,8 @@ export interface OsdElementDef {
   suggest: (canvas: Canvas) => Cell
 }
 
-const centred = (canvas: Canvas, width: number) => Math.max(0, Math.floor((canvas.cols - width) / 2))
+const centred = (canvas: Canvas, width: number) =>
+  Math.max(0, Math.floor((canvas.cols - width) / 2))
 const right = (canvas: Canvas, width: number) => Math.max(0, canvas.cols - 1 - width)
 const fromBottom = (canvas: Canvas, rows: number) => Math.max(0, canvas.rows - 1 - rows)
 
@@ -69,17 +74,27 @@ const element = (
   hint?: string,
 ): OsdElementDef => ({ index: elementIndex(firmwareName), label, sample, suggest, hint })
 
-const gpsElement = (...args: Parameters<typeof element>): OsdElementDef => ({ ...element(...args), gps: true })
+const gpsElement = (...args: Parameters<typeof element>): OsdElementDef => ({
+  ...element(...args),
+  gps: true,
+})
 
-const CUSTOM_MESSAGE_HINT = 'Shows this placeholder until a device (e.g. a Lua script) sends the text.'
+const CUSTOM_MESSAGE_HINT =
+  'Shows this placeholder until a device (e.g. a Lua script) sends the text.'
 
 /** The elements this app manages, in the order of docs/SPEC.md §2; the GPS ones only with a GPS. */
 export const OSD_ELEMENTS: OsdElementDef[] = [
-  element('AVG_CELL_VOLTAGE', 'Battery average cell voltage', '3.98V', (c) => ({ x: 1, y: fromBottom(c, 1) })),
+  element('AVG_CELL_VOLTAGE', 'Battery average cell voltage', '3.98V', (c) => ({
+    x: 1,
+    y: fromBottom(c, 1),
+  })),
   element('CURRENT_DRAW', 'Current draw', '42.0A', (c) => ({ x: 1, y: fromBottom(c, 2) })),
   element('MAH_DRAWN', 'Used mAh', '690mAh', (c) => ({ x: right(c, 6), y: fromBottom(c, 1) })),
   element('LINK_QUALITY', 'Link quality', '2:100', () => ({ x: 1, y: 1 })),
-  element('WARNINGS', 'Warnings', 'LOW BATTERY', (c) => ({ x: centred(c, 11), y: Math.floor(c.rows / 2) + 2 })),
+  element('WARNINGS', 'Warnings', 'LOW BATTERY', (c) => ({
+    x: centred(c, 11),
+    y: Math.floor(c.rows / 2) + 2,
+  })),
   element('DISARMED', 'Disarmed', 'DISARMED', (c) => ({ x: centred(c, 8), y: fromBottom(c, 3) })),
   element('ITEM_TIMER_2', 'Timer 2 (armed time)', '02:43', (c) => ({ x: right(c, 5), y: 1 })),
   ...[0, 1, 2, 3].map((n) =>
@@ -91,17 +106,41 @@ export const OSD_ELEMENTS: OsdElementDef[] = [
       CUSTOM_MESSAGE_HINT,
     ),
   ),
-  element('VTX_CHANNEL', 'VTX channel', 'R:1:25', (c) => ({ x: right(c, 6), y: fromBottom(c, 2) }), 'Band, channel and power.'),
+  element(
+    'VTX_CHANNEL',
+    'VTX channel',
+    'R:1:25',
+    (c) => ({ x: right(c, 6), y: fromBottom(c, 2) }),
+    'Band, channel and power.',
+  ),
   element('ALTITUDE', 'Altitude', '12.3m', (c) => ({ x: right(c, 5), y: 2 })),
   // osdAddActiveElements adds exactly these `if (sensors(SENSOR_GPS))`; the lap timer is a separate build option.
   gpsElement('GPS_SATS', 'GPS satellites', 'SAT14', () => ({ x: 1, y: 2 })),
   gpsElement('GPS_SPEED', 'GPS speed', '67KPH', () => ({ x: 1, y: 3 })),
-  gpsElement('GPS_LAT', 'GPS latitude', 'N48.2081743', (c) => ({ x: centred(c, 11), y: fromBottom(c, 2) })),
-  gpsElement('GPS_LON', 'GPS longitude', 'E16.3738189', (c) => ({ x: centred(c, 11), y: fromBottom(c, 1) })),
-  gpsElement('HOME_DIR', 'Home direction', 'H^', (c) => ({ x: right(c, 5) - 3, y: 3 }), 'Arrow pointing home.'),
+  gpsElement('GPS_LAT', 'GPS latitude', 'N48.2081743', (c) => ({
+    x: centred(c, 11),
+    y: fromBottom(c, 2),
+  })),
+  gpsElement('GPS_LON', 'GPS longitude', 'E16.3738189', (c) => ({
+    x: centred(c, 11),
+    y: fromBottom(c, 1),
+  })),
+  gpsElement(
+    'HOME_DIR',
+    'Home direction',
+    'H^',
+    (c) => ({ x: right(c, 5) - 3, y: 3 }),
+    'Arrow pointing home.',
+  ),
   gpsElement('HOME_DIST', 'Home distance', 'H120m', (c) => ({ x: right(c, 5), y: 3 })),
   gpsElement('FLIGHT_DIST', 'Flight distance', '1.24km', (c) => ({ x: right(c, 6), y: 4 })),
-  gpsElement('EFFICIENCY', 'Efficiency', '42mAh/km', (c) => ({ x: 1, y: fromBottom(c, 3) }), 'Battery used per distance.'),
+  gpsElement(
+    'EFFICIENCY',
+    'Efficiency',
+    '42mAh/km',
+    (c) => ({ x: 1, y: fromBottom(c, 3) }),
+    'Battery used per distance.',
+  ),
 ]
 
 const VTX_CHANNEL = elementIndex('VTX_CHANNEL')
@@ -204,7 +243,9 @@ export function decodeOsdConfig(payload: Uint8Array): OsdConfig {
 /** Inverse of `decodeOsdConfig` for the mock FC; alarms, statistics and warnings are zeroed. */
 export function encodeOsdConfig(config: OsdConfig): Uint8Array {
   const w = new ByteWriter()
-  w.u8((config.supported ? FLAG_OSD_FEATURE : 0) | (config.deviceDetected ? FLAG_DEVICE_DETECTED : 0))
+  w.u8(
+    (config.supported ? FLAG_OSD_FEATURE : 0) | (config.deviceDetected ? FLAG_DEVICE_DETECTED : 0),
+  )
   w.u8(config.videoSystem).zeros(5).u8(config.positions.length).zeros(2)
   for (const position of config.positions) w.u16(position)
   w.u8(0) // no statistics
@@ -266,9 +307,12 @@ const HD_DEFAULT: Canvas = { cols: 53, rows: 20 }
 export function canvasFor(videoSystem: number, reported: Canvas): Canvas {
   const hd = videoSystem === VIDEO_SYSTEM.HD
   const maxCols = hd ? MAX_X + 1 : SD_COLS
-  const valid = reported.cols > 0 && reported.cols <= maxCols && reported.rows > 0 && reported.rows <= MAX_Y + 1
+  const valid =
+    reported.cols > 0 && reported.cols <= maxCols && reported.rows > 0 && reported.rows <= MAX_Y + 1
   if (valid) return reported
-  return hd ? HD_DEFAULT : { cols: SD_COLS, rows: videoSystem === VIDEO_SYSTEM.NTSC ? NTSC_ROWS : PAL_ROWS }
+  return hd
+    ? HD_DEFAULT
+    : { cols: SD_COLS, rows: videoSystem === VIDEO_SYSTEM.NTSC ? NTSC_ROWS : PAL_ROWS }
 }
 
 // ---- snapshot → draft → writes ----
@@ -315,7 +359,9 @@ export function toDraft(snapshot: OsdSnapshot): OsdDraft {
 /** Elements outside this app's list that are switched on in any OSD profile. */
 export function otherVisibleElements(snapshot: OsdSnapshot): number[] {
   const managed = new Set(availableElements(snapshot).map((def) => def.index))
-  return snapshot.config.positions.flatMap((raw, index) => (!managed.has(index) && decodePosition(raw).profiles !== 0 ? [index] : []))
+  return snapshot.config.positions.flatMap((raw, index) =>
+    !managed.has(index) && decodePosition(raw).profiles !== 0 ? [index] : [],
+  )
 }
 
 /**
@@ -326,7 +372,12 @@ function isOnDefaultPile({ x, y }: Cell): boolean {
   return (x === 21 && y === 10) || (x === 10 && y === 7)
 }
 
-export function setElementShown(draft: OsdDraft, index: number, shown: boolean, canvas: Canvas): OsdDraft {
+export function setElementShown(
+  draft: OsdDraft,
+  index: number,
+  shown: boolean,
+  canvas: Canvas,
+): OsdDraft {
   return {
     ...draft,
     elements: draft.elements.map((el) => {
@@ -339,12 +390,16 @@ export function setElementShown(draft: OsdDraft, index: number, shown: boolean, 
 }
 
 export function setElementCell(draft: OsdDraft, index: number, cell: Partial<Cell>): OsdDraft {
-  return { ...draft, elements: draft.elements.map((el) => (el.index === index ? { ...el, ...cell } : el)) }
+  return {
+    ...draft,
+    elements: draft.elements.map((el) => (el.index === index ? { ...el, ...cell } : el)),
+  }
 }
 
 /** Where a drag or an arrow key may put an element: the whole sample text stays on the canvas. */
 export function clampToCanvas(cell: Cell, sampleLength: number, canvas: Canvas): Cell {
-  const clamp = (value: number, max: number) => Math.min(Math.max(0, Math.round(value)), Math.max(0, max))
+  const clamp = (value: number, max: number) =>
+    Math.min(Math.max(0, Math.round(value)), Math.max(0, max))
   return { x: clamp(cell.x, canvas.cols - sampleLength), y: clamp(cell.y, canvas.rows - 1) }
 }
 
@@ -396,7 +451,10 @@ export function planOsdWrites(snapshot: OsdSnapshot, draft: OsdDraft): OsdWrite[
   if (timerShown && timer !== undefined) {
     const source = timer & TIMER_SOURCE_MASK
     if (source !== TIMER_SOURCE_TOTAL_ARMED && source !== TIMER_SOURCE_LAST_ARMED)
-      writes.push({ timer: TIMER_2, config: (timer & ~TIMER_SOURCE_MASK) | TIMER_SOURCE_TOTAL_ARMED })
+      writes.push({
+        timer: TIMER_2,
+        config: (timer & ~TIMER_SOURCE_MASK) | TIMER_SOURCE_TOTAL_ARMED,
+      })
   }
   return writes
 }

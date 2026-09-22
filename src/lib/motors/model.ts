@@ -67,8 +67,15 @@ export function validateMotors(draft: MotorsDraft, snapshot?: MotorsSnapshot): s
   const untouched = snapshot !== undefined && draft.dynIdle === snapshot.dynIdle
   if (!untouched && (draft.dynIdle < DYN_IDLE_MIN || draft.dynIdle > DYN_IDLE_MAX))
     problems.push(`Dynamic idle must be between ${DYN_IDLE_MIN} and ${DYN_IDLE_MAX}.`)
-  if (!Number.isInteger(draft.poles) || draft.poles < 4 || draft.poles > 40 || draft.poles % 2 !== 0)
-    problems.push('Motor poles must be an even number between 4 and 40 (count the magnets; usually 12 or 14).')
+  if (
+    !Number.isInteger(draft.poles) ||
+    draft.poles < 4 ||
+    draft.poles > 40 ||
+    draft.poles % 2 !== 0
+  )
+    problems.push(
+      'Motor poles must be an even number between 4 and 40 (count the magnets; usually 12 or 14).',
+    )
   return problems
 }
 
@@ -162,7 +169,10 @@ export type DroneType = 'five-inch'
 export type IdleZone = 'good' | 'warning' | 'danger'
 
 /** Recommended idle per drone type (SPEC §2 Motors). Everything outside good ± warningMargin is danger. */
-export const DYN_IDLE_ZONES: Record<DroneType, { label: string; goodMin: number; goodMax: number; warningMargin: number }> = {
+export const DYN_IDLE_ZONES: Record<
+  DroneType,
+  { label: string; goodMin: number; goodMax: number; warningMargin: number }
+> = {
   'five-inch': { label: '5"', goodMin: 18, goodMax: 25, warningMargin: 3 },
 }
 
@@ -209,7 +219,10 @@ export function decodeMotorTelemetry(payload: Uint8Array): MotorTelemetry[] {
 
 export function encodeMotorTelemetry(motors: MotorTelemetry[]): Uint8Array {
   const w = new ByteWriter().u8(motors.length)
-  for (const m of motors) w.u32(m.rpm).u16(Math.round(m.invalidPercent * 100)).zeros(7)
+  for (const m of motors)
+    w.u32(m.rpm)
+      .u16(Math.round(m.invalidPercent * 100))
+      .zeros(7)
   return w.toBytes()
 }
 

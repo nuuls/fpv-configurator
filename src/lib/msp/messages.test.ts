@@ -24,7 +24,11 @@ const ascii = (text: string) => [...text].map((c) => c.charCodeAt(0))
 
 describe('message decoders', () => {
   it('decodes MSP_API_VERSION', () => {
-    expect(decodeApiVersion(Uint8Array.of(0, 1, 47))).toEqual({ protocolVersion: 0, major: 1, minor: 47 })
+    expect(decodeApiVersion(Uint8Array.of(0, 1, 47))).toEqual({
+      protocolVersion: 0,
+      major: 1,
+      minor: 47,
+    })
   })
 
   it('decodes MSP_FC_VARIANT', () => {
@@ -32,7 +36,12 @@ describe('message decoders', () => {
   })
 
   it('decodes MSP_FC_VERSION', () => {
-    expect(decodeFcVersion(Uint8Array.of(4, 5, 2))).toEqual({ major: 4, minor: 5, patch: 2, versionString: '' })
+    expect(decodeFcVersion(Uint8Array.of(4, 5, 2))).toEqual({
+      major: 4,
+      minor: 5,
+      patch: 2,
+      versionString: '',
+    })
   })
 
   it('decodes a calendar-versioned MSP_FC_VERSION (API 1.47+)', () => {
@@ -42,8 +51,22 @@ describe('message decoders', () => {
 
   it('round-trips the serial config, including high function bits', () => {
     const ports = [
-      { identifier: 20, functionMask: 1, mspBaud: 5, gpsBaud: 4, telemetryBaud: 0, blackboxBaud: 5 },
-      { identifier: 51, functionMask: 131073, mspBaud: 5, gpsBaud: 4, telemetryBaud: 0, blackboxBaud: 5 },
+      {
+        identifier: 20,
+        functionMask: 1,
+        mspBaud: 5,
+        gpsBaud: 4,
+        telemetryBaud: 0,
+        blackboxBaud: 5,
+      },
+      {
+        identifier: 51,
+        functionMask: 131073,
+        mspBaud: 5,
+        gpsBaud: 4,
+        telemetryBaud: 0,
+        blackboxBaud: 5,
+      },
     ]
     expect(decodeSerialConfig(encodeSerialConfig(ports))).toEqual(ports)
     expect(encodeSerialConfig(ports)).toHaveLength(1 + 2 * 9)
@@ -72,7 +95,10 @@ describe('message decoders', () => {
     }
     expect(decodeBoardInfo(encodeBoardInfo(info))).toEqual(info)
     // firmware before the configuration problems were added: the payload ends after the gyro rate
-    expect(decodeBoardInfo(encodeBoardInfo(info).slice(0, -4))).toEqual({ ...info, configurationProblems: 0 })
+    expect(decodeBoardInfo(encodeBoardInfo(info).slice(0, -4))).toEqual({
+      ...info,
+      configurationProblems: 0,
+    })
   })
 
   it('decodes a legacy MSP_BOARD_INFO that only has identifier + revision', () => {
@@ -88,7 +114,14 @@ describe('message decoders', () => {
   })
 
   it('decodes MSP_STATUS', () => {
-    const status = { cycleTimeUs: 125, i2cErrors: 1, sensors: 0b100001, modeFlags: 0x80000001, pidProfile: 2, cpuLoad: 14 }
+    const status = {
+      cycleTimeUs: 125,
+      i2cErrors: 1,
+      sensors: 0b100001,
+      modeFlags: 0x80000001,
+      pidProfile: 2,
+      cpuLoad: 14,
+    }
     expect(decodeStatus(encodeStatus(status))).toEqual(status)
   })
 
@@ -98,7 +131,11 @@ describe('message decoders', () => {
 
   it('decodes MSP_ATTITUDE, including negative angles', () => {
     // roll -12.5° = -125 = 0xff83, pitch 3.0° = 30, yaw 270
-    expect(decodeAttitude(Uint8Array.of(0x83, 0xff, 30, 0, 0x0e, 0x01))).toEqual({ roll: -12.5, pitch: 3, yaw: 270 })
+    expect(decodeAttitude(Uint8Array.of(0x83, 0xff, 30, 0, 0x0e, 0x01))).toEqual({
+      roll: -12.5,
+      pitch: 3,
+      yaw: 270,
+    })
     expect(decodeAttitude(encodeAttitude({ roll: -179.9, pitch: 45.5, yaw: 359 }))).toEqual({
       roll: -179.9,
       pitch: 45.5,
@@ -107,7 +144,9 @@ describe('message decoders', () => {
   })
 
   it('decodes MSP_ANALOG, preferring the high-resolution voltage', () => {
-    expect(decodeAnalog(encodeAnalog({ voltage: 16.24, mAhDrawn: 850, rssi: 1023, amperage: -0.5 }))).toEqual({
+    expect(
+      decodeAnalog(encodeAnalog({ voltage: 16.24, mAhDrawn: 850, rssi: 1023, amperage: -0.5 })),
+    ).toEqual({
       voltage: 16.24,
       mAhDrawn: 850,
       rssi: 1023,

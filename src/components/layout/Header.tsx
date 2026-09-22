@@ -43,7 +43,7 @@ export function Header({ navOpen, onToggleNav }: HeaderProps) {
         >
           {navOpen ? <X /> : <Menu />}
         </Button>
-        <Cpu className="size-5 text-primary" />
+        <Cpu className="text-primary size-5" />
         <span className="max-sm:sr-only">FPV Configurator</span>
         {/* AGPL §13: everyone using the app gets offered its source. */}
         <a
@@ -51,7 +51,7 @@ export function Header({ navOpen, onToggleNav }: HeaderProps) {
           target="_blank"
           rel="noreferrer"
           title="Source code — free software under the GNU AGPL 3.0 or later"
-          className="ml-2 flex items-center gap-1 text-xs font-normal text-muted-foreground hover:text-foreground"
+          className="text-muted-foreground hover:text-foreground ml-2 flex items-center gap-1 text-xs font-normal"
         >
           <CodeXml className="size-3.5" />
           <span className="max-sm:sr-only">Source</span>
@@ -61,7 +61,7 @@ export function Header({ navOpen, onToggleNav }: HeaderProps) {
       <div
         role="alert"
         title={ALPHA_WARNING}
-        className="flex min-w-0 items-center gap-2 rounded-md bg-warning px-3 py-1.5 text-sm font-semibold text-black max-md:order-last max-md:w-full max-md:text-xs"
+        className="bg-warning flex min-w-0 items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold text-black max-md:order-last max-md:w-full max-md:text-xs"
       >
         <TriangleAlert className="size-5 shrink-0" />
         <span className="shrink-0 text-base font-extrabold tracking-wide uppercase">Alpha</span>
@@ -71,7 +71,9 @@ export function Header({ navOpen, onToggleNav }: HeaderProps) {
       <div className="flex shrink-0 items-center gap-2 md:gap-3">
         {status === 'connected' && fcInfo && (
           <>
-            <span className="text-sm text-muted-foreground max-md:hidden">{formatFirmware(fcInfo)}</span>
+            <span className="text-muted-foreground text-sm max-md:hidden">
+              {formatFirmware(fcInfo)}
+            </span>
             <Badge variant="success">
               <Usb />
               {transportLabel}

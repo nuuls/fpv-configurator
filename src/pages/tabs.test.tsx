@@ -10,7 +10,18 @@ describe('sidebar', () => {
     await openTab('Setup')
     const tabs = within(screen.getByRole('navigation', { name: 'Tabs' })).getAllByRole('link')
     expect(tabs.map((tab) => tab.textContent)).toEqual([
-      'Setup', 'Ports', 'Orientation', 'PID Tuning', 'Filters', 'Rates', 'Modes', 'Motors', 'ESC', 'OSD', 'Analog VTX', 'Diff Checker',
+      'Setup',
+      'Ports',
+      'Orientation',
+      'PID Tuning',
+      'Filters',
+      'Rates',
+      'Modes',
+      'Motors',
+      'ESC',
+      'OSD',
+      'Analog VTX',
+      'Diff Checker',
       'Blackbox',
     ])
   })
@@ -20,14 +31,24 @@ describe('Setup tab', () => {
   it('saves the PID loop frequency across a reboot', async () => {
     const user = await openTab('Setup')
     const group = await screen.findByRole('group', { name: 'PID loop frequency' })
-    expect(within(group).getAllByRole('button').map((b) => b.textContent)).toEqual(['4 kHz', '8 kHz'])
-    expect(within(group).getByRole('button', { name: '8 kHz' })).toHaveAttribute('aria-pressed', 'true')
+    expect(
+      within(group)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['4 kHz', '8 kHz'])
+    expect(within(group).getByRole('button', { name: '8 kHz' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
     expect(screen.getByRole('button', { name: 'Save & Reboot' })).toBeDisabled()
 
     await user.click(within(group).getByRole('button', { name: '4 kHz' }))
     await saveAndReboot(user)
     const after = await screen.findByRole('group', { name: 'PID loop frequency' })
-    expect(within(after).getByRole('button', { name: '4 kHz' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(after).getByRole('button', { name: '4 kHz' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
     expect(await screen.findByText('250 µs')).toBeInTheDocument()
   })
 })
@@ -37,7 +58,9 @@ describe('Blackbox tab', () => {
     const user = await openTab('Blackbox')
     expect(await screen.findByText(/Onboard flash: 3\.3 MB of 16\.0 MB used/)).toBeInTheDocument()
     expect(screen.getByLabelText('Log to')).toHaveValue('1')
-    expect(within(screen.getByLabelText('Log to')).queryByRole('option', { name: /SD card|Serial/ })).toBeNull()
+    expect(
+      within(screen.getByLabelText('Log to')).queryByRole('option', { name: /SD card|Serial/ }),
+    ).toBeNull()
 
     await user.selectOptions(screen.getByLabelText('Logging rate'), '1/8 (1 kHz)')
     await saveAndReboot(user)
@@ -48,7 +71,9 @@ describe('Blackbox tab', () => {
     const user = await openTab('Blackbox')
     await user.click(await screen.findByRole('button', { name: 'Erase storage' }))
     await user.click(await screen.findByRole('button', { name: 'Erase' }))
-    expect(await screen.findByText(/Onboard flash: 0 kB of/, {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(
+      await screen.findByText(/Onboard flash: 0 kB of/, {}, { timeout: 3000 }),
+    ).toBeInTheDocument()
   })
 
   it('restarts as a USB drive and explains how to get back', async () => {
@@ -63,9 +88,11 @@ describe('Orientation tab', () => {
   it('offers 45° steps and saves across a reboot', async () => {
     const user = await openTab('Orientation')
     const yaw = await screen.findByLabelText('Yaw')
-    expect(within(yaw).getAllByRole('option').map((o) => o.textContent)).toEqual(
-      ['0°', '45°', '90°', '135°', '180°', '225°', '270°', '315°'],
-    )
+    expect(
+      within(yaw)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['0°', '45°', '90°', '135°', '180°', '225°', '270°', '315°'])
     await user.selectOptions(yaw, '90')
     await user.selectOptions(screen.getByLabelText('Roll'), '180')
     expect(screen.getByRole('img', { name: /yaw 90°, roll 180°/ })).toBeInTheDocument()
@@ -88,7 +115,9 @@ describe('Orientation tab', () => {
     await user.click(calibrate)
     expect(await screen.findByText('Keep the quad still…')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Calibrating…' })).toBeDisabled()
-    expect(await screen.findByText('Calibration finished and saved.', {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(
+      await screen.findByText('Calibration finished and saved.', {}, { timeout: 3000 }),
+    ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Calibrate accelerometer' })).toBeEnabled()
   })
 })
@@ -97,7 +126,8 @@ describe('Modes tab', () => {
   it('shows only the four supported modes and mentions the ones it leaves alone', async () => {
     await openTab('Modes')
     expect(await screen.findByText('Arm')).toBeInTheDocument()
-    for (const label of ['Angle', 'Turtle mode', 'Beeper']) expect(screen.getByText(label)).toBeInTheDocument()
+    for (const label of ['Angle', 'Turtle mode', 'Beeper'])
+      expect(screen.getByText(label)).toBeInTheDocument()
     expect(screen.queryByText(/Horizon|Failsafe|Air ?mode/i)).toBeNull()
     expect(screen.getByText(/1 other mode range is set up/)).toBeInTheDocument()
     expect(screen.getByText('1700 – 2100')).toBeInTheDocument()
@@ -131,7 +161,11 @@ describe('PID Tuning tab', () => {
     expect(screen.getByText(/Saving resets those/)).toBeInTheDocument()
     expect(await screen.findAllByRole('cell', { name: '45' })).toHaveLength(2) // roll + yaw P at 1.0
 
-    await nudge(user, within(screen.getByLabelText('Master multiplier')).getByRole('slider'), '{ArrowRight}{ArrowRight}')
+    await nudge(
+      user,
+      within(screen.getByLabelText('Master multiplier')).getByRole('slider'),
+      '{ArrowRight}{ArrowRight}',
+    )
     expect(screen.getByText('1.10')).toBeInTheDocument()
     expect(await screen.findAllByRole('cell', { name: '50' })).toHaveLength(2) // 45 × 1.1
   })
@@ -139,11 +173,19 @@ describe('PID Tuning tab', () => {
   it('Pitch gains scales the pitch row only and persists', async () => {
     const user = await openTab('PID Tuning')
     const pitchRow = () => within(screen.getByRole('row', { name: /^Pitch/ })).getAllByRole('cell')
-    await waitFor(() => expect(pitchRow().map((cell) => cell.textContent)).toEqual(['47', '84', '34', '125']))
+    await waitFor(() =>
+      expect(pitchRow().map((cell) => cell.textContent)).toEqual(['47', '84', '34', '125']),
+    )
 
-    await nudge(user, within(screen.getByLabelText('Pitch gains')).getByRole('slider'), '{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}')
+    await nudge(
+      user,
+      within(screen.getByLabelText('Pitch gains')).getByRole('slider'),
+      '{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}',
+    )
     expect(screen.getByText('1.20')).toBeInTheDocument()
-    await waitFor(() => expect(pitchRow().map((cell) => cell.textContent)).toEqual(['56', '101', '41', '150'])) // × 1.2
+    await waitFor(() =>
+      expect(pitchRow().map((cell) => cell.textContent)).toEqual(['56', '101', '41', '150']),
+    ) // × 1.2
     expect(screen.getAllByRole('cell', { name: '45' })).toHaveLength(2) // roll + yaw P untouched
 
     await saveWithoutReboot(user)
@@ -152,14 +194,20 @@ describe('PID Tuning tab', () => {
 
   it('saves sliders without a reboot and a smoothing preset with one', async () => {
     const user = await openTab('PID Tuning')
-    await nudge(user, within(await screen.findByLabelText('Damping')).getByRole('slider'), '{ArrowLeft}')
+    await nudge(
+      user,
+      within(await screen.findByLabelText('Damping')).getByRole('slider'),
+      '{ArrowLeft}',
+    )
     await saveWithoutReboot(user)
     expect(screen.getByText('0.95')).toBeInTheDocument()
     expect(screen.queryByText(/Saving resets those/)).toBeNull() // hidden values are now pinned
 
     await user.click(screen.getByRole('button', { name: /^Light smoothing/ }))
     await saveAndReboot(user)
-    expect(await screen.findByRole('button', { name: /^Light smoothing/, pressed: true })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('button', { name: /^Light smoothing/, pressed: true }),
+    ).toBeInTheDocument()
   })
 })
 
@@ -172,7 +220,9 @@ describe('Rates tab', () => {
     expect(screen.getByLabelText('Roll expo')).toHaveValue(0)
     expect(screen.getByLabelText('Pitch max rate')).toBeDisabled()
     expect(screen.getByLabelText('Yaw max rate')).toBeDisabled()
-    expect(within(screen.getByRole('list', { name: 'Legend' })).getByText('Roll · Pitch · Yaw')).toBeInTheDocument()
+    expect(
+      within(screen.getByRole('list', { name: 'Legend' })).getByText('Roll · Pitch · Yaw'),
+    ).toBeInTheDocument()
     expect(screen.getByText('max 670°/s')).toBeInTheDocument()
   })
 
@@ -229,10 +279,11 @@ describe('Motors tab', () => {
   it('warns while bidirectional DShot is off and offers props out first', async () => {
     const user = await openTab('Motors')
     expect(await screen.findByText(/Bidirectional DShot is off/)).toBeInTheDocument()
-    expect(within(screen.getByLabelText('Prop direction')).getAllByRole('option').map((o) => o.textContent)).toEqual([
-      'Props out (default)',
-      'Props in',
-    ])
+    expect(
+      within(screen.getByLabelText('Prop direction'))
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['Props out (default)', 'Props in'])
     await user.click(screen.getByLabelText('Bidirectional DShot'))
     expect(screen.queryByText(/Bidirectional DShot is off/)).toBeNull()
   })
@@ -252,7 +303,8 @@ describe('Motors tab', () => {
 
   it('rates dynamic idle against the 5" zones and saves it', async () => {
     const user = await openTab('Motors')
-    const idle = () => within(screen.getByRole('group', { name: 'Dynamic idle' })).getByRole('slider')
+    const idle = () =>
+      within(screen.getByRole('group', { name: 'Dynamic idle' })).getByRole('slider')
     expect(await screen.findByText(/Off — drag the slider/)).toBeInTheDocument()
     expect(idle()).toHaveAttribute('data-disabled') // needs bidirectional DShot first
 
@@ -273,17 +325,22 @@ describe('Motors tab', () => {
     const user = await openTab('Motors')
     expect(await screen.findByText('RPM readout needs bidirectional DShot.')).toBeInTheDocument()
     // props in on the mock: motors 1 and 4 turn clockwise, 2 and 3 counter-clockwise
-    expect(screen.getAllByRole('img', { name: /spins clockwise/ }).map((ring) => ring.getAttribute('aria-label'))).toEqual([
-      'Motor 4 spins clockwise',
-      'Motor 1 spins clockwise',
-    ])
+    expect(
+      screen
+        .getAllByRole('img', { name: /spins clockwise/ })
+        .map((ring) => ring.getAttribute('aria-label')),
+    ).toEqual(['Motor 4 spins clockwise', 'Motor 1 spins clockwise'])
     expect(screen.getAllByRole('img', { name: /spins counter-clockwise/ })).toHaveLength(2)
     expect(screen.queryByText(/rpm$/)).toBeNull()
 
     await user.click(screen.getByLabelText('Bidirectional DShot'))
     await saveAndReboot(user)
     await user.click(await screen.findByLabelText(/I have removed all propellers/))
-    await nudge(user, within(screen.getByLabelText('Motor 1')).getByRole('slider'), '{ArrowUp}{ArrowUp}')
+    await nudge(
+      user,
+      within(screen.getByLabelText('Motor 1')).getByRole('slider'),
+      '{ArrowUp}{ArrowUp}',
+    )
     expect(await screen.findByText('1800 rpm')).toBeInTheDocument() // mock: 1500 + 10 × 30
     expect(screen.getAllByText('0 rpm')).toHaveLength(3)
   })
@@ -294,13 +351,21 @@ describe('Motors tab', () => {
     expect(motor1).toHaveAttribute('data-disabled')
 
     await user.click(screen.getByLabelText(/I have removed all propellers/))
-    expect(within(screen.getByLabelText('Motor 1')).getByRole('slider')).not.toHaveAttribute('data-disabled')
-    await nudge(user, within(screen.getByLabelText('Motor 1')).getByRole('slider'), '{ArrowRight}{ArrowRight}')
+    expect(within(screen.getByLabelText('Motor 1')).getByRole('slider')).not.toHaveAttribute(
+      'data-disabled',
+    )
+    await nudge(
+      user,
+      within(screen.getByLabelText('Motor 1')).getByRole('slider'),
+      '{ArrowRight}{ArrowRight}',
+    )
     expect(screen.getAllByText('1010')).toHaveLength(2) // motor 1 and the "all motors" readout
 
     await user.selectOptions(screen.getByLabelText('Prop direction'), 'out') // unsaved edit → locks the test
     expect(screen.getByLabelText(/I have removed all propellers/)).not.toBeChecked()
-    expect(within(screen.getByLabelText('Motor 1')).getByRole('slider')).toHaveAttribute('data-disabled')
+    expect(within(screen.getByLabelText('Motor 1')).getByRole('slider')).toHaveAttribute(
+      'data-disabled',
+    )
     expect(screen.queryByText('1010')).toBeNull()
   })
 })

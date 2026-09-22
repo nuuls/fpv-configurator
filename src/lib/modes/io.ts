@@ -21,7 +21,11 @@ export async function readRcChannels(client: MspClient): Promise<number[]> {
   return decodeRc(await client.request(MSP.RC))
 }
 
-export async function saveModes(client: MspClient, snapshot: ModesSnapshot, draft: ModesDraft): Promise<void> {
+export async function saveModes(
+  client: MspClient,
+  snapshot: ModesSnapshot,
+  draft: ModesDraft,
+): Promise<void> {
   for (const { index, slot } of planModeWrites(snapshot, draft)) {
     await client.request(MSP.SET_MODE_RANGE, encodeSetModeRange(index, slot))
   }

@@ -56,7 +56,9 @@ export function EscPage() {
     const update = (next: ReadState) => setRead({ client, state: next })
     update({ phase: 'reading', index: 0, count: 0 })
     try {
-      const reports = await readEscs(client, (index, count) => update({ phase: 'reading', index, count }))
+      const reports = await readEscs(client, (index, count) =>
+        update({ phase: 'reading', index, count }),
+      )
       update({ phase: 'done', reports })
     } catch (cause) {
       update({ phase: 'failed', message: `Could not read the ESCs: ${describeError(cause)}` })
@@ -65,7 +67,10 @@ export function EscPage() {
 
   return (
     <>
-      <PageHeader title="ESC" description="Firmware and settings of the ESCs, read and changed through the flight controller." />
+      <PageHeader
+        title="ESC"
+        description="Firmware and settings of the ESCs, read and changed through the flight controller."
+      />
       <Card>
         <CardContent className="flex flex-wrap items-center gap-4 text-sm">
           <Button disabled={!client || reading} onClick={() => void start()}>
@@ -83,14 +88,26 @@ export function EscPage() {
 
       {state?.phase === 'failed' && <Notice tone="error">{state.message}</Notice>}
       {state?.phase === 'done' && client && (
-        <EscEditor client={client} reports={state.reports} onWritten={(reports) => setRead({ client, state: { phase: 'done', reports } })} />
+        <EscEditor
+          client={client}
+          reports={state.reports}
+          onWritten={(reports) => setRead({ client, state: { phase: 'done', reports } })}
+        />
       )}
     </>
   )
 }
 
 /** The read result with its editable settings; Save writes the changed ones to the ESCs. */
-function EscEditor({ client, reports, onWritten }: { client: MspClient; reports: EscReport[]; onWritten: (reports: EscReport[]) => void }) {
+function EscEditor({
+  client,
+  reports,
+  onWritten,
+}: {
+  client: MspClient
+  reports: EscReport[]
+  onWritten: (reports: EscReport[]) => void
+}) {
   const { draft, setDraft, dirty, revert } = useDraft(reports, toEscDraft)
   // The ESCs are read back while they are written, so there is nothing to reload afterwards.
   const { saving, error, save } = useSave(() => {})
@@ -114,7 +131,15 @@ function EscEditor({ client, reports, onWritten }: { client: MspClient; reports:
     <>
       <EscReportList reports={reports} draft={draft} onChange={setDraft} />
       {error && <Notice tone="error">{error}</Notice>}
-      {draft.some((block) => block !== null) && <SaveBar dirty={dirty} saving={saving} reboot={false} onRevert={revert} onSave={() => void write()} />}
+      {draft.some((block) => block !== null) && (
+        <SaveBar
+          dirty={dirty}
+          saving={saving}
+          reboot={false}
+          onRevert={revert}
+          onSave={() => void write()}
+        />
+      )}
     </>
   )
 }
@@ -126,20 +151,36 @@ interface EscReportListProps {
   onChange?: (draft: EscDraft) => void
 }
 
-export function EscReportList({ reports, draft = toEscDraft(reports), onChange = () => {} }: EscReportListProps) {
+export function EscReportList({
+  reports,
+  draft = toEscDraft(reports),
+  onChange = () => {},
+}: EscReportListProps) {
   if (reports.length === 0) {
-    return <Notice tone="warning">The flight controller has no ESC outputs to read. Check the motor protocol on the Motors tab.</Notice>
+    return (
+      <Notice tone="warning">
+        The flight controller has no ESC outputs to read. Check the motor protocol on the Motors
+        tab.
+      </Notice>
+    )
   }
   const groups = editableGroups(reports)
   const overview = combineReports(reports)
-  if (overview.view === 'combined') return <CombinedEscCard overview={overview} group={groups[0]} draft={draft} onChange={onChange} />
+  if (overview.view === 'combined')
+    return (
+      <CombinedEscCard overview={overview} group={groups[0]} draft={draft} onChange={onChange} />
+    )
 
   const differing = differingSettings(reports)
-  const unsupported = new Set(reports.flatMap((report) => (report.status === 'unsupported' ? [report.description] : [])))
+  const unsupported = new Set(
+    reports.flatMap((report) => (report.status === 'unsupported' ? [report.description] : [])),
+  )
   return (
     <>
       {reports.every((report) => report.status === 'missing') && (
-        <Notice tone="warning">No ESC answered. Plug in the flight battery, then read again.</Notice>
+        <Notice tone="warning">
+          No ESC answered. Plug in the flight battery, then read again.
+        </Notice>
       )}
       {[...unsupported].map((description) => (
         <Notice key={description} tone="error">
@@ -149,17 +190,29 @@ export function EscReportList({ reports, draft = toEscDraft(reports), onChange =
       {overview.reason && <Notice tone="warning">{overview.reason}</Notice>}
       <div className="mt-4 grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {reports.map((report, index) => (
-          <EscCard key={index} number={index + 1} report={report} differing={differing[index] ?? new Set()} />
+          <EscCard
+            key={index}
+            number={index + 1}
+            report={report}
+            differing={differing[index] ?? new Set()}
+          />
         ))}
       </div>
       {groups.map((group) => (
-        <Card key={group.firmware} role="group" aria-label={`${group.firmware} settings`} className="mt-4 max-w-xl">
+        <Card
+          key={group.firmware}
+          role="group"
+          aria-label={`${group.firmware} settings`}
+          className="mt-4 max-w-xl"
+        >
           <CardHeader>
             <CardTitle>
               Change {group.firmware} {group.version} settings
             </CardTitle>
             <CardDescription>
-              {group.escs.length === 1 ? `ESC ${group.escs.map((esc) => esc + 1).join()}` : `ESC ${group.escs.map((esc) => esc + 1).join(', ')} — set up alike`}
+              {group.escs.length === 1
+                ? `ESC ${group.escs.map((esc) => esc + 1).join()}`
+                : `ESC ${group.escs.map((esc) => esc + 1).join(', ')} — set up alike`}
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm">
@@ -214,7 +267,8 @@ function CombinedEscCard({ overview, group, draft, onChange }: CombinedEscCardPr
                   <ul>
                     {setting.values.map((value, index) => (
                       <li key={index}>
-                        <span className="text-muted-foreground font-normal">ESC {index + 1}</span> {value}
+                        <span className="text-muted-foreground font-normal">ESC {index + 1}</span>{' '}
+                        {value}
                       </li>
                     ))}
                   </ul>
@@ -228,7 +282,15 @@ function CombinedEscCard({ overview, group, draft, onChange }: CombinedEscCardPr
   )
 }
 
-function EscCard({ number, report, differing }: { number: number; report: EscReport; differing: Set<string> }) {
+function EscCard({
+  number,
+  report,
+  differing,
+}: {
+  number: number
+  report: EscReport
+  differing: Set<string>
+}) {
   return (
     <Card role="group" aria-label={`ESC ${number}`}>
       <CardHeader>
@@ -240,9 +302,15 @@ function EscCard({ number, report, differing }: { number: number; report: EscRep
               ? 'Not responding'
               : 'Unknown firmware'}
         </CardTitle>
-        <CardDescription>{report.status === 'ok' || report.status === 'unsupported' ? report.hardware : report.description}</CardDescription>
+        <CardDescription>
+          {report.status === 'ok' || report.status === 'unsupported'
+            ? report.hardware
+            : report.description}
+        </CardDescription>
       </CardHeader>
-      {report.status === 'unsupported' && <CardContent className="text-sm text-destructive">Version not supported</CardContent>}
+      {report.status === 'unsupported' && (
+        <CardContent className="text-destructive text-sm">Version not supported</CardContent>
+      )}
       {report.status === 'ok' && (
         <CardContent className="text-sm">
           {report.note && <p className="text-muted-foreground">{report.note}</p>}
@@ -254,7 +322,10 @@ function EscCard({ number, report, differing }: { number: number; report: EscRep
                 <dd className="flex items-baseline gap-2 text-right font-medium">
                   {setting.value}
                   {differing.has(setting.key) && (
-                    <Badge className="py-0" title="Not the same as on the first ESC with this firmware">
+                    <Badge
+                      className="py-0"
+                      title="Not the same as on the first ESC with this firmware"
+                    >
                       differs
                     </Badge>
                   )}
@@ -297,7 +368,12 @@ function GroupEditor({ group, draft, onChange }: GroupEditorProps) {
       {uneven.length > 0 && (
         <Notice tone="warning">
           Not the same on these ESCs: {uneven.join(', ')}. ESC {first + 1}&apos;s values are shown.{' '}
-          <Button size="sm" variant="outline" className="ml-1" onClick={() => onChange(alignGroup(draft, group))}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-1"
+            onClick={() => onChange(alignGroup(draft, group))}
+          >
             Use them for all
           </Button>
         </Notice>
@@ -317,7 +393,7 @@ function GroupEditor({ group, draft, onChange }: GroupEditorProps) {
                       <label htmlFor={def.perMotor ? undefined : id} className="font-medium">
                         {def.label}
                       </label>
-                      {def.hint && <p className="text-xs text-muted-foreground">{def.hint}</p>}
+                      {def.hint && <p className="text-muted-foreground text-xs">{def.hint}</p>}
                     </div>
                     {def.perMotor ? (
                       <ul className="flex flex-col items-end gap-1.5">
@@ -366,12 +442,27 @@ interface SettingControlProps {
 function SettingControl({ id, def, raw, disabled, onChange }: SettingControlProps) {
   const { control } = def
   if (!control) return null
-  if (control.kind === 'switch') return <Switch id={id} checked={raw !== 0} disabled={disabled} onCheckedChange={(on) => onChange(on ? 1 : 0)} />
+  if (control.kind === 'switch')
+    return (
+      <Switch
+        id={id}
+        checked={raw !== 0}
+        disabled={disabled}
+        onCheckedChange={(on) => onChange(on ? 1 : 0)}
+      />
+    )
   if (control.kind === 'select') {
     return (
-      <NativeSelect id={id} value={raw} disabled={disabled} onChange={(e) => onChange(Number(e.target.value))}>
+      <NativeSelect
+        id={id}
+        value={raw}
+        disabled={disabled}
+        onChange={(e) => onChange(Number(e.target.value))}
+      >
         {/* a value the list doesn't have stays selectable as what it is */}
-        {!control.options.some((option) => option.raw === raw) && <NativeSelectOption value={raw}>{def.format(raw)}</NativeSelectOption>}
+        {!control.options.some((option) => option.raw === raw) && (
+          <NativeSelectOption value={raw}>{def.format(raw)}</NativeSelectOption>
+        )}
         {control.options.map((option) => (
           <NativeSelectOption key={option.raw} value={option.raw}>
             {option.label}
@@ -390,7 +481,7 @@ function SettingControl({ id, def, raw, disabled, onChange }: SettingControlProp
         value={rawToNumber(control, raw)}
         disabled={disabled}
         onValueChange={(value) => onChange(numberToRaw(control, value))}
-        className="h-9 w-24 rounded-md border bg-transparent px-3 disabled:opacity-50 dark:bg-input/30"
+        className="dark:bg-input/30 h-9 w-24 rounded-md border bg-transparent px-3 disabled:opacity-50"
       />
       {control.unit && <span className="text-muted-foreground">{control.unit}</span>}
     </div>

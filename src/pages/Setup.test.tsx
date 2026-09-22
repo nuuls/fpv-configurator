@@ -12,10 +12,16 @@ describe('Setup tab: pre-flight checklist', () => {
   it('lists what the mock FC still needs', async () => {
     await openTab('Setup')
     expect(await screen.findByText('4 of 5 settings need attention.')).toBeInTheDocument()
-    expect(within(row('Bidirectional DShot is enabled')).getByRole('link', { name: 'Open Motors' })).toBeInTheDocument()
-    expect(within(row('Accelerometer is calibrated')).getByRole('link', { name: 'Open Orientation' })).toBeInTheDocument()
+    expect(
+      within(row('Bidirectional DShot is enabled')).getByRole('link', { name: 'Open Motors' }),
+    ).toBeInTheDocument()
+    expect(
+      within(row('Accelerometer is calibrated')).getByRole('link', { name: 'Open Orientation' }),
+    ).toBeInTheDocument()
     expect(row('Arm angle is 180°')).toHaveTextContent('25°')
-    expect(row(/Beeper/)).toHaveTextContent('Beeper off for RX set · DShot beacon off for RX set and RX loss')
+    expect(row(/Beeper/)).toHaveTextContent(
+      'Beeper off for RX set · DShot beacon off for RX set and RX loss',
+    )
     expect(row('Airmode is on')).toHaveTextContent('On')
     expect(within(row('Airmode is on')).queryByRole('button')).toBeNull()
     expect(screen.getByRole('button', { name: 'Save & Reboot' })).toBeDisabled()
@@ -47,7 +53,9 @@ describe('Setup tab: pre-flight checklist', () => {
     await screen.findByText('4 of 5 settings need attention.')
     await user.click(within(row('Accelerometer is calibrated')).getByRole('link'))
     await user.click(await screen.findByRole('button', { name: 'Calibrate accelerometer' }))
-    expect(await screen.findByText('Calibration finished and saved.', {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(
+      await screen.findByText('Calibration finished and saved.', {}, { timeout: 3000 }),
+    ).toBeInTheDocument()
 
     await user.click(screen.getByRole('link', { name: 'Setup' }))
     expect(await screen.findByText('3 of 5 settings need attention.')).toBeInTheDocument()
@@ -59,7 +67,7 @@ const externalList = () => screen.getByRole('list', { name: 'Changed outside thi
 const externalRow = (name: string) => within(externalList()).getByRole('listitem', { name })
 
 describe('Setup tab: changed outside this app', () => {
-  it('lists the settings changed in Betaflight Configurator, default → value; the mock\'s features do not count', async () => {
+  it("lists the settings changed in Betaflight Configurator, default → value; the mock's features do not count", async () => {
     await openTab('Setup')
     expect(await screen.findByText('2 changes made outside this app.')).toBeInTheDocument()
     expect(externalRow('crashflip_motor_percent')).toHaveTextContent('master')
@@ -76,7 +84,9 @@ describe('Setup tab: changed outside this app', () => {
     await screen.findByText('2 changes made outside this app.')
 
     await user.click(within(externalRow('osd_units')).getByRole('button', { name: 'Reset' }))
-    expect(screen.getByText('2 changes made outside this app. 1 to reset once saved.')).toBeInTheDocument()
+    expect(
+      screen.getByText('2 changes made outside this app. 1 to reset once saved.'),
+    ).toBeInTheDocument()
     expect(externalRow('osd_units')).toHaveTextContent('IMPERIAL → METRIC · not saved yet')
     expect(within(externalRow('osd_units')).getByText('METRIC').tagName).toBe('INS') // what it will be
     await user.click(within(externalRow('osd_units')).getByRole('button', { name: 'Keep' }))
@@ -84,7 +94,9 @@ describe('Setup tab: changed outside this app', () => {
     expect(screen.getByRole('button', { name: 'Save & Reboot' })).toBeDisabled()
 
     await user.click(screen.getByRole('button', { name: 'Reset all' }))
-    expect(screen.getByText('2 changes made outside this app. 2 to reset once saved.')).toBeInTheDocument()
+    expect(
+      screen.getByText('2 changes made outside this app. 2 to reset once saved.'),
+    ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reset all' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'Revert' }))
     expect(screen.getByText('2 changes made outside this app.')).toBeInTheDocument()
