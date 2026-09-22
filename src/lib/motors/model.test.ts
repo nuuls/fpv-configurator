@@ -75,6 +75,35 @@ describe('motor output reordering', () => {
     ])
   })
 
+  it('a swap that trades the slider values along leaves the FC outputs untouched', () => {
+    // whatever the FC has saved and whatever is pending, swapping two motors mid-spin changes nothing physically
+    const trade = <T>(list: T[], a: number, b: number) => {
+      const next = [...list]
+      const va = next[a - 1]
+      const vb = next[b - 1]
+      if (va !== undefined && vb !== undefined) {
+        next[a - 1] = vb
+        next[b - 1] = va
+      }
+      return next
+    }
+    for (const fcOrder of [IDENTITY, [2, 1, 0, 3, 4, 5, 6, 7], [1, 0, 3, 2, 4, 5, 6, 7]])
+      for (const pending of [IDENTITY, [3, 1, 2, 0, 4, 5, 6, 7]])
+        for (const [a, b] of [
+          [1, 3],
+          [2, 4],
+          [1, 2],
+        ] as const) {
+          const values = [1010, 1000, 1200, 1000]
+          const before = toFcOutputs(values, fcMotorIndexes(fcOrder, pending, 4))
+          const after = toFcOutputs(
+            trade(values, a, b),
+            fcMotorIndexes(fcOrder, swapMotorOutputs(pending, a, b), 4),
+          )
+          expect(after).toEqual(before)
+        }
+  })
+
   it('tells settings edits (which lock the test) from a pending order (which does not)', () => {
     const snapshot = {
       advancedConfig: [1, 1, 0, 6, 0xe0, 0x01, 0x26, 0x02],

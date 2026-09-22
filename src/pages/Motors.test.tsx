@@ -61,8 +61,9 @@ describe('Motors tab — direction and swap', () => {
       'aria-pressed',
       'true',
     )
-    expect(screen.getByRole('button', { name: 'Swap motor 2' })).toBeDisabled()
-    expect(screen.getAllByRole('button', { name: /^Swap with motor/ })).toHaveLength(3)
+    // the other motors are targets: their disc and their swap icon alike
+    expect(screen.getAllByRole('button', { name: 'Swap with motor 2' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: /^Swap with motor/ })).toHaveLength(6)
 
     // Escape cancels, clicking the icon again cancels too
     await user.keyboard('{Escape}')
@@ -72,7 +73,7 @@ describe('Motors tab — direction and swap', () => {
     expect(screen.queryByText(/Click the motor to swap/)).toBeNull()
 
     await user.click(screen.getByRole('button', { name: 'Swap motor 1' }))
-    await user.click(screen.getByRole('button', { name: 'Swap with motor 3' }))
+    await user.click(screen.getAllByRole('button', { name: 'Swap with motor 3' })[0]!) // the icon
     expect(
       screen.getByText(
         'Motor 1 drives ESC output 3 · Motor 3 drives ESC output 1 — used here already; Save & Reboot to apply it on the flight controller.',
@@ -90,7 +91,7 @@ describe('Motors tab — direction and swap', () => {
 
     // swapping back restores the default and the hint goes away
     await user.click(screen.getByRole('button', { name: 'Swap motor 3' }))
-    await user.click(screen.getByRole('button', { name: 'Swap with motor 1' }))
+    await user.click(screen.getAllByRole('button', { name: 'Swap with motor 1' })[1]!) // the disc
     expect(screen.queryByText(/drives ESC output/)).toBeNull()
     expect(screen.getByRole('button', { name: 'Save & Reboot' })).toBeEnabled()
   })
@@ -107,7 +108,7 @@ describe('Motors tab — direction and swap', () => {
 
     // swap 1 ↔ 3 while it turns: the test stays on, and what was motor 1 is now motor 3 — same FC output
     await user.click(screen.getByRole('button', { name: 'Swap motor 1' }))
-    await user.click(screen.getByRole('button', { name: 'Swap with motor 3' }))
+    await user.click(screen.getAllByRole('button', { name: 'Swap with motor 3' })[1]!) // the disc
     expect(screen.getByLabelText(/I have removed all propellers/)).toBeChecked()
     expect(slider(3)).toHaveAttribute('aria-valuenow', '1010')
     expect(slider(1)).toHaveAttribute('aria-valuenow', '1000')

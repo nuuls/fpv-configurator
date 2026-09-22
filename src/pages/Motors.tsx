@@ -432,14 +432,26 @@ function MotorTest({
         <RotateCw className={flipping === motor ? 'animate-spin' : undefined} />
       </Button>
       <Button
-        variant={pickFrom === motor ? 'default' : 'secondary'}
+        variant={pickFrom === null || pickFrom === motor ? 'secondary' : 'default'}
         size="icon"
-        aria-label={pickFrom === motor ? `Cancel swapping motor ${motor}` : `Swap motor ${motor}`}
+        aria-label={
+          pickFrom === null
+            ? `Swap motor ${motor}`
+            : pickFrom === motor
+              ? `Cancel swapping motor ${motor}`
+              : `Swap with motor ${motor}`
+        }
         aria-pressed={pickFrom === motor}
-        title="Swap outputs with another motor: click, then the other motor"
-        disabled={swapDisabled || flipping !== null || (pickFrom !== null && pickFrom !== motor)}
+        title={
+          pickFrom === null
+            ? 'Swap outputs with another motor: click, then the other motor'
+            : pickFrom === motor
+              ? 'Cancel'
+              : `Swap with motor ${motor}`
+        }
+        disabled={swapDisabled || flipping !== null}
         onClick={() => pick(motor)}
-        className={cn(MOTOR_ICON_BUTTON, placement && cn('absolute', placement.swap))}
+        className={cn(MOTOR_ICON_BUTTON, 'z-20', placement && cn('absolute', placement.swap))}
       >
         <ArrowLeftRight />
       </Button>
