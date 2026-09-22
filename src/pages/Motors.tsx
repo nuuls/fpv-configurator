@@ -6,13 +6,6 @@ import { SaveBar } from '@/components/SaveBar'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
@@ -31,6 +24,7 @@ import {
   stopMotors,
 } from '@/lib/motors/io'
 import {
+  DIRECTION_CHECK,
   DYN_IDLE_MAX,
   DYN_IDLE_MIN,
   DYN_IDLE_ZONES,
@@ -258,8 +252,9 @@ function Editor({
  * the radio is blocked meanwhile, throttle is capped, and everything stops when the switch goes
  * off, the tab is left, or the page is closed.
  *
- * Each motor also carries two small menus: its spin direction (a DShot command the ESC stores, no reboot)
- * and a swap of its output with another motor's (an edit of `motor_output_reordering`, Save & Reboot).
+ * Each motor also carries two small icons: flip its spin direction (a DShot command the ESC stores,
+ * no reboot; the motor is spun afterwards to show the result) and swap its output with another
+ * motor's (click the icon, then the other motor — an edit of `motor_output_reordering`, Save & Reboot).
  */
 function MotorTest({
   client,
@@ -286,11 +281,17 @@ function MotorTest({
   const [enabled, setEnabled] = useState(false)
   const [values, setValues] = useState<number[]>(() => new Array<number>(count).fill(MOTOR_STOP))
   const [error, setError] = useState<string | null>(null)
-  const [directionNote, setDirectionNote] = useState<string | null>(null)
+  // Direction flips: the ESC never tells which way it is set, so this only knows what was sent here.
+  const [reversed, setReversed] = useState<boolean[]>(() => new Array<boolean>(count).fill(false))
+  const [flipping, setFlipping] = useState<number | null>(null)
+  const [note, setNote] = useState<string | null>(null)
+  // Swapping: the motor whose icon was clicked, waiting for the other one.
+  const [pickFrom, setPickFrom] = useState<number | null>(null)
   // Unsaved edits lock the test. Switch it off for good, so it never re-arms itself when unlocked.
   if (enabled && blocked) {
     setEnabled(false)
     setValues(new Array<number>(count).fill(MOTOR_STOP))
+    setNote(null)
   }
   const active = enabled && !blocked
 
@@ -317,6 +318,8 @@ function MotorTest({
     })()
   }
 
+  // Bumped whenever the test ends, so a flip in progress stops touching the motors.
+  const session = useRef(0)
   useEffect(() => {
     if (!active) return
     const stopNow = () => void stopMotors(client).catch(() => {})
@@ -325,10 +328,18 @@ function MotorTest({
     return () => {
       window.removeEventListener('pagehide', stopNow)
       pending.current = null
+      session.current++
       stopNow()
       void setArmingDisabled(client, false).catch(() => {})
     }
   }, [active, client])
+
+  useEffect(() => {
+    if (pickFrom === null) return
+    const cancel = (event: KeyboardEvent) => event.key === 'Escape' && setPickFrom(null)
+    window.addEventListener('keydown', cancel)
+    return () => window.removeEventListener('keydown', cancel)
+  }, [pickFrom])
 
   const apply = (next: number[]) => {
     setValues(next)
@@ -337,46 +348,103 @@ function MotorTest({
 
   const toggle = (on: boolean) => {
     setError(null)
-    setDirectionNote(null)
+    setNote(null)
+    setFlipping(null)
     setValues(new Array<number>(count).fill(MOTOR_STOP))
     setEnabled(on)
   }
 
-  // ESCs only take commands while stopped, so every motor stops first (the FC pauses the outputs anyway).
-  const changeDirection = async (motor: number, reversed: boolean) => {
-    setError(null)
-    setDirectionNote(null)
+  /**
+   * Like the Betaflight Configurator's direction wizard: stop, give the ESC time to notice (it drops
+   * commands while the motor turns), send the command, then spin the motor so the new direction shows.
+   */
+  const flip = async (motor: number) => {
+    const token = session.current
+    const alive = () => token === session.current
+    const toReversed = !(reversed[motor - 1] ?? false)
     const stopped = new Array<number>(count).fill(MOTOR_STOP)
+    setError(null)
+    setNote(null)
+    setFlipping(motor)
     pending.current = null
     setValues(stopped)
     try {
       await setMotorOutputs(client, stopped)
-      await setMotorDirection(client, motor, reversed)
-      setDirectionNote(
-        `Motor ${motor} set to ${reversed ? 'reversed' : 'normal'} and stored by its ESC. Spin it to check — pick the other one if it still turns the wrong way.`,
+      await sleep(DIRECTION_CHECK.stopMs)
+      if (!alive()) return
+      await setMotorDirection(client, motor, toReversed)
+      setReversed(reversed.map((r, i) => (i === motor - 1 ? toReversed : r)))
+      setNote(
+        `Motor ${motor} set to ${toReversed ? 'reversed' : 'normal'} — spinning it to check. Still the wrong way? Click again.`,
       )
+      await sleep(DIRECTION_CHECK.settleMs)
+      if (!alive()) return
+      const spinning = stopped.map((v, i) => (i === motor - 1 ? DIRECTION_CHECK.spinValue : v))
+      setValues(spinning)
+      await setMotorOutputs(client, spinning)
+      await sleep(DIRECTION_CHECK.spinMs)
+      if (!alive()) return
+      setValues(stopped)
+      await setMotorOutputs(client, stopped)
     } catch {
+      if (!alive()) return
       setError('Lost contact with the flight controller while testing — unplug the battery.')
       setEnabled(false)
+    } finally {
+      if (alive()) setFlipping(null)
     }
   }
-  const directionMenu = (motor: number, className?: string) => (
-    <DirectionMenu
-      motor={motor}
-      disabled={!active || !dshot}
-      onSelect={(reversed) => void changeDirection(motor, reversed)}
-      className={className}
-    />
+
+  const pick = (motor: number) => {
+    if (pickFrom === null || pickFrom === motor) {
+      setPickFrom(pickFrom === motor ? null : motor)
+      return
+    }
+    onSwap(pickFrom, motor)
+    setPickFrom(null)
+  }
+
+  const tools = (motor: number, placement?: { direction: string; swap: string }) => (
+    <>
+      <Button
+        variant="secondary"
+        size="icon"
+        aria-label={`Flip direction of motor ${motor}`}
+        title="Flip the spin direction (the ESC stores it)"
+        disabled={!active || !dshot || flipping !== null || pickFrom !== null}
+        onClick={() => void flip(motor)}
+        className={cn(MOTOR_ICON_BUTTON, placement && cn('absolute', placement.direction))}
+      >
+        <RotateCw className={flipping === motor ? 'animate-spin' : undefined} />
+      </Button>
+      <Button
+        variant={pickFrom === motor ? 'default' : 'secondary'}
+        size="icon"
+        aria-label={pickFrom === motor ? `Cancel swapping motor ${motor}` : `Swap motor ${motor}`}
+        aria-pressed={pickFrom === motor}
+        title="Swap outputs with another motor: click, then the other motor"
+        disabled={swapDisabled || flipping !== null || (pickFrom !== null && pickFrom !== motor)}
+        onClick={() => pick(motor)}
+        className={cn(MOTOR_ICON_BUTTON, placement && cn('absolute', placement.swap))}
+      >
+        <ArrowLeftRight />
+      </Button>
+    </>
   )
-  const swapMenu = (motor: number, className?: string) => (
-    <SwapMenu
-      motor={motor}
-      count={count}
-      disabled={swapDisabled}
-      onSwap={onSwap}
-      className={className}
-    />
-  )
+  /** In pick mode the other motors become targets. */
+  const target = (motor: number, className: string) =>
+    pickFrom !== null &&
+    pickFrom !== motor && (
+      <button
+        type="button"
+        aria-label={`Swap with motor ${motor}`}
+        onClick={() => pick(motor)}
+        className={cn(
+          'ring-primary bg-primary/15 hover:bg-primary/25 focus-visible:ring-ring z-10 cursor-pointer ring-2 outline-none',
+          className,
+        )}
+      />
+    )
   const remapped = remappedMotors(outputOrder, count)
   const remapUnsaved = outputOrder.some((output, i) => output !== snapshot.outputOrder[i])
 
@@ -393,7 +461,7 @@ function MotorTest({
       min={MOTOR_STOP}
       max={MOTOR_TEST_MAX}
       step={5}
-      disabled={!active}
+      disabled={!active || flipping !== null}
       value={[values[motor - 1] ?? MOTOR_STOP]}
       onValueChange={([v]) =>
         v !== undefined && apply(values.map((old, i) => (i === motor - 1 ? v : old)))
@@ -479,8 +547,8 @@ function MotorTest({
                   >
                     {motor}
                   </span>
-                  {directionMenu(motor, cn('absolute', direction))}
-                  {swapMenu(motor, cn('absolute', swap))}
+                  {tools(motor, { direction, swap })}
+                  {target(motor, 'absolute inset-[4%] rounded-full')}
                   {motorSlider(motor, true)}
                   <div className="relative font-mono text-xs tabular-nums">
                     {hasRpm ? `${telemetry?.[motor - 1]?.rpm ?? 0} rpm` : output}
@@ -492,16 +560,16 @@ function MotorTest({
         ) : (
           <div className="grid grid-cols-2 gap-x-8 gap-y-5">
             {Array.from({ length: count }, (_, i) => i + 1).map((motor) => (
-              <div key={motor}>
+              <div key={motor} className="relative">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <span className="font-medium">Motor {motor}</span>
-                  {directionMenu(motor)}
-                  {swapMenu(motor)}
+                  {tools(motor)}
                   <span className="ml-auto font-mono tabular-nums">
                     {values[motor - 1] ?? MOTOR_STOP} · {rpmText(motor)}
                   </span>
                 </div>
                 {motorSlider(motor, false)}
+                {target(motor, 'absolute -inset-2 rounded-md')}
               </div>
             ))}
           </div>
@@ -512,6 +580,11 @@ function MotorTest({
             Changing a motor&apos;s direction needs a DShot ESC protocol.
           </p>
         )}
+        {pickFrom !== null && (
+          <p className="text-muted-foreground">
+            Click the motor to swap with motor {pickFrom}. Esc cancels.
+          </p>
+        )}
         {remapped.length > 0 && (
           <p className="text-muted-foreground">
             {remapped
@@ -520,7 +593,7 @@ function MotorTest({
             {remapUnsaved && ' — Save & Reboot to apply.'}
           </p>
         )}
-        {directionNote && <p className="text-muted-foreground">{directionNote}</p>}
+        {note && <p className="text-muted-foreground">{note}</p>}
 
         <div>
           <div className="mb-2 flex justify-between">
@@ -532,7 +605,7 @@ function MotorTest({
             min={MOTOR_STOP}
             max={MOTOR_TEST_MAX}
             step={5}
-            disabled={!active}
+            disabled={!active || flipping !== null}
             value={[master]}
             onValueChange={([v]) => v !== undefined && apply(values.map(() => v))}
           />
@@ -545,84 +618,7 @@ function MotorTest({
 
 const MOTOR_ICON_BUTTON = 'size-6 rounded-full [&_svg]:size-3.5'
 
-/**
- * Which way a motor's ESC turns it. Set with DShot commands the ESC stores; nothing reports the current
- * setting back, so both are offered and the user checks by spinning the motor.
- */
-function DirectionMenu({
-  motor,
-  disabled,
-  onSelect,
-  className,
-}: {
-  motor: number
-  disabled: boolean
-  onSelect: (reversed: boolean) => void
-  className?: string
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="secondary"
-          size="icon"
-          aria-label={`Motor ${motor} direction`}
-          title="Change the spin direction (stored by the ESC)"
-          disabled={disabled}
-          className={cn(MOTOR_ICON_BUTTON, className)}
-        >
-          <RotateCw />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        <DropdownMenuLabel>Motor {motor} direction</DropdownMenuLabel>
-        <DropdownMenuItem onSelect={() => onSelect(false)}>Normal</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => onSelect(true)}>Reversed</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
-/** Exchanges the ESC outputs of two motors (`motor_output_reordering`); takes a Save & Reboot. */
-function SwapMenu({
-  motor,
-  count,
-  disabled,
-  onSwap,
-  className,
-}: {
-  motor: number
-  count: number
-  disabled: boolean
-  onSwap: (motor: number, other: number) => void
-  className?: string
-}) {
-  const others = Array.from({ length: count }, (_, i) => i + 1).filter((m) => m !== motor)
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="secondary"
-          size="icon"
-          aria-label={`Swap motor ${motor}`}
-          title="Swap this motor's output with another motor's"
-          disabled={disabled || others.length === 0}
-          className={cn(MOTOR_ICON_BUTTON, className)}
-        >
-          <ArrowLeftRight />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        <DropdownMenuLabel>Swap motor {motor} with</DropdownMenuLabel>
-        {others.map((other) => (
-          <DropdownMenuItem key={other} onSelect={() => onSwap(motor, other)}>
-            Motor {other}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 const ZONE_STYLE: Record<IdleZone, { bar: string; text: string; icon: typeof CircleCheck }> = {
   good: { bar: 'bg-success', text: 'text-success', icon: CircleCheck },

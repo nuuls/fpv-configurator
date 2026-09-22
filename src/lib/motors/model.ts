@@ -164,6 +164,19 @@ export function decodeDshotCommand(payload: Uint8Array): DshotCommandRequest {
 }
 
 /**
+ * How a direction flip is checked, like the Betaflight Configurator's wizard does it: the motor is stopped and
+ * the ESC given time to notice (Bluejay and AM32 drop commands while the motor turns; the Configurator pauses
+ * 400 ms), the command is sent, the ESC gets a moment to store it (AM32 chimes), then the motor is spun so the
+ * new direction can be seen.
+ */
+export const DIRECTION_CHECK = {
+  stopMs: 500,
+  settleMs: 500,
+  spinMs: 2000,
+  spinValue: 1100,
+} as const
+
+/**
  * Sets and stores the spin direction of one motor's ESC. Blocking, like the Betaflight Configurator's direction
  * wizard: the FC pauses the motor outputs, repeats each command as often as the ESC needs, and resumes.
  */
