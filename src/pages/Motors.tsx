@@ -55,43 +55,13 @@ const PATH = '/motors'
 
 /**
  * Betaflight Quad X as seen from above, nose up: 4 front-left, 2 front-right, 3 rear-left, 1 rear-right.
- * The number badge sits on the disc's outer corner, the direction icon beside it and the swap icon below/above it.
+ * The number badge sits on the disc's outer corner; the two action buttons are a row inside the disc.
  */
-const QUAD_POSITIONS: {
-  motor: number
-  className: string
-  badge: string
-  direction: string
-  swap: string
-}[] = [
-  {
-    motor: 4,
-    className: 'left-0 top-0',
-    badge: 'left-[8%] top-[8%]',
-    direction: 'right-[8%] top-[8%]',
-    swap: 'left-[8%] bottom-[8%]',
-  },
-  {
-    motor: 2,
-    className: 'right-0 top-0',
-    badge: 'right-[8%] top-[8%]',
-    direction: 'left-[8%] top-[8%]',
-    swap: 'right-[8%] bottom-[8%]',
-  },
-  {
-    motor: 3,
-    className: 'left-0 bottom-0',
-    badge: 'left-[8%] bottom-[8%]',
-    direction: 'right-[8%] bottom-[8%]',
-    swap: 'left-[8%] top-[8%]',
-  },
-  {
-    motor: 1,
-    className: 'right-0 bottom-0',
-    badge: 'right-[8%] bottom-[8%]',
-    direction: 'left-[8%] bottom-[8%]',
-    swap: 'right-[8%] top-[8%]',
-  },
+const QUAD_POSITIONS: { motor: number; className: string; badge: string }[] = [
+  { motor: 4, className: 'left-0 top-0', badge: 'left-[7%] top-[7%]' },
+  { motor: 2, className: 'right-0 top-0', badge: 'right-[7%] top-[7%]' },
+  { motor: 3, className: 'left-0 bottom-0', badge: 'left-[7%] bottom-[7%]' },
+  { motor: 1, className: 'right-0 bottom-0', badge: 'right-[7%] bottom-[7%]' },
 ]
 
 /** Until drone types exist (SPEC §2), every quad is treated as a 5". */
@@ -448,8 +418,8 @@ function MotorTest({
     }
   }
 
-  const tools = (motor: number, placement?: { direction: string; swap: string }) => (
-    <>
+  const tools = (motor: number) => (
+    <div className="relative z-20 flex gap-2">
       <Button
         variant="secondary"
         size="icon"
@@ -457,7 +427,7 @@ function MotorTest({
         title="Flip the spin direction (the ESC stores it)"
         disabled={!active || !dshot || paused || pickFrom !== null}
         onClick={() => void flip(motor)}
-        className={cn(MOTOR_ICON_BUTTON, placement && cn('absolute', placement.direction))}
+        className={MOTOR_ICON_BUTTON}
       >
         <RotateCw className={flipping === motor ? 'animate-spin' : undefined} />
       </Button>
@@ -481,11 +451,11 @@ function MotorTest({
         }
         disabled={swapDisabled || paused}
         onClick={() => pick(motor)}
-        className={cn(MOTOR_ICON_BUTTON, 'z-20', placement && cn('absolute', placement.swap))}
+        className={MOTOR_ICON_BUTTON}
       >
         <ArrowLeftRight />
       </Button>
-    </>
+    </div>
   )
   /** In pick mode the other motors become targets. */
   const target = (motor: number, className: string) =>
@@ -511,7 +481,7 @@ function MotorTest({
       orientation={vertical ? 'vertical' : 'horizontal'}
       className={
         vertical
-          ? 'data-[orientation=vertical]:h-20 data-[orientation=vertical]:min-h-0'
+          ? 'data-[orientation=vertical]:h-16 data-[orientation=vertical]:min-h-0'
           : undefined
       }
       min={MOTOR_STOP}
@@ -554,7 +524,7 @@ function MotorTest({
         )}
 
         {count === 4 ? (
-          <div className="relative mx-auto aspect-square w-full max-w-sm">
+          <div className="relative mx-auto aspect-square w-full max-w-md">
             {/* frame seen from above; the arrow on the body points to the front */}
             <svg
               viewBox="0 0 100 100"
@@ -581,7 +551,7 @@ function MotorTest({
               <path d="m50 40 5 8h-3v9h-4v-9h-3z" fill="var(--primary)" />
             </svg>
 
-            {QUAD_POSITIONS.map(({ motor, className, badge, direction, swap }) => {
+            {QUAD_POSITIONS.map(({ motor, className, badge }) => {
               const output = values[motor - 1] ?? MOTOR_STOP
               // while a flip runs the FC has been told to stop everything; the sliders keep their values
               const spinning = output > MOTOR_STOP && active && !paused
@@ -591,26 +561,26 @@ function MotorTest({
                   key={motor}
                   title={`Motor ${motor} · output ${output}`}
                   className={cn(
-                    'absolute flex aspect-square w-[40%] flex-col items-center justify-center gap-1.5',
+                    'absolute flex aspect-square w-[42%] flex-col items-center justify-center gap-1.5',
                     className,
                   )}
                 >
                   <SpinRing motor={motor} clockwise={clockwise} spinning={spinning} />
                   <span
                     className={cn(
-                      'absolute flex size-5 items-center justify-center rounded-full text-xs font-semibold',
+                      'absolute flex size-6 items-center justify-center rounded-full text-sm font-semibold',
                       badge,
                       spinning ? 'bg-destructive text-white' : 'bg-muted text-foreground',
                     )}
                   >
                     {motor}
                   </span>
-                  {tools(motor, { direction, swap })}
                   {target(motor, 'absolute inset-[4%] rounded-full')}
                   {motorSlider(motor, true)}
                   <div className="relative font-mono text-xs tabular-nums">
                     {hasRpm ? `${rpm(motor)} rpm` : output}
                   </div>
+                  {tools(motor)}
                 </div>
               )
             })}
@@ -675,7 +645,7 @@ function MotorTest({
   )
 }
 
-const MOTOR_ICON_BUTTON = 'size-6 rounded-full [&_svg]:size-3.5'
+const MOTOR_ICON_BUTTON = 'size-8 rounded-full [&_svg]:size-4'
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
