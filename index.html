@@ -4,16 +4,16 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FPV Configurator – simple Betaflight configurator in the browser</title>
+    <title>FPV Configurator: a stripped-down Betaflight configurator</title>
     <meta
       name="description"
-      content="A simplified Betaflight configurator that runs in the browser. Set up the flight controller and ESCs of your FPV drone over USB – no install needed."
+      content="A stripped-down Betaflight configurator that runs in the browser. It keeps only the settings most pilots change: three PID sliders, a few filters, four modes, one OSD profile."
     />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="FPV Configurator" />
     <meta
       property="og:description"
-      content="A simplified Betaflight configurator that runs in the browser. Set up the flight controller and ESCs of your FPV drone over USB – no install needed."
+      content="A stripped-down Betaflight configurator that runs in the browser. It keeps only the settings most pilots change: three PID sliders, a few filters, four modes, one OSD profile."
     />
   </head>
   <body>
@@ -22,11 +22,25 @@
       <main>
         <h1>FPV Configurator</h1>
         <p>
-          A simplified Betaflight configurator that runs in the browser. Connect the flight
-          controller of your FPV drone over USB and set up ports, orientation, PID tuning, filters,
-          rates, modes, motors, ESCs (Bluejay and AM32), OSD and VTX. Nothing to install; it needs a
-          Chromium-based browser such as Chrome or Edge for Web Serial.
+          A stripped-down Betaflight configurator that runs in the browser. Most of Betaflight's
+          options are left out; what remains is what most pilots actually change. Connect the flight
+          controller over USB in Chrome or Edge.
         </p>
+        <ul>
+          <li>PID tuning with three sliders: damping, pitch gains and master multiplier</li>
+          <li>
+            Filters cut down to gyro lowpass, RPM filter, dynamic notch, D-term and yaw lowpass
+          </li>
+          <li>One rate profile, synced across axes, with a curve graph</li>
+          <li>Four modes: arm, angle, turtle and beeper</li>
+          <li>Ports assigned by device: pick the receiver, VTX or GPS, then its UART</li>
+          <li>
+            Pre-flight checklist: bidirectional DShot, accelerometer, arm angle, beepers, airmode
+          </li>
+          <li>Bluejay and AM32 ESC settings through the flight controller</li>
+          <li>OSD with a short list of elements and one profile</li>
+          <li>Analog VTX tables from presets</li>
+        </ul>
       </main>
     </div>
     <script type="module" src="/src/main.tsx"></script>
