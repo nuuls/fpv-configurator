@@ -297,15 +297,6 @@ describe('changed outside this app', () => {
         reset: false,
       },
       {
-        section: 'feature',
-        key: 'feature: feature LED_STRIP',
-        label: 'feature LED_STRIP',
-        name: 'feature',
-        value: 'LED_STRIP',
-        defaultValue: '-LED_STRIP',
-        reset: false,
-      },
-      {
         section: 'led',
         key: null,
         label: 'led 0 0,0::C:2',
@@ -352,18 +343,12 @@ describe('changed outside this app', () => {
   it('marks resets in the draft and turns them into CLI lines, profile switches restored', () => {
     const snapshot = withDiff()
     let draft = withReset(readSetup(snapshot), 'profile 1: anti_gravity_gain', true)
-    expect(externalChanges(snapshot, draft).map((change) => change.reset)).toEqual([false, false, false, false, true, false])
+    expect(externalChanges(snapshot, draft).map((change) => change.reset)).toEqual([false, false, false, true, false])
     expect(resetScript(snapshot, draft)).toEqual(['profile 1', 'set anti_gravity_gain = 80', 'profile 0'])
 
     draft = withAllResets(snapshot, draft)
-    expect(draft.resets).toEqual([
-      'feature: feature LED_STRIP',
-      'master: crashflip_motor_percent',
-      'profile 1: anti_gravity_gain',
-      'rateprofile 0: tpa_rate',
-    ])
+    expect(draft.resets).toEqual(['master: crashflip_motor_percent', 'profile 1: anti_gravity_gain', 'rateprofile 0: tpa_rate'])
     expect(resetScript(snapshot, draft)).toEqual([
-      'feature -LED_STRIP',
       'set crashflip_motor_percent = 0',
       'profile 1',
       'set anti_gravity_gain = 80',
@@ -374,17 +359,15 @@ describe('changed outside this app', () => {
     ])
 
     draft = withReset(draft, 'profile 1: anti_gravity_gain', false)
-    expect(draft.resets).toEqual(['feature: feature LED_STRIP', 'master: crashflip_motor_percent', 'rateprofile 0: tpa_rate'])
+    expect(draft.resets).toEqual(['master: crashflip_motor_percent', 'rateprofile 0: tpa_rate'])
     expect(withReset(draft, 'master: crashflip_motor_percent', true).resets).toEqual(draft.resets)
   })
 
-  it('reads the mock FC: two features and two settings changed in Betaflight Configurator, nothing a tab manages', async () => {
+  it('reads the mock FC: two settings changed in Betaflight Configurator; its features and the app-managed setup do not count', async () => {
     const { client } = await connect(new MockFlightController())
     const snapshot = await readSetupSnapshot(client)
     expect(snapshot.externalError).toBeNull()
     expect(externalChanges(snapshot, readSetup(snapshot)).map((change) => [change.name, change.defaultValue, change.value])).toEqual([
-      ['feature', '-TELEMETRY', 'TELEMETRY'],
-      ['feature', '-ESC_SENSOR', 'ESC_SENSOR'],
       ['crashflip_motor_percent', '0', '50'],
       ['osd_units', 'METRIC', 'IMPERIAL'],
     ])
@@ -400,11 +383,7 @@ describe('changed outside this app', () => {
     await dropped
 
     const after = await readSetupSnapshot((await connect(fc)).client)
-    expect(externalChanges(after, readSetup(after)).map((change) => change.label)).toEqual([
-      'feature TELEMETRY',
-      'feature ESC_SENSOR',
-      'crashflip_motor_percent',
-    ])
+    expect(externalChanges(after, readSetup(after)).map((change) => change.label)).toEqual(['crashflip_motor_percent'])
     const before = defaultMockConfig()
     expect(fc.savedConfig).toEqual({
       ...before,
@@ -420,8 +399,6 @@ describe('changed outside this app', () => {
     const snapshot = await readSetupSnapshot(client)
     const draft = withAllResets(snapshot, readSetup(snapshot))
     expect(resetScript(snapshot, draft)).toEqual([
-      'feature -TELEMETRY',
-      'feature -ESC_SENSOR',
       'set crashflip_motor_percent = 0',
       'set osd_units = METRIC',
       'profile 0',
@@ -435,7 +412,7 @@ describe('changed outside this app', () => {
       osd_units: 'METRIC',
       anti_gravity_gain: '80',
     })
-    expect(fc.savedConfig.features).toBe((config.features & ~(FEATURE.TELEMETRY | FEATURE.ESC_SENSOR)) >>> 0)
+    expect(fc.savedConfig.features).toBe(config.features)
     // the link is back to MSP
     expect((await readFcInfo(client)).variant).toBe('BTFL')
   })

@@ -277,14 +277,36 @@ const MANAGED_SETTING_PATTERNS = [
 ]
 /** Commands other than `set` that a tab writes; `feature`, `beeper` and `beacon` only for the names given. */
 const MANAGED_COMMANDS = new Set(['serial', 'aux', 'vtxtable'])
-const MANAGED_FEATURES = new Set(['AIRMODE', 'RX_SERIAL', 'GPS'])
 const MANAGED_BEEPS = new Set(['RX_SET', 'RX_LOST'])
+/**
+ * Not counted as changed outside this app (asked for by the user): features — switching a feature on is how a
+ * quad gets set up, not a deviation — and calibrations, which are meant to differ from the defaults: the
+ * accelerometer / magnetometer zero and trims, the gyro yaw offset, and the battery voltage / current meters.
+ */
+const NOT_COUNTED_SETTINGS = new Set([
+  'acc_calibration',
+  'mag_calibration',
+  'acc_trim_pitch',
+  'acc_trim_roll',
+  'gyro_offset_yaw',
+  'vbat_scale',
+  'vbat_divider',
+  'vbat_multiplier',
+  'ibata_scale',
+  'ibata_offset',
+  'ibatv_scale',
+  'ibatv_offset',
+])
 
 function isManaged(entry: DiffEntry): boolean {
   if (entry.kind === 'setting') return MANAGED_SETTINGS.has(entry.name) || MANAGED_SETTING_PATTERNS.some((p) => p.test(entry.name))
   const flag = parseFlag(entry.line)
-  if (flag) return (flag.command === 'feature' ? MANAGED_FEATURES : MANAGED_BEEPS).has(flag.flag.replace(/^-/, ''))
+  if (flag) return flag.command === 'feature' || MANAGED_BEEPS.has(flag.flag.replace(/^-/, ''))
   return MANAGED_COMMANDS.has(entry.line.split(' ')[0] ?? '')
+}
+
+function isCounted(entry: DiffEntry): boolean {
+  return entry.kind !== 'setting' || !NOT_COUNTED_SETTINGS.has(entry.name)
 }
 
 /**
@@ -295,7 +317,9 @@ export function externalOnly(report: DiffReport): DiffReport {
   const sections = report.sections
     .map((section) => ({
       ...section,
-      entries: section.entries.filter((entry) => !isManaged(entry) && (entry.kind === 'setting' || !entry.isDefault)),
+      entries: section.entries.filter(
+        (entry) => !isManaged(entry) && isCounted(entry) && (entry.kind === 'setting' || !entry.isDefault),
+      ),
     }))
     .filter((section) => section.entries.length > 0)
   return { ...report, sections }

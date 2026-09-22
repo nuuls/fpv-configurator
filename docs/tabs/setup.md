@@ -23,8 +23,7 @@ everything that was changed outside this app (Betaflight Configurator, CLI) with
 |  ! Bidirectional DShot is enabled  Off [Open Motors]  |
 +-------------------------------------------------------+
 | Changed outside this app                  [Reset all] |
-|  4 changes made outside this app. 1 to reset once saved. |
-|  feature  feature TELEMETRY  [-TELEMETRY] → [TELEMETRY] [Reset] |
+|  3 changes made outside this app. 1 to reset once saved. |
 |  master   crashflip_motor_percent        [0] → [50] [Reset] |
 |  master   osd_units  [IMPERIAL] → [METRIC] · not saved yet [Keep] |
 |  led      led 0 0,0::C:2      Only in Betaflight Configurator |
@@ -48,7 +47,7 @@ it will be.
 | Check: beeper and DShot beacon sound on RX set and RX loss | check + **Fix** | `beeper`, `beacon` · `MSP_BEEPER_CONFIG` `beeper_off_flags` and `dshotBeaconOffFlags`, bits 9 (RX_SET) and 1 (RX_LOST) of each (read-modify-write) | pass = all four bits clear · Fix clears them | other beeps and the beacon tone stay as they are |
 | Check: airmode is on | check + **Fix** | `feature AIRMODE` · `MSP_FEATURE_CONFIG` bit 22 | pass = set · Fix sets it | needs reboot |
 | Changed outside this app | list | CLI `diff all defaults` (read as on the Diff Checker) minus every setting and command a tab of this app writes | — | one row per change: section · name · default → value; read together with the checklist |
-| Reset / Keep | button per row | `set name = default` in the CLI, inside the diff's own `profile N` / `rateprofile N` switch and restore lines; `feature -NAME` / `feature NAME`, `beeper` and `beacon` alike | — | Reset is a local edit (row: `value → default · not saved yet`, button reads Keep); needs reboot |
+| Reset / Keep | button per row | `set name = default` in the CLI, inside the diff's own `profile N` / `rateprofile N` switch and restore lines; `beeper -NAME` / `beeper NAME` and `beacon` alike | — | Reset is a local edit (row: `value → default · not saved yet`, button reads Keep); needs reboot |
 | Reset all | button | same | — | marks every row that has a Reset |
 
 ## Behaviour
@@ -77,16 +76,20 @@ it will be.
   from the "Betaflight setting / MSP" columns of every tab spec: e.g. `pid_process_denom`, `small_angle`,
   `serialrx_provider`, `align_board_*`, `rc_smoothing*`, the filter cutoffs Filters pins, `simplified_*`, the PIDs
   and rates, `motor_*`, `dshot_bidir`, `osd_*_pos`, `vtx_*`, `blackbox_device`; the commands `serial`, `aux`,
-  `vtxtable`, `feature AIRMODE/RX_SERIAL/GPS`, `beeper`/`beacon` RX_SET and RX_LOST. Everything else that differs
-  is listed: other `set` variables of `master`, the PID / rate / battery profiles, other features and beeper
-  conditions, and lines such as `led`, `map`, `resource`, `mmix`, `adjrange`, plus the craft name. **A tab that
-  starts writing a new setting must add it to that list.**
+  `vtxtable`, `beeper`/`beacon` RX_SET and RX_LOST. Everything else that differs is listed: other `set` variables
+  of `master`, the PID / rate / battery profiles, other beeper conditions, and lines such as `led`, `map`,
+  `resource`, `mmix`, `adjrange`, plus the craft name. **A tab that starts writing a new setting must add it to
+  that list.**
+- **Not counted** (`NOT_COUNTED_SETTINGS`, and every `feature` line): features — switching one on is how a quad
+  gets set up — and calibrations, which are meant to differ from the defaults: `acc_calibration`,
+  `mag_calibration`, `acc_trim_roll/pitch`, `gyro_offset_yaw`, `vbat_scale/divider/multiplier`,
+  `ibata_scale/offset`, `ibatv_scale/offset`. They neither appear in the list nor in the count.
 - The summary reads "N changes made outside this app." (+ "M to reset once saved."), or "Nothing was changed
   outside this app."; the card reads the diff with the checklist (about a second) and again after every reboot.
 - Reset puts the Betaflight default back — what the FC printed as the default (`#set` line) or the opposite flag.
   Save & Reboot first runs the resets in one non-interactive CLI session (`runCliCommands`: STX, the lines, ETX —
   no `#`, no arming flag), laid out like the diff: `set …` for `master`, `profile N` → `set …` → the diff's own
-  restore line (`profile 0`) for profile settings, `feature -TELEMETRY` for a feature; then the tab's MSP writes,
+  restore line (`profile 0`) for profile settings, `beeper GYRO_CALIBRATED` for a muted beep; then the tab's MSP writes,
   `MSP_EEPROM_WRITE`, reboot. A `###ERROR` from the CLI (e.g. INVALID NAME) fails the save with that message and
   nothing is saved.
 - No Reset ("Only in Betaflight Configurator"): the craft name, a setting whose default the FC didn't print, lines
@@ -131,13 +134,14 @@ it will be.
   not managed: the app never changes them, so a change to them was made elsewhere.
 - Resets go through the CLI (`set name = default`), not `MSP2_CLI_SETTING`: the diff prints settings of every
   profile, and only the CLI can switch to `profile 1` and back (the diff's own restore lines are reused), and the
-  same session undoes `feature` / `beeper` / `beacon` flags.
+  same session undoes `beeper` / `beacon` flags.
 - "Recommended" is the Betaflight default the FC itself reports — there are no drone-type presets yet (SPEC §2
   "Drone type"); when there are, they take this list's place.
 - Reset is a local edit saved with the tab's Save & Reboot (SPEC §5, one Save per tab), never written on click;
   every reset reboots since most of these settings need it and the tab reboots anyway.
-- Features and beeper conditions are listed as resettable flags (`-TELEMETRY → TELEMETRY`); the mock's ESC
-  telemetry therefore shows up as two external changes — true to the app: no tab sets them up.
+- Features and calibrations don't count (2026-09-22, asked for by the user): the mock's ESC telemetry
+  (`feature TELEMETRY`, `feature ESC_SENSOR`) is not listed although no tab sets it up, and a calibrated battery
+  meter isn't something to reset. Beeper conditions still are, as resettable flags (`-GYRO_CALIBRATED → GYRO_CALIBRATED`).
 
 ## Acceptance
 
@@ -156,17 +160,18 @@ Checkable with **Connect Mock FC**:
       config (beeper on, beacon off) fails the check
 - [x] Turning airmode off on the mock and fixing it writes only the feature mask (unit test)
 
-- [x] Changed outside this app: "4 changes made outside this app." — `feature TELEMETRY`, `feature ESC_SENSOR`,
-      `crashflip_motor_percent` 0 → 50, `osd_units` METRIC → IMPERIAL, each with Reset; Reset all enabled;
-      the app's own setup (ports, modes, `dshot_bidir`, …) isn't listed
+- [x] Changed outside this app: "2 changes made outside this app." — `crashflip_motor_percent` 0 → 50, `osd_units`
+      METRIC → IMPERIAL, each with Reset; Reset all enabled; the app's own setup (ports, modes, `dshot_bidir`, …)
+      and the mock's features (`TELEMETRY`, `ESC_SENSOR`) aren't listed
 - [x] Reset `osd_units` → "IMPERIAL → METRIC · not saved yet" and "1 to reset once saved.", Keep takes it back;
-      Reset all marks all four, Revert unmarks them; Reset `osd_units` → Save & Reboot → "3 changes made outside
+      Reset all marks both, Revert unmarks them; Reset `osd_units` → Save & Reboot → "1 change made outside
       this app.", Diff Checker reads "0 tuning differences · 7 other hidden"
-- [x] Reset all on a mock with `anti_gravity_gain = 100` in profile 0 sends `feature -TELEMETRY`,
-      `feature -ESC_SENSOR`, `set crashflip_motor_percent = 0`, `set osd_units = METRIC`, `profile 0`,
-      `set anti_gravity_gain = 80`, `profile 0`; afterwards the FC is back on MSP (unit test)
-- [x] The craft name, `led` lines and a setting without a printed default have no Reset; an unknown name makes the
-      save fail with the CLI's error (unit tests)
+- [x] Reset all on a mock with `anti_gravity_gain = 100` in profile 0 sends `set crashflip_motor_percent = 0`,
+      `set osd_units = METRIC`, `profile 0`, `set anti_gravity_gain = 80`, `profile 0`, and leaves the features
+      alone; afterwards the FC is back on MSP (unit test)
+- [x] The craft name, `led` lines and a setting without a printed default have no Reset; calibrations
+      (`vbat_scale`, `acc_calibration`, …) and features aren't listed; an unknown name makes the save fail with the
+      CLI's error (unit tests)
 - [x] FC that ignores the STX: the card reports it, the checklist still works (unit test)
 
 On real hardware:
@@ -176,8 +181,8 @@ On real hardware:
 - [ ] Fresh FC: accelerometer check fails, passes after calibrating; arm angle Fix survives a power cycle
 - [ ] After Fix beeper + Save: `beacon` in the CLI lists RX_LOST and RX_SET, and the ESCs beep with the BEEPER switch
 - [ ] A quad set up in Betaflight Configurator lists what that configurator changed, minus what this app's tabs
-      cover; resetting a `profile 1` setting leaves the selected profile as it was; a feature reset survives the
-      power cycle
+      cover, features and calibrations; resetting a `profile 1` setting leaves the selected profile as it was and
+      survives the power cycle
 
 ## Open questions
 
@@ -185,5 +190,5 @@ On real hardware:
 - [x] Beeper check: should the DShot beacon count too (quads without a wired buzzer)? Yes — checked and fixed
       together with the wired beeper
 - [ ] Fix buttons go beyond "verifies" in SPEC §2 — keep, or make the checklist read-only?
-- [ ] Reset all also resets deliberate calibrations (`vbat_scale`, `ibata_scale`, `gyro_1_sensor_align`, …) when
-      they differ — leave them out of Reset all, or keep it literal?
+- [x] Should Reset all touch calibrations (`vbat_scale`, `ibata_scale`, …)? No — they and the features aren't
+      counted at all (user, 2026-09-22)

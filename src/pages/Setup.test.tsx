@@ -59,25 +59,24 @@ const externalList = () => screen.getByRole('list', { name: 'Changed outside thi
 const externalRow = (name: string) => within(externalList()).getByRole('listitem', { name })
 
 describe('Setup tab: changed outside this app', () => {
-  it('lists the features and settings changed in Betaflight Configurator, default → value', async () => {
+  it('lists the settings changed in Betaflight Configurator, default → value; the mock\'s features do not count', async () => {
     await openTab('Setup')
-    expect(await screen.findByText('4 changes made outside this app.')).toBeInTheDocument()
+    expect(await screen.findByText('2 changes made outside this app.')).toBeInTheDocument()
     expect(externalRow('crashflip_motor_percent')).toHaveTextContent('master')
     expect(externalRow('crashflip_motor_percent')).toHaveTextContent('0 → 50')
     expect(within(externalRow('osd_units')).getByText('METRIC').tagName).toBe('DEL') // the default, red
     expect(within(externalRow('osd_units')).getByText('IMPERIAL').tagName).toBe('INS') // what is set, green
-    expect(externalRow('feature TELEMETRY')).toHaveTextContent('-TELEMETRY → TELEMETRY')
-    expect(within(externalRow('feature ESC_SENSOR')).getByRole('button', { name: 'Reset' })).toBeInTheDocument()
+    expect(within(externalList()).queryByRole('listitem', { name: /feature/ })).toBeNull()
     expect(screen.getByRole('button', { name: 'Reset all' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Save & Reboot' })).toBeDisabled()
   })
 
   it('resets one setting with Save & Reboot; Keep and Revert take resets back', async () => {
     const user = await openTab('Setup')
-    await screen.findByText('4 changes made outside this app.')
+    await screen.findByText('2 changes made outside this app.')
 
     await user.click(within(externalRow('osd_units')).getByRole('button', { name: 'Reset' }))
-    expect(screen.getByText('4 changes made outside this app. 1 to reset once saved.')).toBeInTheDocument()
+    expect(screen.getByText('2 changes made outside this app. 1 to reset once saved.')).toBeInTheDocument()
     expect(externalRow('osd_units')).toHaveTextContent('IMPERIAL → METRIC · not saved yet')
     expect(within(externalRow('osd_units')).getByText('METRIC').tagName).toBe('INS') // what it will be
     await user.click(within(externalRow('osd_units')).getByRole('button', { name: 'Keep' }))
@@ -85,14 +84,14 @@ describe('Setup tab: changed outside this app', () => {
     expect(screen.getByRole('button', { name: 'Save & Reboot' })).toBeDisabled()
 
     await user.click(screen.getByRole('button', { name: 'Reset all' }))
-    expect(screen.getByText('4 changes made outside this app. 4 to reset once saved.')).toBeInTheDocument()
+    expect(screen.getByText('2 changes made outside this app. 2 to reset once saved.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reset all' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'Revert' }))
-    expect(screen.getByText('4 changes made outside this app.')).toBeInTheDocument()
+    expect(screen.getByText('2 changes made outside this app.')).toBeInTheDocument()
 
     await user.click(within(externalRow('osd_units')).getByRole('button', { name: 'Reset' }))
     await saveAndReboot(user)
-    expect(await screen.findByText('3 changes made outside this app.')).toBeInTheDocument()
+    expect(await screen.findByText('1 change made outside this app.')).toBeInTheDocument()
     expect(externalRow('crashflip_motor_percent')).toHaveTextContent('0 → 50')
     expect(within(externalList()).queryByRole('listitem', { name: 'osd_units' })).toBeNull()
 

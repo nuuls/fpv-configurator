@@ -245,7 +245,7 @@ describe('externalOnly', () => {
       'vtx_pit_mode_freq',
       'blackbox_disable_pids',
       'feedforward_boost',
-      'vbat_scale',
+      'vbat_warning_cell_voltage',
     ]
     const output = ['# master', ...[...managed, ...others].map((name) => `set ${name} = 1`)].join('\r\n')
     expect(names(externalOnly(parseDiff(output)), 'master')).toEqual(others)
@@ -288,14 +288,30 @@ describe('externalOnly', () => {
       'resource MOTOR 1 A01',
     ].join('\r\n')
     const external = externalOnly(parseDiff(output))
+    // features don't count, whichever they are
     expect(external.sections.map((s) => [s.title, ...(names(external, s.title) ?? [])])).toEqual([
-      ['feature', 'feature LED_STRIP'],
       ['beeper', 'beeper -GYRO_CALIBRATED'],
       ['map', 'map TAER1234'],
       ['led', 'led 0 0,0::CW:2'],
       ['resource', 'resource MOTOR 1 A01'],
     ])
-    expect(countDifferences(external)).toBe(5)
+    expect(countDifferences(external)).toBe(4)
+  })
+
+  it('does not count calibrations', () => {
+    const calibrations = [
+      'acc_calibration',
+      'mag_calibration',
+      'acc_trim_roll',
+      'gyro_offset_yaw',
+      'vbat_scale',
+      'vbat_divider',
+      'ibata_scale',
+      'ibata_offset',
+      'ibatv_offset',
+    ]
+    const output = ['# master', ...calibrations.map((name) => `set ${name} = 1`), 'set osd_units = IMPERIAL'].join('\r\n')
+    expect(names(externalOnly(parseDiff(output)), 'master')).toEqual(['osd_units'])
   })
 })
 
