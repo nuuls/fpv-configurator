@@ -6,8 +6,11 @@ import {
   buildSimplifiedTuning,
   decodePidfs,
   decodeRcSmoothing,
+  decodeTpa,
   smoothingWrites,
+  tpaWrites,
   type AxisPids,
+  type SliderDraft,
   type TuningDraft,
   type TuningSnapshot,
 } from './model'
@@ -15,14 +18,15 @@ import {
 export async function readTuningSnapshot(client: MspClient): Promise<TuningSnapshot> {
   const simplified = [...(await client.request(MSP.SIMPLIFIED_TUNING))]
   const smoothing = decodeRcSmoothing(await client.request(MSP.RX_CONFIG))
-  return { simplified, ...smoothing }
+  const tpa = decodeTpa(await client.request(MSP.PID_ADVANCED))
+  return { simplified, ...smoothing, tpa }
 }
 
 /** Asks the firmware what PIDs the draft sliders would produce, without applying anything. */
 export async function previewPids(
   client: MspClient,
   snapshot: TuningSnapshot,
-  draft: TuningDraft,
+  draft: SliderDraft,
 ): Promise<AxisPids[]> {
   return decodePidfs(
     await client.request(MSP.CALCULATE_SIMPLIFIED_PID, buildCalculateRequest(snapshot, draft)),
@@ -36,8 +40,10 @@ export async function saveTuning(
   draft: TuningDraft,
 ): Promise<boolean> {
   await client.request(MSP.SET_SIMPLIFIED_TUNING, buildSimplifiedTuning(snapshot, draft))
-  const settings = smoothingWrites(snapshot, draft)
-  for (const { name, value } of settings) await writeSetting(client, name, value)
+  const smoothing = smoothingWrites(snapshot, draft)
+  // TPA by name: MSP_SET_PID_ADVANCED carries ~40 unrelated tuning fields. The EEPROM write re-inits the PID loop.
+  for (const { name, value } of [...smoothing, ...tpaWrites(snapshot, draft)])
+    await writeSetting(client, name, value)
   await saveToEeprom(client)
-  return settings.length > 0
+  return smoothing.length > 0
 }

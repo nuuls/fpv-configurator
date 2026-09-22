@@ -245,6 +245,9 @@ const MANAGED_SETTINGS = new Set([
   'rc_smoothing_auto_factor',
   'rc_smoothing_auto_factor_throttle',
   'feedforward_smooth_factor',
+  'tpa_mode',
+  'tpa_rate',
+  'tpa_breakpoint',
   // Filters
   'gyro_lpf1_static_hz',
   'gyro_lpf1_dyn_min_hz',

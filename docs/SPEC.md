@@ -52,6 +52,7 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
     - Pitch gains (master multiplier for the pitch axis only)
     - Master multiplier
   - Dynamic D is locked at 0 (and not visible)
+  - TPA: mode (D / PD), rate and breakpoint
   - Other sliders are locked at 1 (and not visible)
 
   - Replace entire smoothing section with:

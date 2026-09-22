@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ButtonGroup } from '@/components/ButtonGroup'
 import { Notice, LoadingState } from '@/components/Notice'
 import { SaveBar } from '@/components/SaveBar'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -17,8 +18,14 @@ import {
   sliderBounds,
   SMOOTHING_PRESETS,
   smoothingWrites,
+  TPA_BREAKPOINT,
+  TPA_MODE,
+  TPA_MODE_OPTIONS,
+  TPA_RATE,
+  tpaThrottlePercent,
   type AxisPids,
   type SmoothingPreset,
+  type TpaSettings,
   type TuningDraft,
   type TuningSnapshot,
 } from '@/lib/tuning/model'
@@ -51,7 +58,7 @@ export function PidTuningPage() {
     <>
       <PageHeader
         title="PID Tuning"
-        description="Three sliders and a stick-feel preset. The rest is handled for you."
+        description="Three sliders, a stick-feel preset and TPA. The rest is handled for you."
       />
       {client && snapshot ? (
         <Editor client={client} snapshot={snapshot} reload={reload} />
@@ -87,25 +94,16 @@ function Editor({
           </CardHeader>
           <CardContent className="flex flex-col gap-6">
             {SLIDERS.map(({ key, label, hint }) => (
-              <div key={key}>
-                <div className="flex items-baseline justify-between">
-                  <span className="text-sm font-medium">{label}</span>
-                  <span className="font-mono text-sm tabular-nums">
-                    {(draft[key] / 100).toFixed(2)}
-                  </span>
-                </div>
-                <Slider
-                  aria-label={label}
-                  className="my-3"
-                  {...sliderBounds(readTuning(snapshot)[key])}
-                  step={SLIDER_STEP}
-                  value={[draft[key]]}
-                  onValueChange={([value]) =>
-                    value !== undefined && setDraft({ ...draft, [key]: value })
-                  }
-                />
-                <p className="text-muted-foreground text-sm">{hint}</p>
-              </div>
+              <TuningSlider
+                key={key}
+                label={label}
+                readout={(draft[key] / 100).toFixed(2)}
+                hint={hint}
+                {...sliderBounds(readTuning(snapshot)[key])}
+                step={SLIDER_STEP}
+                value={draft[key]}
+                onChange={(value) => setDraft({ ...draft, [key]: value })}
+              />
             ))}
           </CardContent>
         </Card>
@@ -184,6 +182,14 @@ function Editor({
         </CardContent>
       </Card>
 
+      {draft.tpa && snapshot.tpa && (
+        <TpaCard
+          tpa={draft.tpa}
+          original={snapshot.tpa}
+          onChange={(tpa) => setDraft({ ...draft, tpa })}
+        />
+      )}
+
       {hasHiddenTuning(snapshot) && (
         <Notice tone="warning">
           This quad uses tuning values this app doesn&apos;t show (other sliders, Dynamic D, or
@@ -200,6 +206,107 @@ function Editor({
         onSave={() => void save(() => saveTuning(client, snapshot, draft))}
       />
     </>
+  )
+}
+
+function TuningSlider({
+  label,
+  readout,
+  hint,
+  min,
+  max,
+  step,
+  value,
+  onChange,
+}: {
+  label: string
+  readout: string
+  hint?: string
+  min: number
+  max: number
+  step: number
+  value: number
+  onChange: (value: number) => void
+}) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between">
+        <span className="text-sm font-medium">{label}</span>
+        <span className="font-mono text-sm tabular-nums">{readout}</span>
+      </div>
+      <Slider
+        aria-label={label}
+        className="my-3"
+        min={min}
+        max={max}
+        step={step}
+        value={[value]}
+        onValueChange={([next]) => next !== undefined && onChange(next)}
+      />
+      {hint && <p className="text-muted-foreground text-sm">{hint}</p>}
+    </div>
+  )
+}
+
+/** What the current TPA settings do, in one sentence. */
+function tpaSummary({ mode, rate, breakpoint }: TpaSettings): string {
+  if (rate === 0) return 'TPA is off: the gains stay the same at every throttle position.'
+  const terms =
+    mode === TPA_MODE.D ? 'D is' : mode === TPA_MODE.PD ? 'P and D are' : 'P, D and S are'
+  return `${terms} lowered gradually above ${tpaThrottlePercent(breakpoint)} % throttle, down to ${100 - rate} % of normal at full throttle.`
+}
+
+function TpaCard({
+  tpa,
+  original,
+  onChange,
+}: {
+  tpa: TpaSettings
+  original: TpaSettings
+  onChange: (tpa: TpaSettings) => void
+}) {
+  return (
+    <Card className="mt-4">
+      <CardHeader>
+        <CardTitle>TPA</CardTitle>
+        <CardDescription>
+          Throttle PID attenuation: lowers gains at high throttle, where the quad reacts harder and
+          oscillates more easily.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-6">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-sm font-medium">Lowers</span>
+          <ButtonGroup
+            label="TPA mode"
+            options={TPA_MODE_OPTIONS}
+            value={tpa.mode}
+            onChange={(mode) => onChange({ ...tpa, mode })}
+          />
+        </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          <TuningSlider
+            label="TPA rate"
+            readout={`${tpa.rate} %`}
+            hint="How much the gains are lowered at full throttle. 0 turns TPA off."
+            {...sliderBounds(original.rate, TPA_RATE)}
+            step={TPA_RATE.step}
+            value={tpa.rate}
+            onChange={(rate) => onChange({ ...tpa, rate })}
+          />
+          <TuningSlider
+            label="TPA breakpoint"
+            readout={`${tpa.breakpoint} µs`}
+            hint="Throttle where the lowering starts. Raise it if the quad oscillates only near full throttle."
+            {...sliderBounds(original.breakpoint, TPA_BREAKPOINT)}
+            step={TPA_BREAKPOINT.step}
+            value={tpa.breakpoint}
+            onChange={(breakpoint) => onChange({ ...tpa, breakpoint })}
+          />
+        </div>
+        <p className="text-muted-foreground text-sm">{tpaSummary(tpa)}</p>
+      </CardContent>
+    </Card>
   )
 }
 

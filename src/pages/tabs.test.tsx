@@ -157,7 +157,7 @@ describe('Modes tab', () => {
 describe('PID Tuning tab', () => {
   it('shows three sliders, a live PID preview and warns about hidden tuning', async () => {
     const user = await openTab('PID Tuning')
-    expect(await screen.findAllByRole('slider')).toHaveLength(3)
+    expect(await screen.findAllByRole('slider')).toHaveLength(5) // + TPA rate and breakpoint
     expect(screen.getByText(/Saving resets those/)).toBeInTheDocument()
     expect(await screen.findAllByRole('cell', { name: '45' })).toHaveLength(2) // roll + yaw P at 1.0
 

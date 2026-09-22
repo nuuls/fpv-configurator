@@ -61,6 +61,9 @@ const PROFILE_SETTINGS = new Set([
   'feedforward_smooth_factor',
   'dyn_idle_min_rpm',
   'anti_gravity_gain',
+  'tpa_mode',
+  'tpa_rate',
+  'tpa_breakpoint',
 ])
 
 function serialLine(port: SerialPortConfig): string {

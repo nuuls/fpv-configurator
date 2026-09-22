@@ -42,9 +42,13 @@ import { MockTransport } from '@/lib/transport/mock'
 import { previewPids, readTuningSnapshot, saveTuning } from '@/lib/tuning/io'
 import {
   buildSimplifiedTuning,
+  decodeTpa,
   hasHiddenTuning,
   readTuning,
   smoothingWrites,
+  TPA_MODE,
+  tpaThrottlePercent,
+  tpaWrites,
   type TuningSnapshot,
 } from '@/lib/tuning/model'
 
@@ -213,6 +217,7 @@ describe('pid tuning', () => {
     simplified: defaultMockConfig().simplifiedTuning,
     rcSmoothing: true,
     rcSmoothingAutoFactor: 30,
+    tpa: { mode: TPA_MODE.D, rate: 65, breakpoint: 1350 },
   }
   const withFf = (ff: number, patch: Partial<TuningSnapshot> = {}): TuningSnapshot => ({
     ...base,
@@ -284,7 +289,13 @@ describe('pid tuning', () => {
   it('previews and saves against the FC', async () => {
     const { fc, transport, client } = await connect()
     const snapshot = await readTuningSnapshot(client)
-    const draft = { master: 120, damping: 100, pitch: 110, smoothing: 'light' as const }
+    const draft = {
+      master: 120,
+      damping: 100,
+      pitch: 110,
+      smoothing: 'light' as const,
+      tpa: snapshot.tpa,
+    }
 
     const pids = await previewPids(client, snapshot, draft)
     expect(pids).toHaveLength(3)
@@ -299,6 +310,44 @@ describe('pid tuning', () => {
     expect(fc.savedConfig.settings).toMatchObject({
       rc_smoothing_auto_factor: '25',
       rc_smoothing_auto_factor_throttle: '25',
+    })
+  })
+
+  it('decodes TPA from the end of MSP_PID_ADVANCED and tolerates older, shorter payloads', () => {
+    const payload = new Uint8Array(61)
+    payload.set([0, 50, 0x46, 0x05], 57) // PD, 50 %, 1350 µs
+    expect(decodeTpa(payload)).toEqual({ mode: TPA_MODE.PD, rate: 50, breakpoint: 1350 })
+    expect(decodeTpa(payload.subarray(0, 57))).toBeNull()
+  })
+
+  it('writes only the TPA settings that changed', () => {
+    const draft = readTuning(base)
+    expect(tpaWrites(base, draft)).toEqual([])
+    expect(
+      tpaWrites(base, { ...draft, tpa: { mode: TPA_MODE.PD, rate: 65, breakpoint: 1500 } }),
+    ).toEqual([
+      { name: 'tpa_mode', value: 'PD' },
+      { name: 'tpa_breakpoint', value: '1500' },
+    ])
+  })
+
+  it('converts the TPA breakpoint to a throttle percent like the firmware', () => {
+    expect(tpaThrottlePercent(1350)).toBe(35)
+    expect(tpaThrottlePercent(900)).toBe(0)
+    expect(tpaThrottlePercent(2000)).toBe(99)
+  })
+
+  it('reads the TPA defaults and saves changed TPA without a reboot', async () => {
+    const { fc, client } = await connect()
+    const snapshot = await readTuningSnapshot(client)
+    expect(snapshot.tpa).toEqual({ mode: TPA_MODE.D, rate: 65, breakpoint: 1350 })
+    const tpa = { mode: TPA_MODE.PD, rate: 40, breakpoint: 1500 }
+    expect(await saveTuning(client, snapshot, { ...readTuning(snapshot), tpa })).toBe(false)
+    expect((await readTuningSnapshot(client)).tpa).toEqual(tpa)
+    expect(fc.savedConfig.settings).toMatchObject({
+      tpa_mode: 'PD',
+      tpa_rate: '40',
+      tpa_breakpoint: '1500',
     })
   })
 

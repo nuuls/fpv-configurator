@@ -1,5 +1,5 @@
 /**
- * Slider-based PID tuning and RC smoothing presets — docs/tabs/pid-tuning.md.
+ * Slider-based PID tuning, RC smoothing presets and TPA — docs/tabs/pid-tuning.md.
  * The firmware computes the PIDs from the sliders (Betaflight "simplified tuning"); this app only
  * exposes three (master, damping, and the two pitch sliders moved as one) and pins the rest.
  */
@@ -86,6 +86,8 @@ export interface TuningSnapshot {
   simplified: number[]
   rcSmoothing: boolean
   rcSmoothingAutoFactor: number
+  /** null when MSP_PID_ADVANCED is too short to carry TPA (older firmware). */
+  tpa: TpaSettings | null
 }
 
 export interface TuningDraft {
@@ -95,7 +97,11 @@ export interface TuningDraft {
   /** Pitch gains: written to both pitch sliders, so it scales every pitch gain like the master does. */
   pitch: number
   smoothing: SmoothingPreset | 'custom'
+  tpa: TpaSettings | null
 }
+
+/** What MSP_SIMPLIFIED_TUNING and MSP_CALCULATE_SIMPLIFIED_PID are built from. */
+export type SliderDraft = Omit<TuningDraft, 'tpa'>
 
 export interface AxisPids {
   p: number
@@ -118,6 +124,58 @@ export function decodeRcSmoothing(rxConfig: Uint8Array): {
     rcSmoothingAutoFactor: rxConfig[RX_CONFIG_AUTO_FACTOR_OFFSET] ?? 30,
     rcSmoothing: (rxConfig[RX_CONFIG_RC_SMOOTHING_OFFSET] ?? 1) !== 0,
   }
+}
+
+// ---- MSP_PID_ADVANCED (94): TPA, the last four bytes ----
+
+/** Throttle PID attenuation of the current PID profile. */
+export interface TpaSettings {
+  /** `tpa_mode`: index into TPA_MODE_NAMES. */
+  mode: number
+  /** `tpa_rate`: percent the gains are lowered by at full throttle. */
+  rate: number
+  /** `tpa_breakpoint`: throttle (µs, 1000–2000) above which the gains are lowered. */
+  breakpoint: number
+}
+
+/** `tpa_mode` lookup table (`lookupTableTpaMode`); PDS only exists on wing builds. */
+const TPA_MODE_NAMES = ['PD', 'D', 'PDS'] as const
+export const TPA_MODE = { PD: 0, D: 1 } as const
+export const TPA_MODE_OPTIONS = [
+  { value: TPA_MODE.D, label: 'D only' },
+  { value: TPA_MODE.PD, label: 'P and D' },
+] as const
+
+/** `tpa_mode`, `tpa_rate` (u8) and `tpa_breakpoint` (u16) end the message (msp.c, API 1.45+). */
+const PID_ADVANCED_TPA_OFFSET = 57
+
+export const TPA_RATE = { min: 0, max: 100, step: 5 } as const
+export const TPA_BREAKPOINT = { min: 1000, max: 2000, step: 10 } as const
+
+export function decodeTpa(pidAdvanced: Uint8Array): TpaSettings | null {
+  const r = new ByteReader(pidAdvanced)
+  if (r.remaining < PID_ADVANCED_TPA_OFFSET + 4) return null
+  r.skip(PID_ADVANCED_TPA_OFFSET)
+  return { mode: r.u8(), rate: r.u8(), breakpoint: r.u16() }
+}
+
+/** Throttle percent where TPA starts, as the firmware computes it (`pidInitConfig`: 0–99 %). */
+export function tpaThrottlePercent(breakpoint: number): number {
+  return Math.round(Math.min(Math.max((breakpoint - 1000) / 10, 0), 99))
+}
+
+/** CLI settings for the TPA values that changed; applied by the EEPROM write, no reboot. */
+export function tpaWrites(snapshot: TuningSnapshot, draft: TuningDraft): SettingWrite[] {
+  const before = snapshot.tpa
+  const after = draft.tpa
+  if (!before || !after) return []
+  const writes: SettingWrite[] = []
+  const modeName = TPA_MODE_NAMES[after.mode]
+  if (after.mode !== before.mode && modeName) writes.push({ name: 'tpa_mode', value: modeName })
+  if (after.rate !== before.rate) writes.push({ name: 'tpa_rate', value: String(after.rate) })
+  if (after.breakpoint !== before.breakpoint)
+    writes.push({ name: 'tpa_breakpoint', value: String(after.breakpoint) })
+  return writes
 }
 
 // ---- MSP_CALCULATE_SIMPLIFIED_PID (142) response: roll, pitch, yaw ----
@@ -147,6 +205,7 @@ export function readTuning(snapshot: TuningSnapshot): TuningDraft {
     damping: snapshot.simplified[OFFSET.D_GAIN] ?? 100,
     pitch: snapshot.simplified[OFFSET.PITCH_PI_GAIN] ?? 100,
     smoothing: detectSmoothing(snapshot),
+    tpa: snapshot.tpa,
   }
 }
 
@@ -159,12 +218,15 @@ export function hasHiddenTuning(snapshot: TuningSnapshot): boolean {
 }
 
 /** Slider range, widened if the FC's current value lies outside the normal one. */
-export function sliderBounds(value: number): { min: number; max: number } {
-  return { min: Math.min(SLIDER_MIN, value), max: Math.max(SLIDER_MAX, value) }
+export function sliderBounds(
+  value: number,
+  range: { min: number; max: number } = { min: SLIDER_MIN, max: SLIDER_MAX },
+): { min: number; max: number } {
+  return { min: Math.min(range.min, value), max: Math.max(range.max, value) }
 }
 
 /** Payload for MSP_SET_SIMPLIFIED_TUNING (whole message) — filter sliders are passed through untouched. */
-export function buildSimplifiedTuning(snapshot: TuningSnapshot, draft: TuningDraft): Uint8Array {
+export function buildSimplifiedTuning(snapshot: TuningSnapshot, draft: SliderDraft): Uint8Array {
   const payload = Uint8Array.from(snapshot.simplified)
   for (const [offset, value] of LOCKED) payload[offset] = value
   payload[OFFSET.MASTER] = draft.master
@@ -177,12 +239,12 @@ export function buildSimplifiedTuning(snapshot: TuningSnapshot, draft: TuningDra
 }
 
 /** Payload for MSP_CALCULATE_SIMPLIFIED_PID: just the PID slider block. */
-export function buildCalculateRequest(snapshot: TuningSnapshot, draft: TuningDraft): Uint8Array {
+export function buildCalculateRequest(snapshot: TuningSnapshot, draft: SliderDraft): Uint8Array {
   return buildSimplifiedTuning(snapshot, draft).subarray(0, PID_SLIDER_BYTES)
 }
 
 /** CLI settings to write when the smoothing preset changed. Empty = nothing to do (no reboot needed). */
-export function smoothingWrites(snapshot: TuningSnapshot, draft: TuningDraft): SettingWrite[] {
+export function smoothingWrites(snapshot: TuningSnapshot, draft: SliderDraft): SettingWrite[] {
   if (draft.smoothing === 'custom' || draft.smoothing === detectSmoothing(snapshot)) return []
   const preset = SMOOTHING_PRESETS[draft.smoothing]
   return [

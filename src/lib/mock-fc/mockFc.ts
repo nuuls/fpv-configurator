@@ -188,6 +188,9 @@ export function defaultMockConfig(): MockFcConfig {
       rc_smoothing_auto_factor_throttle: '30',
       feedforward_smooth_factor: '65',
       dyn_idle_min_rpm: '0', // Betaflight default: dynamic idle off
+      tpa_mode: 'D',
+      tpa_rate: '65',
+      tpa_breakpoint: '1350',
       // Changed in Betaflight Configurator — no tab of this app manages them (Betaflight defaults: 0, METRIC)
       crashflip_motor_percent: '50',
       osd_units: 'IMPERIAL',
@@ -637,9 +640,13 @@ export class MockFlightController {
         )
       }
       case MSP.PID_ADVANCED: {
-        // Only dyn_idle_min_rpm (byte 49) is meaningful in the mock.
+        // Only dyn_idle_min_rpm (byte 49) and TPA (bytes 57–60) are meaningful in the mock.
         const payload = new Uint8Array(61)
-        payload[49] = Number(this.running.settings['dyn_idle_min_rpm'])
+        const settings = this.running.settings
+        payload[49] = Number(settings['dyn_idle_min_rpm'])
+        payload[57] = ['PD', 'D', 'PDS'].indexOf(settings['tpa_mode'] ?? 'D')
+        payload[58] = Number(settings['tpa_rate'])
+        new DataView(payload.buffer).setUint16(59, Number(settings['tpa_breakpoint']), true)
         return payload
       }
       case MSP.SET_MOTOR:

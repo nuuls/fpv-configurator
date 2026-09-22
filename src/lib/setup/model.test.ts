@@ -319,8 +319,8 @@ describe('changed outside this app', () => {
     'rateprofile 0',
     '',
     '# rateprofile 0',
-    '#set tpa_rate = 65',
-    'set tpa_rate = 50',
+    '#set throttle_limit_percent = 100',
+    'set throttle_limit_percent = 80',
     '',
     '# restore original rateprofile selection',
     'rateprofile 0',
@@ -368,11 +368,11 @@ describe('changed outside this app', () => {
       },
       {
         section: 'rateprofile 0',
-        key: 'rateprofile 0: tpa_rate',
-        label: 'tpa_rate',
-        name: 'tpa_rate',
-        value: '50',
-        defaultValue: '65',
+        key: 'rateprofile 0: throttle_limit_percent',
+        label: 'throttle_limit_percent',
+        name: 'throttle_limit_percent',
+        value: '80',
+        defaultValue: '100',
         reset: false,
       },
     ])
@@ -403,20 +403,23 @@ describe('changed outside this app', () => {
     expect(draft.resets).toEqual([
       'master: crashflip_motor_percent',
       'profile 1: anti_gravity_gain',
-      'rateprofile 0: tpa_rate',
+      'rateprofile 0: throttle_limit_percent',
     ])
     expect(resetScript(snapshot, draft)).toEqual([
       'set crashflip_motor_percent = 0',
       'profile 1',
       'set anti_gravity_gain = 80',
       'rateprofile 0',
-      'set tpa_rate = 65',
+      'set throttle_limit_percent = 100',
       'profile 0',
       'rateprofile 0',
     ])
 
     draft = withReset(draft, 'profile 1: anti_gravity_gain', false)
-    expect(draft.resets).toEqual(['master: crashflip_motor_percent', 'rateprofile 0: tpa_rate'])
+    expect(draft.resets).toEqual([
+      'master: crashflip_motor_percent',
+      'rateprofile 0: throttle_limit_percent',
+    ])
     expect(withReset(draft, 'master: crashflip_motor_percent', true).resets).toEqual(draft.resets)
   })
 
