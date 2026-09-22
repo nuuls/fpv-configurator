@@ -296,7 +296,7 @@ function TpaCard({
           />
           <TuningSlider
             label="TPA breakpoint"
-            readout={`${tpa.breakpoint} µs`}
+            readout={`${tpaThrottlePercent(tpa.breakpoint)} % throttle`}
             hint="Throttle where the lowering starts. Raise it if the quad oscillates only near full throttle."
             {...sliderBounds(original.breakpoint, TPA_BREAKPOINT)}
             step={TPA_BREAKPOINT.step}

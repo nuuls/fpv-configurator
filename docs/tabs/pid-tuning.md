@@ -10,16 +10,16 @@ Three sliders, one stick-feel choice and TPA. The firmware's own slider math ("s
 
 ## Controls
 
-| Control           | Type            | Betaflight setting / MSP                                                                  | Values · default                          | Notes                                              |
-| ----------------- | --------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------- | -------------------------------------------------- |
-| Damping           | slider          | `simplified_d_gain` · `MSP_SIMPLIFIED_TUNING` (140/141)                                   | 0.50–1.50, step 0.05 · 1.0                | Range widens if the FC's value is outside          |
-| Pitch gains       | slider          | `simplified_pitch_pi_gain` + `simplified_roll_pitch_ratio`, both set to the slider value  | same                                      | A master multiplier for pitch only, see Decisions  |
-| Master multiplier | slider          | `simplified_master_multiplier`                                                            | same                                      |                                                    |
-| Resulting PIDs    | view-only table | `MSP_CALCULATE_SIMPLIFIED_PID` (142)                                                      | P, I, D, FF per axis                      | Recalculated by the FC as the sliders move         |
-| Stick feel        | 3 preset cards  | see below                                                                                 | Direct, Light smoothing, Strong smoothing | "Custom" note when the FC matches none             |
-| TPA mode          | button group    | `tpa_mode` · read `MSP_PID_ADVANCED` (94) byte 57, written by name via `MSP2_CLI_SETTING` | D only (`D`), P and D (`PD`) · D          | Neither pressed for `PDS` (wing builds)            |
-| TPA rate          | slider          | `tpa_rate` · byte 58, written by name                                                     | 0–100 %, step 5 · 65                      | 0 = off. Range widens if the FC's value is outside |
-| TPA breakpoint    | slider          | `tpa_breakpoint` (u16) · bytes 59–60, written by name                                     | 1000–2000 µs, step 10 · 1350              | Same; a sentence below says what TPA now does      |
+| Control           | Type            | Betaflight setting / MSP                                                                  | Values · default                          | Notes                                                                                                     |
+| ----------------- | --------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Damping           | slider          | `simplified_d_gain` · `MSP_SIMPLIFIED_TUNING` (140/141)                                   | 0.50–1.50, step 0.05 · 1.0                | Range widens if the FC's value is outside                                                                 |
+| Pitch gains       | slider          | `simplified_pitch_pi_gain` + `simplified_roll_pitch_ratio`, both set to the slider value  | same                                      | A master multiplier for pitch only, see Decisions                                                         |
+| Master multiplier | slider          | `simplified_master_multiplier`                                                            | same                                      |                                                                                                           |
+| Resulting PIDs    | view-only table | `MSP_CALCULATE_SIMPLIFIED_PID` (142)                                                      | P, I, D, FF per axis                      | Recalculated by the FC as the sliders move                                                                |
+| Stick feel        | 3 preset cards  | see below                                                                                 | Direct, Light smoothing, Strong smoothing | "Custom" note when the FC matches none                                                                    |
+| TPA mode          | button group    | `tpa_mode` · read `MSP_PID_ADVANCED` (94) byte 57, written by name via `MSP2_CLI_SETTING` | D only (`D`), P and D (`PD`) · D          | Neither pressed for `PDS` (wing builds)                                                                   |
+| TPA rate          | slider          | `tpa_rate` · byte 58, written by name                                                     | 0–100 %, step 5 · 65                      | 0 = off. Range widens if the FC's value is outside                                                        |
+| TPA breakpoint    | slider          | `tpa_breakpoint` (u16) · bytes 59–60, written by name                                     | 1000–2000 µs, step 10 · 1350              | Shown as % throttle (1350 = 35 %), like the firmware computes it; a sentence below says what TPA now does |
 
 Pinned on every save: `simplified_pids_mode = RPY`, I / PI sliders = 1.0,
 Dynamic D (`simplified_d_max_gain`) = 0. Filter sliders in the same message are passed through untouched.
@@ -54,7 +54,7 @@ Mock FC (stock defaults):
 - [x] Slider change → Save (no reboot) → persists, warning gone
 - [x] Preset → Save & Reboot → preset shown as selected afterwards
 - [x] Pitch gains 1.2 → only the Pitch row changes (all four columns × 1.2) → Save (no reboot) → persists
-- [x] TPA shows D only / 65 % / 1350 µs → P and D, 55 %, 1400 µs → Save (no reboot) → persists
+- [x] TPA shows D only / 65 % / 35 % throttle → P and D, 55 %, 40 % throttle → Save (no reboot) → persists
 
 On real hardware:
 

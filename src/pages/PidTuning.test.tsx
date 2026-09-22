@@ -12,7 +12,7 @@ describe('PID Tuning tab: TPA', () => {
       within(screen.getByRole('group', { name: 'TPA mode' })).getByRole('button', { name })
 
     expect(await screen.findByText('65 %')).toBeInTheDocument()
-    expect(screen.getByText('1350 µs')).toBeInTheDocument()
+    expect(screen.getByText('35 % throttle')).toBeInTheDocument()
     expect(mode('D only')).toHaveAttribute('aria-pressed', 'true')
     expect(
       screen.getByText(
@@ -39,7 +39,7 @@ describe('PID Tuning tab: TPA', () => {
 
     await saveWithoutReboot(user)
     expect(screen.getByText('55 %')).toBeInTheDocument()
-    expect(screen.getByText('1400 µs')).toBeInTheDocument()
+    expect(screen.getByText('40 % throttle')).toBeInTheDocument()
     expect(mode('P and D')).toHaveAttribute('aria-pressed', 'true')
   })
 })
