@@ -81,17 +81,17 @@ const FEATURES: { icon: LucideIcon; title: string; text: string }[] = [
   {
     icon: SlidersHorizontal,
     title: 'Simplified setup',
-    text: 'Only the settings most pilots actually change. PID tuning, for example, is three sliders.',
+    text: 'Only the settings pilots actually touch. PID tuning is three sliders, not a wall of numbers copied from a YouTube video.',
   },
   {
     icon: ListChecks,
     title: 'Finds config issues',
-    text: 'Checks the settings a quad should not fly without, like bidirectional DShot and a calibrated accelerometer, and offers a fix.',
+    text: 'Spots the settings you forgot, like bidirectional DShot or an accelerometer that was never calibrated, and fixes them before you have to ask on Discord.',
   },
   {
     icon: Cpu,
     title: 'ESC configuration',
-    text: 'Change Bluejay and AM32 ESC settings through the flight controller, without a separate app.',
+    text: 'Change Bluejay and AM32 settings right here, through the flight controller. No second configurator, no extra browser tab.',
   },
 ]
 
