@@ -81,7 +81,7 @@ const FEATURES: { icon: LucideIcon; title: string; text: string }[] = [
   {
     icon: SlidersHorizontal,
     title: 'Simplified setup',
-    text: 'Only the settings pilots actually touch. PID tuning is three sliders, not a wall of numbers copied from a YouTube video.',
+    text: 'Only the settings pilots actually touch. PID tuning is three sliders, not a spaceship control panel.',
   },
   {
     icon: ListChecks,
@@ -91,7 +91,7 @@ const FEATURES: { icon: LucideIcon; title: string; text: string }[] = [
   {
     icon: Cpu,
     title: 'ESC configuration',
-    text: 'Change Bluejay and AM32 settings right here, through the flight controller. No second configurator, no extra browser tab.',
+    text: 'Change Bluejay and AM32 settings right here, through the flight controller. No second configurator. And it double checks your settings as well.',
   },
 ]
 
