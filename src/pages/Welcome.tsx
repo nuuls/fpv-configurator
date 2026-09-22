@@ -12,6 +12,11 @@ export function WelcomePage() {
 
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-4 pt-12">
+      <p className="text-muted-foreground text-sm">
+        FPV Configurator is a simplified Betaflight configurator that runs in the browser. Set up
+        the flight controller and ESCs of your FPV drone over USB: ports, PID tuning, filters,
+        rates, modes, motors, OSD and more, with nothing to install.
+      </p>
       <Card>
         <CardHeader>
           <CardTitle>No flight controller connected</CardTitle>

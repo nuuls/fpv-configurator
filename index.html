@@ -4,10 +4,31 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FPV Configurator</title>
+    <title>FPV Configurator – simple Betaflight configurator in the browser</title>
+    <meta
+      name="description"
+      content="A simplified Betaflight configurator that runs in the browser. Set up the flight controller and ESCs of your FPV drone over USB – no install needed."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="FPV Configurator" />
+    <meta
+      property="og:description"
+      content="A simplified Betaflight configurator that runs in the browser. Set up the flight controller and ESCs of your FPV drone over USB – no install needed."
+    />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Shown until the app loads (and to crawlers that don't run JavaScript); React replaces it. -->
+      <main>
+        <h1>FPV Configurator</h1>
+        <p>
+          A simplified Betaflight configurator that runs in the browser. Connect the flight
+          controller of your FPV drone over USB and set up ports, orientation, PID tuning, filters,
+          rates, modes, motors, ESCs (Bluejay and AM32), OSD and VTX. Nothing to install; it needs a
+          Chromium-based browser such as Chrome or Edge for Web Serial.
+        </p>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

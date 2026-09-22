@@ -197,6 +197,9 @@ and closed with a menu button in the header; it also closes on picking a tab, ta
 The header shows the app name and "Source" as icons only, hides the firmware version, and puts the alpha warning
 on its own row.
 
+The welcome screen (no FC connected) starts with a one-paragraph description of the app; `index.html` carries the
+same description as meta tags and as static text for search engines, replaced once the app loads.
+
 A tab still marked TBD in §2 shows a "not specified yet" placeholder (`src/pages/PlaceholderPage.tsx`); currently none.
 _Assumed — change freely; the drone-type setup step has no place in the layout yet._
 
