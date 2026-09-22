@@ -26,6 +26,7 @@ import {
 import {
   DIRECTION_CHECK,
   DYN_IDLE_MAX,
+  SWAP_RESTART_MS,
   DYN_IDLE_MIN,
   DYN_IDLE_ZONES,
   dynIdleSegments,
@@ -287,6 +288,9 @@ function MotorTest({
   // Direction flips: the ESC never tells which way it is set, so this only knows what was sent here.
   const [reversed, setReversed] = useState<boolean[]>(() => new Array<boolean>(count).fill(false))
   const [flipping, setFlipping] = useState<number | null>(null)
+  // A swap while motors turn restarts them (the cue that it happened); sliders and icons wait meanwhile.
+  const [restarting, setRestarting] = useState(false)
+  const paused = flipping !== null || restarting
   const [note, setNote] = useState<string | null>(null)
   // Swapping: the motor whose icon was clicked, waiting for the other one.
   const [pickFrom, setPickFrom] = useState<number | null>(null)
@@ -412,10 +416,36 @@ function MotorTest({
       }
       return next
     }
-    setValues(trade(values))
+    const next = trade(values)
+    setValues(next)
     setReversed(trade(reversed))
     onSwap(pickFrom, motor)
     setPickFrom(null)
+    if (active && next.some((v) => v > MOTOR_STOP))
+      void restart(
+        next,
+        fcMotorIndexes(snapshot.outputOrder, swapMotorOutputs(outputOrder, pickFrom, motor), count),
+      )
+  }
+
+  /** Stops the motors for a moment and spins them back up under the new order — the feedback for a swap. */
+  const restart = async (next: number[], nextIndexes: number[]) => {
+    const token = session.current
+    const alive = () => token === session.current
+    setRestarting(true)
+    pending.current = null
+    try {
+      await stopMotors(client)
+      await sleep(SWAP_RESTART_MS)
+      if (!alive()) return
+      await setMotorOutputs(client, toFcOutputs(next, nextIndexes))
+    } catch {
+      if (!alive()) return
+      setError('Lost contact with the flight controller while testing — unplug the battery.')
+      setEnabled(false)
+    } finally {
+      if (alive()) setRestarting(false)
+    }
   }
 
   const tools = (motor: number, placement?: { direction: string; swap: string }) => (
@@ -425,7 +455,7 @@ function MotorTest({
         size="icon"
         aria-label={`Flip direction of motor ${motor}`}
         title="Flip the spin direction (the ESC stores it)"
-        disabled={!active || !dshot || flipping !== null || pickFrom !== null}
+        disabled={!active || !dshot || paused || pickFrom !== null}
         onClick={() => void flip(motor)}
         className={cn(MOTOR_ICON_BUTTON, placement && cn('absolute', placement.direction))}
       >
@@ -449,7 +479,7 @@ function MotorTest({
               ? 'Cancel'
               : `Swap with motor ${motor}`
         }
-        disabled={swapDisabled || flipping !== null}
+        disabled={swapDisabled || paused}
         onClick={() => pick(motor)}
         className={cn(MOTOR_ICON_BUTTON, 'z-20', placement && cn('absolute', placement.swap))}
       >
@@ -487,7 +517,7 @@ function MotorTest({
       min={MOTOR_STOP}
       max={MOTOR_TEST_MAX}
       step={5}
-      disabled={!active || flipping !== null}
+      disabled={!active || paused}
       value={[values[motor - 1] ?? MOTOR_STOP]}
       onValueChange={([v]) =>
         v !== undefined && apply(values.map((old, i) => (i === motor - 1 ? v : old)))
@@ -554,7 +584,7 @@ function MotorTest({
             {QUAD_POSITIONS.map(({ motor, className, badge, direction, swap }) => {
               const output = values[motor - 1] ?? MOTOR_STOP
               // while a flip runs the FC has been told to stop everything; the sliders keep their values
-              const spinning = output > MOTOR_STOP && active && flipping === null
+              const spinning = output > MOTOR_STOP && active && !paused
               const clockwise = spinsClockwise(motor, snapshot.propsOut)
               return (
                 <div
@@ -634,7 +664,7 @@ function MotorTest({
             min={MOTOR_STOP}
             max={MOTOR_TEST_MAX}
             step={5}
-            disabled={!active || flipping !== null}
+            disabled={!active || paused}
             value={[master]}
             onValueChange={([v]) => v !== undefined && apply(values.map(() => v))}
           />

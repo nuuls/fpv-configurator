@@ -201,6 +201,9 @@ export function decodeDshotCommand(payload: Uint8Array): DshotCommandRequest {
  */
 export const DIRECTION_CHECK = { stopMs: 500, settleMs: 500 } as const
 
+/** A swap while motors turn stops them for this long before they come back — the cue that it happened. */
+export const SWAP_RESTART_MS = 600
+
 /**
  * Sets and stores the spin direction of one motor's ESC. Blocking, like the Betaflight Configurator's direction
  * wizard: the FC pauses the motor outputs, repeats each command as often as the ESC needs, and resumes.

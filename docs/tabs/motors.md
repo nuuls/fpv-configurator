@@ -47,7 +47,8 @@ Only 5" exists so far and every quad is treated as one until drone types (SPEC �
 - A pending motor order is applied on this side until it is saved (`fcMotorIndexes` in `src/lib/motors/model.ts`):
   each shown motor's slider, RPM and direction command go to the FC motor that drives its ESC output, so the whole
   quad can be sorted out with the test running. A swap trades the two motors' slider values and direction flags
-  along with their outputs — nothing changes physically at that moment. Save & Reboot then hands the order to the FC.
+  along with their outputs, so the same motors keep turning; as the cue that it happened, turning motors stop for
+  0.6 s and spin back up. Save & Reboot then hands the order to the FC.
 
 ## Hidden on purpose
 
@@ -72,8 +73,9 @@ Mock FC:
 - [x] Swap icon on motor 1, then motor 3 → hint "Motor 1 drives ESC output 3 · Motor 3 drives ESC output 1 — used
       here already; Save & Reboot to apply it on the flight controller", test stays available; Esc / the icon
       cancel pick mode; Save & Reboot persists `[2, 1, 0, 3, …]` and the hint stays; swapping back clears it
-- [x] Swap 1 ↔ 3 while motor 1 turns: the test stays on, slider 3 now holds the value and shows the RPM, moving
-      it drives the FC's motor 1; after Save & Reboot slider 3 drives the FC's motor 3
+- [x] Swap 1 ↔ 3 while motor 1 turns: the test stays on, the motors stop for a moment and come back, slider 3 now
+      holds the value and shows the RPM, moving it drives the FC's motor 1; after Save & Reboot slider 3 drives
+      the FC's motor 3
 
 On real hardware — **props off**:
 
@@ -85,8 +87,8 @@ On real hardware — **props off**:
 - [ ] Settings match Betaflight Configurator after saving
 - [ ] A flip while the motor turns: it pauses for about a second and comes back the other way, also after a power
       cycle
-- [ ] Swapping while a motor turns changes nothing physically; afterwards the sliders spin the motors as the
-      new order says, before and after Save & Reboot; `get motor_output_reordering` matches
+- [ ] Swapping while a motor turns: it stops briefly and the same motor comes back; afterwards the sliders spin
+      the motors as the new order says, before and after Save & Reboot; `get motor_output_reordering` matches
 
 ## Decisions
 

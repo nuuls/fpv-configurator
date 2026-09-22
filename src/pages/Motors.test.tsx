@@ -1,7 +1,7 @@
 /** Acceptance checks for the direction flip and motor swap of the Motors tab (docs/tabs/motors.md). */
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { DIRECTION_CHECK } from '@/lib/motors/model'
+import { DIRECTION_CHECK, SWAP_RESTART_MS } from '@/lib/motors/model'
 import { nudge, openTab, resetAppAfterEach, saveAndReboot } from '@/test/app'
 
 resetAppAfterEach()
@@ -115,9 +115,13 @@ describe('Motors tab — direction and swap', () => {
     const disc = (motor: number) => screen.getByTitle(new RegExp(`^Motor ${motor} ·`))
     expect(within(disc(3)).getByText('1800 rpm')).toBeInTheDocument()
     expect(within(disc(1)).getByText('0 rpm')).toBeInTheDocument()
-    // nothing was re-sent to the FC by the swap: a few telemetry polls later it's still the same motor turning
-    await new Promise((resolve) => setTimeout(resolve, 350))
-    expect(within(disc(3)).getByText('1800 rpm')).toBeInTheDocument()
+    // the cue that it happened: the motors stop for a moment and come back — the same FC motor as before
+    expect(slider(3)).toHaveAttribute('data-disabled')
+    await waitFor(() => expect(screen.getAllByText('0 rpm')).toHaveLength(4))
+    await waitFor(() => expect(within(disc(3)).getByText('1800 rpm')).toBeInTheDocument(), {
+      timeout: SWAP_RESTART_MS + 1500,
+    })
+    await waitFor(() => expect(slider(3)).not.toHaveAttribute('data-disabled'))
     expect(within(disc(1)).getByText('0 rpm')).toBeInTheDocument()
     expect(screen.getAllByText('0 rpm')).toHaveLength(3)
 
