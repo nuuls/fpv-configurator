@@ -313,7 +313,14 @@ describe('pid tuning', () => {
 
 describe('motors', () => {
   it('validates motor poles', () => {
-    const draft = { protocol: 6, bidirDshot: false, poles: 14, propsOut: false, dynIdle: 20 }
+    const draft = {
+      protocol: 6,
+      bidirDshot: false,
+      poles: 14,
+      propsOut: false,
+      dynIdle: 20,
+      outputOrder: [0, 1, 2, 3, 4, 5, 6, 7],
+    }
     expect(validateMotors(draft)).toEqual([])
     expect(validateMotors({ ...draft, poles: 13 })).toHaveLength(1)
     expect(validateMotors({ ...draft, poles: 2 })).toHaveLength(1)
@@ -328,6 +335,7 @@ describe('motors', () => {
       poles: 14,
       propsOut: false,
       dynIdle: 0,
+      outputOrder: [0, 1, 2, 3, 4, 5, 6, 7],
     })
     expect(snapshot.motorCount).toBe(4)
 
@@ -337,6 +345,7 @@ describe('motors', () => {
       poles: 12,
       propsOut: true,
       dynIdle: 0,
+      outputOrder: snapshot.outputOrder,
     })
     const after = await readMotorsSnapshot(await rebootAndReconnect(fc, transport, client))
     expect(readMotors(after)).toEqual({
@@ -345,6 +354,7 @@ describe('motors', () => {
       poles: 12,
       propsOut: true,
       dynIdle: 0,
+      outputOrder: [0, 1, 2, 3, 4, 5, 6, 7],
     })
     expect(after.advancedConfig.filter((_, i) => i !== 3)).toEqual(
       snapshot.advancedConfig.filter((_, i) => i !== 3),
@@ -360,6 +370,7 @@ describe('motors', () => {
       poles: 14,
       propsOut: false,
       dynIdle: 0,
+      outputOrder: snapshot.outputOrder,
     })
     expect((await readMotorsSnapshot(client)).bidirDshot).toBe(false)
   })

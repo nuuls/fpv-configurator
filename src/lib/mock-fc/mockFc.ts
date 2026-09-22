@@ -35,12 +35,20 @@ import {
 } from '@/lib/filters/model'
 import { decodeSetModeRange, encodeModeRanges, encodeRc, type ModeSlot } from '@/lib/modes/model'
 import {
+  decodeDshotCommand,
+  decodeMotorOutputReordering,
   decodeSetMotor,
   decodeSetMotorConfig,
+  DSHOT_ALL_MOTORS,
+  DSHOT_CMD,
   encodeMixerConfig,
   encodeMotorConfig,
+  encodeMotorOutputReordering,
   encodeMotorTelemetry,
+  isDshot,
+  MAX_MOTORS,
   MOTOR_STOP,
+  type DshotCommandRequest,
 } from '@/lib/motors/model'
 import {
   decodeBoardAlignment,
@@ -75,7 +83,7 @@ import {
 } from '@/lib/vtx/model'
 import { ByteReader, ByteWriter } from '@/lib/msp/bytes'
 import { MockCliSession, renderDiff } from './mockCli'
-import { defaultMockEscs, MockFourWayInterface, type MockEsc } from './mockEscs'
+import { defaultMockEscs, MockFourWayInterface, setMockEscReversed, type MockEsc } from './mockEscs'
 
 const EMPTY = new Uint8Array(0)
 
@@ -110,6 +118,8 @@ export interface MockFcConfig {
   /** Raw MSP_ADVANCED_CONFIG payload; byte 3 is the motor protocol. */
   advancedConfig: number[]
   motor: { poles: number; bidirDshot: boolean; mixerMode: number; propsOut: boolean }
+  /** `motor_output_reordering`: the output each of the 8 motors drives. */
+  motorOutputReordering: number[]
   /** Raw MSP_RC_TUNING payload (24 bytes), see lib/rates/model.ts for the offsets. */
   rcTuning: number[]
   /** Raw `item_pos` per OSD element and the two timer configs, see lib/osd/model.ts for the bits. */
@@ -214,6 +224,7 @@ export function defaultMockConfig(): MockFcConfig {
     // denom 1 · DSHOT300 · pwm rate 480 · idle 550 · ... · debug count 80
     advancedConfig: [1, 1, 0, 6, 0xe0, 0x01, 0x26, 0x02, 0, 0, 0, 0, 48, 125, 0, 0, 0, 1, 0, 80],
     motor: { poles: 14, bidirDshot: false, mixerMode: 3, propsOut: false },
+    motorOutputReordering: Array.from({ length: MAX_MOTORS }, (_, i) => i),
     // Betaflight defaults: Actual rates, 70 / 670 / 0 on every axis, rate limit 1998, throttle mid 50
     rcTuning: [
       7, 0, 67, 67, 67, 0, 50, 0, 0, 0, 0, 7, 7, 0, 0, 100, 0xce, 0x07, 0xce, 0x07, 0xce, 0x07, 3,
@@ -314,6 +325,8 @@ export class MockFlightController {
   private motors: number[] = new Array<number>(8).fill(MOTOR_STOP)
   private armingDisabledByMsp = false
   private accCalibrations = 0
+  /** Every MSP2_SEND_DSHOT_COMMAND that reached the ESCs (a DShot protocol was active). */
+  private dshotCommands: DshotCommandRequest[] = []
   private flash = { usedBytes: 3_500_000, ready: true }
   private readonly escs: MockEsc[]
   /** Non-null from MSP_SET_PASSTHROUGH on; while it hasn't exited, the port speaks 4-way instead of MSP. */
@@ -348,6 +361,16 @@ export class MockFlightController {
 
   get armingDisabled(): boolean {
     return this.armingDisabledByMsp
+  }
+
+  /** The ESCs on the motor outputs (live objects). For assertions in tests. */
+  get connectedEscs(): readonly MockEsc[] {
+    return this.escs
+  }
+
+  /** The DShot commands sent so far, oldest first. For assertions in tests. */
+  get dshotCommandLog(): DshotCommandRequest[] {
+    return this.dshotCommands.map((c) => ({ ...c, commands: [...c.commands] }))
   }
 
   /** The last ESC passthrough session (null before the first one). For assertions in tests. */
@@ -591,6 +614,7 @@ export class MockFlightController {
           minCommand: 1000,
           ...this.running.motor,
           dynIdle: 0,
+          outputOrder: [],
         })
       case MSP.SET_MOTOR_CONFIG:
         this.running.motor = { ...this.running.motor, ...decodeSetMotorConfig(request) }
@@ -624,6 +648,36 @@ export class MockFlightController {
       case MSP.SET_ARMING_DISABLED:
         this.armingDisabledByMsp = request[0] === 1
         return EMPTY
+      case MSP.MOTOR_OUTPUT_REORDERING:
+        return encodeMotorOutputReordering(this.running.motorOutputReordering)
+      case MSP.SET_MOTOR_OUTPUT_REORDERING: {
+        // Like the firmware: motors beyond the sent count go back to their own output.
+        const sent = decodeMotorOutputReordering(request)
+        this.running.motorOutputReordering = Array.from(
+          { length: MAX_MOTORS },
+          (_, i) => sent[i] ?? i,
+        )
+        return EMPTY
+      }
+      case MSP.SEND_DSHOT_COMMAND: {
+        // `dshotCommandWrite` drops everything unless a DShot protocol is running; the reply is an ack either way.
+        if (!isDshot(this.running.advancedConfig[3] ?? 0)) return EMPTY
+        const command = decodeDshotCommand(request)
+        this.dshotCommands.push(command)
+        const escs =
+          command.motorIndex === DSHOT_ALL_MOTORS
+            ? this.escs
+            : [this.escs[command.motorIndex]].filter((esc) => esc !== undefined)
+        // Only the direction takes effect in the mock, and only once the ESC is told to store it.
+        if (command.commands.includes(DSHOT_CMD.SAVE_SETTINGS))
+          for (const esc of escs) {
+            if (command.commands.includes(DSHOT_CMD.SPIN_DIRECTION_REVERSED))
+              setMockEscReversed(esc, true)
+            else if (command.commands.includes(DSHOT_CMD.SPIN_DIRECTION_NORMAL))
+              setMockEscReversed(esc, false)
+          }
+        return EMPTY
+      }
       case MSP.SET_PASSTHROUGH:
         // Only the BLHeli 4-way mode (no payload, or mode 0xFF). `esc4wayInit` disables the motor outputs; from
         // the reply on the port speaks 4-way until cmd_InterfaceExit (see `receive`).

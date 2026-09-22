@@ -4,14 +4,18 @@ import { MSP } from '@/lib/msp/codes'
 import {
   decodeDynIdle,
   decodeMixerConfig,
+  decodeMotorOutputReordering,
   decodeMotorTelemetry,
   decodeMotorConfig,
   encodeArmingDisabled,
+  encodeDshotCommand,
   encodeMixerConfig,
+  encodeMotorOutputReordering,
   encodeSetAdvancedConfig,
   encodeSetMotor,
   encodeSetMotorConfig,
   MOTOR_STOP,
+  spinDirectionRequest,
   type MotorsDraft,
   type MotorTelemetry,
   type MotorsSnapshot,
@@ -22,7 +26,8 @@ export async function readMotorsSnapshot(client: MspClient): Promise<MotorsSnaps
   const motorConfig = decodeMotorConfig(await client.request(MSP.MOTOR_CONFIG))
   const mixer = decodeMixerConfig(await client.request(MSP.MIXER_CONFIG))
   const dynIdle = decodeDynIdle(await client.request(MSP.PID_ADVANCED))
-  return { advancedConfig, ...motorConfig, ...mixer, dynIdle }
+  const outputOrder = decodeMotorOutputReordering(await client.request(MSP.MOTOR_OUTPUT_REORDERING))
+  return { advancedConfig, ...motorConfig, ...mixer, dynIdle, outputOrder }
 }
 
 export async function saveMotors(
@@ -36,7 +41,27 @@ export async function saveMotors(
   // Written by name: the matching MSP message (SET_PID_ADVANCED) carries ~40 unrelated tuning fields.
   if (draft.dynIdle !== snapshot.dynIdle)
     await writeSetting(client, 'dyn_idle_min_rpm', String(draft.dynIdle))
+  if (draft.outputOrder.some((output, i) => output !== snapshot.outputOrder[i]))
+    await client.request(
+      MSP.SET_MOTOR_OUTPUT_REORDERING,
+      encodeMotorOutputReordering(draft.outputOrder),
+    )
   await saveToEeprom(client)
+}
+
+/**
+ * Tells motor `motor`'s ESC (1-based) which way to spin and has it store that. DShot only; the ESC keeps it
+ * without a reboot. Nothing reports the current setting back, so the caller can only offer both.
+ */
+export async function setMotorDirection(
+  client: MspClient,
+  motor: number,
+  reversed: boolean,
+): Promise<void> {
+  await client.request(
+    MSP.SEND_DSHOT_COMMAND,
+    encodeDshotCommand(spinDirectionRequest(motor, reversed)),
+  )
 }
 
 /** Blocks arming from the radio while the motors are being driven from here (and releases it again). */

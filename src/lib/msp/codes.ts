@@ -71,6 +71,11 @@ export const MSP = {
   // MSP v2 (16-bit codes)
   COMMON_SERIAL_CONFIG: 0x1009,
   COMMON_SET_SERIAL_CONFIG: 0x100a,
+  /** `motor_output_reordering`: count, then the output each motor drives. */
+  MOTOR_OUTPUT_REORDERING: 0x3001,
+  SET_MOTOR_OUTPUT_REORDERING: 0x3002,
+  /** Payload: command type (0 inline, 1 blocking), motor index (255 = all), count, then the DShot commands. */
+  SEND_DSHOT_COMMAND: 0x3003,
   /** Payload: ASCII "name = value". Reading ("name") is broken in Betaflight 2026.6 — write-only. */
   CLI_SETTING: 0x3010,
 } as const

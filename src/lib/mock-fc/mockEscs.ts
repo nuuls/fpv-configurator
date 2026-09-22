@@ -126,6 +126,30 @@ export function mockAm32Esc(): MockEsc {
   }
 }
 
+/** Where the settings block sits, by bootloader family (see the mock ESCs above). */
+const SETTINGS_ADDRESS = { silabs: 0x1a00, arm: 0x7c00 } as const
+
+/** The direction stored in the ESC's settings, as a DShot direction command changes it. */
+export function mockEscReversed(esc: MockEsc): boolean {
+  if (esc.interfaceMode === INTERFACE_MODE.ARM_BLB)
+    return esc.flash[SETTINGS_ADDRESS.arm]?.[17] === 1
+  const direction = esc.flash[SETTINGS_ADDRESS.silabs]?.[0x0b]
+  return direction === 2 || direction === 4
+}
+
+/** What `DSHOT_CMD_SPIN_DIRECTION_*` + `SAVE_SETTINGS` do to the ESC: the direction setting flips and is kept. */
+export function setMockEscReversed(esc: MockEsc, reversed: boolean): void {
+  if (esc.interfaceMode === INTERFACE_MODE.ARM_BLB) {
+    const block = esc.flash[SETTINGS_ADDRESS.arm]
+    if (block) block[17] = reversed ? 1 : 0
+    return
+  }
+  const block = esc.flash[SETTINGS_ADDRESS.silabs]
+  if (!block) return
+  const bidirectional = block[0x0b] === 3 || block[0x0b] === 4
+  block[0x0b] = (bidirectional ? 3 : 1) + (reversed ? 1 : 0)
+}
+
 /** A 4-in-1 Bluejay ESC: four ESCs that are set up alike, motors 2 and 3 reversed. */
 export function defaultMockEscs(): MockEsc[] {
   return [

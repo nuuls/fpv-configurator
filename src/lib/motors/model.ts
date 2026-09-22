@@ -40,6 +40,8 @@ export interface MotorsSnapshot {
   propsOut: boolean
   /** `dyn_idle_min_rpm` of the current PID profile, in units of 100 rpm. 0 = dynamic idle off. */
   dynIdle: number
+  /** `motor_output_reordering`: the (0-based) output each motor drives, `outputOrder[motor - 1]`. */
+  outputOrder: number[]
 }
 
 export interface MotorsDraft {
@@ -49,6 +51,7 @@ export interface MotorsDraft {
   /** "Props out": yaw_motors_reversed. */
   propsOut: boolean
   dynIdle: number
+  outputOrder: number[]
 }
 
 export function readMotors(snapshot: MotorsSnapshot): MotorsDraft {
@@ -58,6 +61,7 @@ export function readMotors(snapshot: MotorsSnapshot): MotorsDraft {
     poles: snapshot.poles,
     propsOut: snapshot.propsOut,
     dynIdle: snapshot.dynIdle,
+    outputOrder: [...snapshot.outputOrder],
   }
 }
 
@@ -76,7 +80,102 @@ export function validateMotors(draft: MotorsDraft, snapshot?: MotorsSnapshot): s
     problems.push(
       'Motor poles must be an even number between 4 and 40 (count the magnets; usually 12 or 14).',
     )
+  const outputs = draft.outputOrder.slice(0, snapshot?.motorCount ?? draft.outputOrder.length)
+  if (new Set(outputs).size !== outputs.length) problems.push('Every motor needs its own output.')
   return problems
+}
+
+// ---- MSP2_MOTOR_OUTPUT_REORDERING (0x3001) / SET (0x3002): count, then the output each motor drives ----
+
+export const MAX_MOTORS = 8
+
+export function decodeMotorOutputReordering(payload: Uint8Array): number[] {
+  const r = new ByteReader(payload)
+  const count = r.u8()
+  const order: number[] = []
+  for (let i = 0; i < count && r.remaining >= 1; i++) order.push(r.u8())
+  return order
+}
+
+/** Same layout for reading and writing; the firmware fills motors beyond `order` with their own index. */
+export function encodeMotorOutputReordering(order: number[]): Uint8Array {
+  const w = new ByteWriter().u8(order.length)
+  for (const output of order) w.u8(output)
+  return w.toBytes()
+}
+
+export const isDefaultOutputOrder = (order: number[]) => order.every((output, i) => output === i)
+
+/** Motors `a` and `b` (1-based) exchange their outputs: what `a`'s slider drove now answers to `b` and vice versa. */
+export function swapMotorOutputs(order: number[], a: number, b: number): number[] {
+  const next = [...order]
+  const outputA = next[a - 1]
+  const outputB = next[b - 1]
+  if (outputA === undefined || outputB === undefined || a === b) return next
+  next[a - 1] = outputB
+  next[b - 1] = outputA
+  return next
+}
+
+/** The motors (1-based) that don't drive the output of the same number, for the hint under the drawing. */
+export function remappedMotors(
+  order: number[],
+  count: number,
+): { motor: number; output: number }[] {
+  return order
+    .slice(0, count)
+    .map((output, i) => ({ motor: i + 1, output: output + 1 }))
+    .filter(({ motor, output }) => motor !== output)
+}
+
+// ---- MSP2_SEND_DSHOT_COMMAND (0x3003): type, motor index, count, commands ----
+
+/** `dshotCommands_e`; direction commands are stored by the ESC once SAVE_SETTINGS follows. */
+export const DSHOT_CMD = {
+  SPIN_DIRECTION_NORMAL: 7,
+  SPIN_DIRECTION_REVERSED: 8,
+  SAVE_SETTINGS: 12,
+} as const
+
+export const DSHOT_CMD_TYPE = { INLINE: 0, BLOCKING: 1 } as const
+export const DSHOT_ALL_MOTORS = 255
+
+export interface DshotCommandRequest {
+  type: number
+  /** 0-based motor index, or DSHOT_ALL_MOTORS. */
+  motorIndex: number
+  commands: number[]
+}
+
+export function encodeDshotCommand(request: DshotCommandRequest): Uint8Array {
+  const w = new ByteWriter().u8(request.type).u8(request.motorIndex).u8(request.commands.length)
+  for (const command of request.commands) w.u8(command)
+  return w.toBytes()
+}
+
+export function decodeDshotCommand(payload: Uint8Array): DshotCommandRequest {
+  const r = new ByteReader(payload)
+  const type = r.u8()
+  const motorIndex = r.u8()
+  const count = r.u8()
+  const commands: number[] = []
+  for (let i = 0; i < count && r.remaining >= 1; i++) commands.push(r.u8())
+  return { type, motorIndex, commands }
+}
+
+/**
+ * Sets and stores the spin direction of one motor's ESC. Blocking, like the Betaflight Configurator's direction
+ * wizard: the FC pauses the motor outputs, repeats each command as often as the ESC needs, and resumes.
+ */
+export function spinDirectionRequest(motor: number, reversed: boolean): DshotCommandRequest {
+  return {
+    type: DSHOT_CMD_TYPE.BLOCKING,
+    motorIndex: motor - 1,
+    commands: [
+      reversed ? DSHOT_CMD.SPIN_DIRECTION_REVERSED : DSHOT_CMD.SPIN_DIRECTION_NORMAL,
+      DSHOT_CMD.SAVE_SETTINGS,
+    ],
+  }
 }
 
 // ---- MSP_MOTOR_CONFIG (131) / MSP_SET_MOTOR_CONFIG (222) ----

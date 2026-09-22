@@ -1,10 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
-import { CircleCheck, OctagonAlert, TriangleAlert } from 'lucide-react'
+import { ArrowLeftRight, CircleCheck, OctagonAlert, RotateCw, TriangleAlert } from 'lucide-react'
 import { Notice, LoadingState } from '@/components/Notice'
 import { NumberInput } from '@/components/NumberInput'
 import { SaveBar } from '@/components/SaveBar'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
@@ -18,6 +26,7 @@ import {
   readMotorTelemetry,
   saveMotors,
   setArmingDisabled,
+  setMotorDirection,
   setMotorOutputs,
   stopMotors,
 } from '@/lib/motors/io'
@@ -32,8 +41,10 @@ import {
   MOTOR_STOP,
   MOTOR_TEST_MAX,
   readMotors,
+  remappedMotors,
   SELECTABLE_PROTOCOLS,
   spinsClockwise,
+  swapMotorOutputs,
   validateMotors,
   type DroneType,
   type IdleZone,
@@ -44,12 +55,45 @@ import { cn } from '@/lib/utils'
 
 const PATH = '/motors'
 
-/** Betaflight Quad X as seen from above, nose up: 4 front-left, 2 front-right, 3 rear-left, 1 rear-right. */
-const QUAD_POSITIONS: { motor: number; className: string; badge: string }[] = [
-  { motor: 4, className: 'left-0 top-0', badge: 'left-[8%] top-[8%]' },
-  { motor: 2, className: 'right-0 top-0', badge: 'right-[8%] top-[8%]' },
-  { motor: 3, className: 'left-0 bottom-0', badge: 'left-[8%] bottom-[8%]' },
-  { motor: 1, className: 'right-0 bottom-0', badge: 'right-[8%] bottom-[8%]' },
+/**
+ * Betaflight Quad X as seen from above, nose up: 4 front-left, 2 front-right, 3 rear-left, 1 rear-right.
+ * The number badge sits on the disc's outer corner, the direction icon beside it and the swap icon below/above it.
+ */
+const QUAD_POSITIONS: {
+  motor: number
+  className: string
+  badge: string
+  direction: string
+  swap: string
+}[] = [
+  {
+    motor: 4,
+    className: 'left-0 top-0',
+    badge: 'left-[8%] top-[8%]',
+    direction: 'right-[8%] top-[8%]',
+    swap: 'left-[8%] bottom-[8%]',
+  },
+  {
+    motor: 2,
+    className: 'right-0 top-0',
+    badge: 'right-[8%] top-[8%]',
+    direction: 'left-[8%] top-[8%]',
+    swap: 'right-[8%] bottom-[8%]',
+  },
+  {
+    motor: 3,
+    className: 'left-0 bottom-0',
+    badge: 'left-[8%] bottom-[8%]',
+    direction: 'right-[8%] bottom-[8%]',
+    swap: 'left-[8%] top-[8%]',
+  },
+  {
+    motor: 1,
+    className: 'right-0 bottom-0',
+    badge: 'right-[8%] bottom-[8%]',
+    direction: 'left-[8%] bottom-[8%]',
+    swap: 'right-[8%] top-[8%]',
+  },
 ]
 
 /** Until drone types exist (SPEC §2), every quad is treated as a 5". */
@@ -169,7 +213,17 @@ function Editor({
           </CardContent>
         </Card>
 
-        <MotorTest client={client} snapshot={snapshot} blocked={dirty || saving} />
+        <MotorTest
+          client={client}
+          snapshot={snapshot}
+          blocked={dirty || saving}
+          dshot={isDshot(current)}
+          outputOrder={draft.outputOrder}
+          swapDisabled={saving}
+          onSwap={(a, b) =>
+            setDraft({ ...draft, outputOrder: swapMotorOutputs(draft.outputOrder, a, b) })
+          }
+        />
       </div>
 
       {!(draft.bidirDshot && dshot) && (
@@ -203,15 +257,28 @@ function Editor({
  * Spins motors from the browser. Safety: locked until the user confirms props are off, arming from
  * the radio is blocked meanwhile, throttle is capped, and everything stops when the switch goes
  * off, the tab is left, or the page is closed.
+ *
+ * Each motor also carries two small menus: its spin direction (a DShot command the ESC stores, no reboot)
+ * and a swap of its output with another motor's (an edit of `motor_output_reordering`, Save & Reboot).
  */
 function MotorTest({
   client,
   snapshot,
   blocked,
+  dshot,
+  outputOrder,
+  swapDisabled,
+  onSwap,
 }: {
   client: MspClient
   snapshot: MotorsSnapshot
   blocked: boolean
+  /** The FC runs a DShot protocol, so its ESCs take direction commands. */
+  dshot: boolean
+  /** The draft's `motor_output_reordering`. */
+  outputOrder: number[]
+  swapDisabled: boolean
+  onSwap: (motor: number, other: number) => void
 }) {
   const count = Math.min(Math.max(snapshot.motorCount, 1), 8)
   const telemetry = useMspPoll(readMotorTelemetry, 100)
@@ -219,6 +286,7 @@ function MotorTest({
   const [enabled, setEnabled] = useState(false)
   const [values, setValues] = useState<number[]>(() => new Array<number>(count).fill(MOTOR_STOP))
   const [error, setError] = useState<string | null>(null)
+  const [directionNote, setDirectionNote] = useState<string | null>(null)
   // Unsaved edits lock the test. Switch it off for good, so it never re-arms itself when unlocked.
   if (enabled && blocked) {
     setEnabled(false)
@@ -269,9 +337,48 @@ function MotorTest({
 
   const toggle = (on: boolean) => {
     setError(null)
+    setDirectionNote(null)
     setValues(new Array<number>(count).fill(MOTOR_STOP))
     setEnabled(on)
   }
+
+  // ESCs only take commands while stopped, so every motor stops first (the FC pauses the outputs anyway).
+  const changeDirection = async (motor: number, reversed: boolean) => {
+    setError(null)
+    setDirectionNote(null)
+    const stopped = new Array<number>(count).fill(MOTOR_STOP)
+    pending.current = null
+    setValues(stopped)
+    try {
+      await setMotorOutputs(client, stopped)
+      await setMotorDirection(client, motor, reversed)
+      setDirectionNote(
+        `Motor ${motor} set to ${reversed ? 'reversed' : 'normal'} and stored by its ESC. Spin it to check — pick the other one if it still turns the wrong way.`,
+      )
+    } catch {
+      setError('Lost contact with the flight controller while testing — unplug the battery.')
+      setEnabled(false)
+    }
+  }
+  const directionMenu = (motor: number, className?: string) => (
+    <DirectionMenu
+      motor={motor}
+      disabled={!active || !dshot}
+      onSelect={(reversed) => void changeDirection(motor, reversed)}
+      className={className}
+    />
+  )
+  const swapMenu = (motor: number, className?: string) => (
+    <SwapMenu
+      motor={motor}
+      count={count}
+      disabled={swapDisabled}
+      onSwap={onSwap}
+      className={className}
+    />
+  )
+  const remapped = remappedMotors(outputOrder, count)
+  const remapUnsaved = outputOrder.some((output, i) => output !== snapshot.outputOrder[i])
 
   const master = Math.max(...values)
   const motorSlider = (motor: number, vertical: boolean) => (
@@ -349,7 +456,7 @@ function MotorTest({
               <path d="m50 40 5 8h-3v9h-4v-9h-3z" fill="var(--primary)" />
             </svg>
 
-            {QUAD_POSITIONS.map(({ motor, className, badge }) => {
+            {QUAD_POSITIONS.map(({ motor, className, badge, direction, swap }) => {
               const output = values[motor - 1] ?? MOTOR_STOP
               const spinning = output > MOTOR_STOP && active
               const clockwise = spinsClockwise(motor, snapshot.propsOut)
@@ -372,6 +479,8 @@ function MotorTest({
                   >
                     {motor}
                   </span>
+                  {directionMenu(motor, cn('absolute', direction))}
+                  {swapMenu(motor, cn('absolute', swap))}
                   {motorSlider(motor, true)}
                   <div className="relative font-mono text-xs tabular-nums">
                     {hasRpm ? `${telemetry?.[motor - 1]?.rpm ?? 0} rpm` : output}
@@ -384,9 +493,11 @@ function MotorTest({
           <div className="grid grid-cols-2 gap-x-8 gap-y-5">
             {Array.from({ length: count }, (_, i) => i + 1).map((motor) => (
               <div key={motor}>
-                <div className="mb-2 flex justify-between">
+                <div className="mb-2 flex items-center justify-between gap-2">
                   <span className="font-medium">Motor {motor}</span>
-                  <span className="font-mono tabular-nums">
+                  {directionMenu(motor)}
+                  {swapMenu(motor)}
+                  <span className="ml-auto font-mono tabular-nums">
                     {values[motor - 1] ?? MOTOR_STOP} · {rpmText(motor)}
                   </span>
                 </div>
@@ -396,6 +507,20 @@ function MotorTest({
           </div>
         )}
         {!hasRpm && <p className="text-muted-foreground">RPM readout needs bidirectional DShot.</p>}
+        {!dshot && (
+          <p className="text-muted-foreground">
+            Changing a motor&apos;s direction needs a DShot ESC protocol.
+          </p>
+        )}
+        {remapped.length > 0 && (
+          <p className="text-muted-foreground">
+            {remapped
+              .map(({ motor, output }) => `Motor ${motor} drives ESC output ${output}`)
+              .join(' · ')}
+            {remapUnsaved && ' — Save & Reboot to apply.'}
+          </p>
+        )}
+        {directionNote && <p className="text-muted-foreground">{directionNote}</p>}
 
         <div>
           <div className="mb-2 flex justify-between">
@@ -415,6 +540,87 @@ function MotorTest({
         {error && <Notice tone="error">{error}</Notice>}
       </CardContent>
     </Card>
+  )
+}
+
+const MOTOR_ICON_BUTTON = 'size-6 rounded-full [&_svg]:size-3.5'
+
+/**
+ * Which way a motor's ESC turns it. Set with DShot commands the ESC stores; nothing reports the current
+ * setting back, so both are offered and the user checks by spinning the motor.
+ */
+function DirectionMenu({
+  motor,
+  disabled,
+  onSelect,
+  className,
+}: {
+  motor: number
+  disabled: boolean
+  onSelect: (reversed: boolean) => void
+  className?: string
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="secondary"
+          size="icon"
+          aria-label={`Motor ${motor} direction`}
+          title="Change the spin direction (stored by the ESC)"
+          disabled={disabled}
+          className={cn(MOTOR_ICON_BUTTON, className)}
+        >
+          <RotateCw />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        <DropdownMenuLabel>Motor {motor} direction</DropdownMenuLabel>
+        <DropdownMenuItem onSelect={() => onSelect(false)}>Normal</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => onSelect(true)}>Reversed</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+/** Exchanges the ESC outputs of two motors (`motor_output_reordering`); takes a Save & Reboot. */
+function SwapMenu({
+  motor,
+  count,
+  disabled,
+  onSwap,
+  className,
+}: {
+  motor: number
+  count: number
+  disabled: boolean
+  onSwap: (motor: number, other: number) => void
+  className?: string
+}) {
+  const others = Array.from({ length: count }, (_, i) => i + 1).filter((m) => m !== motor)
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="secondary"
+          size="icon"
+          aria-label={`Swap motor ${motor}`}
+          title="Swap this motor's output with another motor's"
+          disabled={disabled || others.length === 0}
+          className={cn(MOTOR_ICON_BUTTON, className)}
+        >
+          <ArrowLeftRight />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        <DropdownMenuLabel>Swap motor {motor} with</DropdownMenuLabel>
+        {others.map((other) => (
+          <DropdownMenuItem key={other} onSelect={() => onSwap(motor, other)}>
+            Motor {other}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
