@@ -25,8 +25,6 @@ export const MOTOR_MAX = 2000
 export const MOTOR_TEST_MAX = 1300
 
 const ADVANCED_CONFIG_PROTOCOL_OFFSET = 3
-/** `motor_idle` (u16, hundredths of a percent) inside MSP_ADVANCED_CONFIG. */
-const ADVANCED_CONFIG_IDLE_OFFSET = 6
 /** `dyn_idle_min_rpm` inside MSP_PID_ADVANCED (94). Same offset with and without USE_DYN_IDLE. */
 const PID_ADVANCED_DYN_IDLE_OFFSET = 49
 
@@ -166,29 +164,12 @@ export function decodeDshotCommand(payload: Uint8Array): DshotCommandRequest {
 }
 
 /**
- * How a direction flip is checked, like the Betaflight Configurator's wizard does it: the motor is stopped and
- * the ESC given time to notice (Bluejay and AM32 drop commands while the motor turns; the Configurator pauses
- * 400 ms), the command is sent, the ESC gets a moment to store it (AM32 chimes), then the motor is spun at the
- * FC's idle throttle (`directionCheckValue`) so the new direction can be seen.
+ * Pauses around a direction flip, like the Betaflight Configurator's wizard: the motors are stopped and the
+ * ESC given time to notice (Bluejay and AM32 drop commands while the motor turns; the Configurator pauses
+ * 400 ms), the command is sent, the ESC gets a moment to store it (AM32 chimes), then the motors get their
+ * slider values back.
  */
-export const DIRECTION_CHECK = { stopMs: 500, settleMs: 500, spinMs: 2000 } as const
-
-/** `motor_idle` in percent (Betaflight default 5.5). */
-export function decodeMotorIdlePercent(advancedConfig: number[]): number {
-  const lo = advancedConfig[ADVANCED_CONFIG_IDLE_OFFSET]
-  const hi = advancedConfig[ADVANCED_CONFIG_IDLE_OFFSET + 1]
-  return lo === undefined || hi === undefined ? 0 : (lo + (hi << 8)) / 100
-}
-
-/**
- * Output for the check spin after a direction flip: the FC's own idle throttle, what the motors turn at
- * when armed — the Configurator's wizard spins at the same value. Kept between 3 % and 10 % in case the
- * setting is off or odd.
- */
-export function directionCheckValue(snapshot: MotorsSnapshot): number {
-  const percent = Math.min(10, Math.max(3, decodeMotorIdlePercent(snapshot.advancedConfig)))
-  return MOTOR_STOP + Math.round(percent * 10)
-}
+export const DIRECTION_CHECK = { stopMs: 500, settleMs: 500 } as const
 
 /**
  * Sets and stores the spin direction of one motor's ESC. Blocking, like the Betaflight Configurator's direction

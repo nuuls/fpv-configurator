@@ -25,7 +25,6 @@ import {
 } from '@/lib/motors/io'
 import {
   DIRECTION_CHECK,
-  directionCheckValue,
   DYN_IDLE_MAX,
   DYN_IDLE_MIN,
   DYN_IDLE_ZONES,
@@ -356,8 +355,9 @@ function MotorTest({
   }
 
   /**
-   * Like the Betaflight Configurator's direction wizard: stop, give the ESC time to notice (it drops
-   * commands while the motor turns), send the command, then spin the motor so the new direction shows.
+   * Meant to be clicked while the motor turns under a finger: the ESC only takes the command once the
+   * motor is stopped, so all motors pause for a moment, the command goes out, and the sliders' values
+   * are sent again — the motor comes back turning the other way. The sliders themselves don't move.
    */
   const flip = async (motor: number) => {
     const token = session.current
@@ -368,7 +368,6 @@ function MotorTest({
     setNote(null)
     setFlipping(motor)
     pending.current = null
-    setValues(stopped)
     try {
       await setMotorOutputs(client, stopped)
       await sleep(DIRECTION_CHECK.stopMs)
@@ -376,18 +375,11 @@ function MotorTest({
       await setMotorDirection(client, motor, toReversed)
       setReversed(reversed.map((r, i) => (i === motor - 1 ? toReversed : r)))
       setNote(
-        `Motor ${motor} set to ${toReversed ? 'reversed' : 'normal'} — spinning it to check. Still the wrong way? Click again.`,
+        `Motor ${motor} set to ${toReversed ? 'reversed' : 'normal'}. Still the wrong way? Click again.`,
       )
       await sleep(DIRECTION_CHECK.settleMs)
       if (!alive()) return
-      const checkValue = directionCheckValue(snapshot)
-      const spinning = stopped.map((v, i) => (i === motor - 1 ? checkValue : v))
-      setValues(spinning)
-      await setMotorOutputs(client, spinning)
-      await sleep(DIRECTION_CHECK.spinMs)
-      if (!alive()) return
-      setValues(stopped)
-      await setMotorOutputs(client, stopped)
+      await setMotorOutputs(client, values)
     } catch {
       if (!alive()) return
       setError('Lost contact with the flight controller while testing — unplug the battery.')
@@ -528,7 +520,8 @@ function MotorTest({
 
             {QUAD_POSITIONS.map(({ motor, className, badge, direction, swap }) => {
               const output = values[motor - 1] ?? MOTOR_STOP
-              const spinning = output > MOTOR_STOP && active
+              // while a flip runs the FC has been told to stop everything; the sliders keep their values
+              const spinning = output > MOTOR_STOP && active && flipping === null
               const clockwise = spinsClockwise(motor, snapshot.propsOut)
               return (
                 <div

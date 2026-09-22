@@ -6,13 +6,11 @@ import { nudge, openTab, resetAppAfterEach, saveAndReboot } from '@/test/app'
 
 resetAppAfterEach()
 
-/** The flip stops, waits, sends, waits, spins for a while and stops again — in real time. */
-const FLIP_MS = DIRECTION_CHECK.stopMs + DIRECTION_CHECK.settleMs + DIRECTION_CHECK.spinMs
-/** The mock's motor_idle is 5.5 %, so the check spin runs at 1055. */
-const CHECK_VALUE = '1055'
+/** The flip stops, waits, sends, waits and restores — in real time. */
+const FLIP_MS = DIRECTION_CHECK.stopMs + DIRECTION_CHECK.settleMs
 
 describe('Motors tab — direction and swap', () => {
-  it('flips a motor direction with one click once motor control is on, then spins it to show', async () => {
+  it('flips a motor direction with one click while the motor turns, and keeps it turning', async () => {
     const user = await openTab('Motors')
     const flip = () => screen.getByRole('button', { name: 'Flip direction of motor 2' })
     await screen.findByRole('button', { name: 'Flip direction of motor 2' })
@@ -27,21 +25,20 @@ describe('Motors tab — direction and swap', () => {
     expect(screen.getAllByText('1010')).toHaveLength(2)
 
     await user.click(flip())
-    expect(screen.queryByText('1010')).toBeNull() // every motor stopped first
-    expect(flip()).toBeDisabled() // busy
+    expect(flip()).toBeDisabled() // busy: the FC is told to stop, the sliders keep their values
+    expect(screen.getAllByText('1010')).toHaveLength(2)
+    expect(within(screen.getByLabelText('Motor 1')).getByRole('slider')).toHaveAttribute(
+      'data-disabled',
+    )
     expect(
       await screen.findByText(
-        /Motor 2 set to reversed — spinning it to check/,
+        /Motor 2 set to reversed\. Still the wrong way\?/,
         {},
         { timeout: 2000 },
       ),
     ).toBeInTheDocument()
-    // the check spin shows on motor 2 (and the "all motors" readout), then everything stops again
-    await waitFor(() => expect(screen.getAllByText(CHECK_VALUE)).toHaveLength(2), {
-      timeout: 2000,
-    })
-    await waitFor(() => expect(screen.queryByText(CHECK_VALUE)).toBeNull(), { timeout: FLIP_MS })
-    expect(flip()).toBeEnabled()
+    await waitFor(() => expect(flip()).toBeEnabled(), { timeout: FLIP_MS + 1000 })
+    expect(screen.getAllByText('1010')).toHaveLength(2) // motor 1 turns again
     expect(screen.getByLabelText(/I have removed all propellers/)).toBeChecked()
 
     // the next click sends the opposite; switching the test off clears the note and locks the icon
@@ -50,7 +47,7 @@ describe('Motors tab — direction and swap', () => {
       await screen.findByText(/Motor 2 set to normal/, {}, { timeout: 2000 }),
     ).toBeInTheDocument()
     await user.click(screen.getByLabelText(/I have removed all propellers/))
-    expect(screen.queryByText(/spinning it to check/)).toBeNull()
+    expect(screen.queryByText(/Still the wrong way/)).toBeNull()
     expect(flip()).toBeDisabled()
   }, 15000)
 

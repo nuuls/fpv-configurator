@@ -5,8 +5,6 @@ import { MockFlightController } from '@/lib/mock-fc/mockFc'
 import { readMotorsSnapshot, saveMotors, setMotorDirection } from '@/lib/motors/io'
 import {
   decodeDshotCommand,
-  decodeMotorIdlePercent,
-  directionCheckValue,
   decodeMotorOutputReordering,
   DSHOT_CMD,
   DSHOT_CMD_TYPE,
@@ -88,18 +86,6 @@ describe('motor output reordering', () => {
 })
 
 describe('motor direction', () => {
-  it('spins the check at the FC idle throttle, kept within 3–10 %', () => {
-    const snapshot = (idle: number[]) =>
-      ({ advancedConfig: [1, 1, 0, 6, 0xe0, 0x01, ...idle] }) as Parameters<
-        typeof directionCheckValue
-      >[0]
-    expect(decodeMotorIdlePercent([1, 1, 0, 6, 0xe0, 0x01, 0x26, 0x02])).toBe(5.5)
-    expect(directionCheckValue(snapshot([0x26, 0x02]))).toBe(1055) // 5.5 %
-    expect(directionCheckValue(snapshot([0, 0]))).toBe(1030) // idle off: still turn it
-    expect(directionCheckValue(snapshot([0xd0, 0x07]))).toBe(1100) // 20 %: capped
-    expect(directionCheckValue(snapshot([]))).toBe(1030) // short payload
-  })
-
   it('encodes a blocking direction + save command for one motor', () => {
     const request = spinDirectionRequest(2, true)
     expect(request).toEqual({
