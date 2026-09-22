@@ -76,7 +76,7 @@ function Editor({
 
   return (
     <>
-      <div className="grid items-start gap-6 lg:grid-cols-2">
+      <div className="grid items-start gap-4 lg:grid-cols-2">
         <FilterCard
           title="Gyro lowpass 2"
           readout={draft.gyroLpf2 === 0 ? 'Off' : hz(gyroLpf2Hz(draft.gyroLpf2))}
@@ -202,11 +202,11 @@ interface FilterCardProps {
   children: ReactNode
 }
 
-/** One filter: its name, the resulting value in large type, then its slider. */
+/** One filter: its name, the resulting value in prominent type, then its slider. */
 function FilterCard({ title, caption, readout, detail, aside, dimmed, children }: FilterCardProps) {
   return (
     <Card>
-      <CardContent className="flex flex-col gap-8">
+      <CardContent className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
           <h3 className="font-medium">
             {title}
@@ -216,7 +216,7 @@ function FilterCard({ title, caption, readout, detail, aside, dimmed, children }
         </div>
         <div
           className={cn(
-            'flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 font-mono text-3xl font-semibold tabular-nums xl:text-4xl',
+            'flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 font-mono text-xl font-semibold tabular-nums',
             dimmed && 'opacity-50',
           )}
         >
@@ -247,10 +247,9 @@ interface FilterSliderProps {
 
 function FilterSlider({ label, ends, value, onChange, ...range }: FilterSliderProps) {
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2">
       <Slider
         aria-label={label}
-        className="[&_[data-slot=slider-thumb]]:size-6 [&_[data-slot=slider-track][data-orientation=horizontal]]:h-2.5"
         {...range}
         // an FC value outside the range keeps the thumb on the track; the readout shows the real one
         value={[Math.min(range.max, Math.max(range.min, value))]}

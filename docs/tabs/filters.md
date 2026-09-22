@@ -36,7 +36,7 @@ The minimal filter stack for a quad with working RPM filtering: five sliders and
 ```
 
 Only sliders and button groups — no number inputs or dropdowns, and no explanatory text. Every filter is one card,
-in the order above: its name, the resulting cutoff in large monospace type (the one thing to look at), then its
+in the order above: its name, the resulting cutoff in bold monospace type, one size above the rest of the card (the one thing to look at), then its
 slider with the meaning of the track ends underneath. Gyro lowpass 2 shows only the cutoff, not the slider position;
 D-term filtering shows the slider position on the left and its cutoffs on the right. The dynamic notch card also
 holds the count.
@@ -101,9 +101,11 @@ On real hardware:
 - **Yaw lowpass is a slider** (user request, 2026-09-22; it was left alone before): 0–500 Hz like the CLI, 0 = off.
   It is written with `MSP_SET_FILTER_CONFIG` like the rest and needs no pinning.
 - **Numbers first, no prose** (user request, 2026-09-22): the resulting Hz (and for D-term the slider position) are
-  the large monospace text of each card, the cards sit in the order of SPEC §2 (gyro lowpass 2, RPM filter, dynamic
+  the bold monospace text of each card, the cards sit in the order of SPEC §2 (gyro lowpass 2, RPM filter, dynamic
   notch, D-term, yaw lowpass), and the descriptions of what each filter does were dropped along with the card
   groupings. The gyro slider's position is not shown at all — the cutoff says it.
+- **Normal sizes** (user request, 2026-09-22): the numbers stay prominent but at `text-xl`, not display size; card
+  spacing and the sliders are the app's usual ones.
 - **Slider 0–2**: Betaflight's multiplier range is 0.1–2.0 (CLI rejects < 10), so the step is 0.1 and 0 means "off".
 - **"Notch count (1 default)"**: the tab shows what the FC has and recommends 1; actually applying 1 is left to
   the drone-type "Apply defaults" step (SPEC §2), which doesn't exist yet.
