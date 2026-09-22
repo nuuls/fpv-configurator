@@ -36,6 +36,7 @@ const STOCK_DRAFT: FiltersDraft = {
   rpmMinHz: 100,
   dynNotchCount: 2,
   dynNotchMinHz: 100,
+  yawLowpassHz: 100,
 }
 
 const u16 = (bytes: ArrayLike<number>, offset: number) =>
@@ -79,6 +80,7 @@ describe('filter payloads', () => {
       rpmMinHz: 80,
       dynNotchCount: 1,
       dynNotchMinHz: 150,
+      yawLowpassHz: 0,
     })
 
     expect(payload).toHaveLength(FILTER_CONFIG_LENGTH)
@@ -90,10 +92,9 @@ describe('filter payloads', () => {
       67, 67, 135, 135,
     ]) // D-term
     expect([payload[44], payload[48], u16(payload, 41)]).toEqual([80, 1, 150])
-    // untouched: yaw lowpass, dyn notch Q + max, RPM harmonics, fade, Q, weights
-    expect([u16(payload, 3), u16(payload, 39), u16(payload, 45), payload[43]]).toEqual([
-      100, 300, 600, 3,
-    ])
+    expect(u16(payload, 3)).toBe(0) // yaw lowpass off
+    // untouched: dyn notch Q + max, RPM harmonics, fade, Q, weights
+    expect([u16(payload, 39), u16(payload, 45), payload[43]]).toEqual([300, 600, 3])
     expect([u16(payload, 49), u16(payload, 51), payload[53]]).toEqual([50, 500, 100])
   })
 
@@ -191,6 +192,10 @@ describe('validateFilters', () => {
     expect(validateFilters({ ...STOCK_DRAFT, dynNotchCount: 3 })[0]).toMatch(
       /Dynamic notch count must be 0–2/,
     )
+    expect(validateFilters({ ...STOCK_DRAFT, yawLowpassHz: 0 })).toEqual([]) // off
+    expect(validateFilters({ ...STOCK_DRAFT, yawLowpassHz: 600 })[0]).toMatch(
+      /Yaw lowpass must be 0–500/,
+    )
   })
 })
 
@@ -248,6 +253,7 @@ describe('filters against the mock FC', () => {
       rpmMinHz: 90,
       dynNotchCount: 1,
       dynNotchMinHz: 120,
+      yawLowpassHz: 80,
     }
     await saveFilters(client, before, draft)
 

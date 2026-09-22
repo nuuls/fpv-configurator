@@ -80,6 +80,8 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
     - Min frequency
   - D term filtering
     - Only slider from 0.5 - 1.5
+  - Yaw lowpass
+    - Slider from 0 (off) - 500 Hz
   - No other filters
 
 - Rates

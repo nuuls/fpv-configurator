@@ -1,6 +1,6 @@
 /**
  * The minimal filter stack — docs/tabs/filters.md: gyro lowpass 2 (PT1) and the D-term lowpasses on the
- * firmware's filter sliders, RPM filter, dynamic notch. Everything else is switched off on save.
+ * firmware's filter sliders, RPM filter, dynamic notch, yaw lowpass. Everything else is switched off on save.
  *
  * Two messages carry the values, and they overlap: MSP_FILTER_CONFIG has every cutoff, MSP_SIMPLIFIED_TUNING
  * has the slider positions plus the cutoffs the sliders drive. Both raw payloads are kept in the snapshot
@@ -11,6 +11,7 @@
 const FC = {
   GYRO_LPF1_STATIC_U8: 0, // legacy copy, overwritten by the u16 at 20
   DTERM_LPF1_STATIC: 1,
+  YAW_LOWPASS: 3,
   GYRO_NOTCH1_HZ: 5,
   GYRO_NOTCH1_CUTOFF: 7,
   DTERM_NOTCH_HZ: 9,
@@ -82,6 +83,8 @@ export const GYRO_SLIDER = { min: 0, max: 200, step: 10 } as const
 export const DTERM_SLIDER = { min: 50, max: 150, step: 5 } as const
 export const RPM_MIN_HZ = { min: 30, max: 200, step: 5 } as const
 export const DYN_NOTCH_MIN_HZ = { min: 20, max: 250, step: 5 } as const
+/** `yaw_lowpass_hz` range in the firmware; 0 = off. */
+export const YAW_LOWPASS_HZ = { min: 0, max: 500, step: 5 } as const
 /** Most notches this app offers; the firmware takes up to DYN_NOTCH_COUNT_FIRMWARE_MAX. */
 export const DYN_NOTCH_COUNT_MAX = 2
 const DYN_NOTCH_COUNT_FIRMWARE_MAX = 7
@@ -106,6 +109,8 @@ export interface FiltersDraft {
   /** 0 = dynamic notch off. */
   dynNotchCount: number
   dynNotchMinHz: number
+  /** PT1 on the yaw P term (per PID profile); 0 = off. */
+  yawLowpassHz: number
 }
 
 // ---- byte access; payloads shorter than expected read as 0 and are not extended ----
@@ -174,6 +179,7 @@ export function readFilters({ filterConfig, simplified }: FiltersSnapshot): Filt
     // more than the app offers (stock firmware: 3) reads as the most it does; pinnedChanges says so
     dynNotchCount: Math.min(DYN_NOTCH_COUNT_MAX, u8At(filterConfig, FC.DYN_NOTCH_COUNT_U8)),
     dynNotchMinHz: u16At(filterConfig, FC.DYN_NOTCH_MIN_HZ),
+    yawLowpassHz: u16At(filterConfig, FC.YAW_LOWPASS),
   }
 }
 
@@ -194,6 +200,8 @@ export function validateFilters(draft: FiltersDraft): string[] {
     )
   if (outside(draft.dynNotchCount, { min: 0, max: DYN_NOTCH_COUNT_MAX }))
     problems.push(`Dynamic notch count must be 0–${DYN_NOTCH_COUNT_MAX}.`)
+  if (outside(draft.yawLowpassHz, YAW_LOWPASS_HZ))
+    problems.push(`Yaw lowpass must be ${YAW_LOWPASS_HZ.min}–${YAW_LOWPASS_HZ.max} Hz.`)
   return problems
 }
 
@@ -233,6 +241,7 @@ export function buildFilterConfig(snapshot: FiltersSnapshot, draft: FiltersDraft
   setU8(payload, FC.DYN_NOTCH_COUNT_U8, draft.dynNotchCount)
   // Not validated while the notch is off (the field is disabled), so the FC keeps the frequency it had.
   if (draft.dynNotchCount > 0) setU16(payload, FC.DYN_NOTCH_MIN_HZ, draft.dynNotchMinHz)
+  setU16(payload, FC.YAW_LOWPASS, draft.yawLowpassHz)
   return payload
 }
 
@@ -305,7 +314,7 @@ export function defaultFilterConfig(): number[] {
   const payload = new Uint8Array(FILTER_CONFIG_LENGTH)
   setU8(payload, FC.GYRO_LPF1_STATIC_U8, GYRO_LPF1_DYN_MIN_HZ)
   setU16(payload, FC.DTERM_LPF1_STATIC, DTERM_LPF1_DYN_MIN_HZ)
-  setU16(payload, 3, 100) // yaw_lowpass_hz
+  setU16(payload, FC.YAW_LOWPASS, 100)
   setU16(payload, FC.GYRO_LPF1_STATIC, GYRO_LPF1_DYN_MIN_HZ)
   setU16(payload, FC.GYRO_LPF2_STATIC, GYRO_LPF2_HZ)
   setU16(payload, FC.DTERM_LPF2_STATIC, DTERM_LPF2_HZ)
