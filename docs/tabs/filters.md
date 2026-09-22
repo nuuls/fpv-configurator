@@ -14,14 +14,14 @@ The minimal filter stack for a quad with working RPM filtering: five sliders and
 +---------------------------------+---------------------------------+
 | Gyro lowpass 2                  | RPM filter · min frequency      |
 |                                 |                                 |
-| 1.0 · 500 Hz                    | 100 Hz                          |
+| 500 Hz                          | 100 Hz                          |
 |                                 |                                 |
 | [----------o----------]         | [--------o------------]         |
 | Off                 2.0         | 30 Hz            200 Hz         |
 +---------------------------------+---------------------------------+
 | Dynamic notch · min   [Off|1|2] | D-term filtering                |
 |                                 |                                 |
-| 100 Hz                          | 1.00 · 75–150 / 150 Hz          |
+| 100 Hz                          | 1.00        75–150 / 150 Hz     |
 |                                 |                                 |
 | [-------o-------------]         | [----------o----------]         |
 | 20 Hz            250 Hz         | 0.5                 1.5         |
@@ -36,18 +36,20 @@ The minimal filter stack for a quad with working RPM filtering: five sliders and
 ```
 
 Only sliders and button groups — no number inputs or dropdowns, and no explanatory text. Every filter is one card,
-in the order above: its name, the slider position and the resulting cutoff in large type (the one thing to look at),
-then its slider with the meaning of the track ends underneath. The dynamic notch card also holds the count.
+in the order above: its name, the resulting cutoff in large monospace type (the one thing to look at), then its
+slider with the meaning of the track ends underneath. Gyro lowpass 2 shows only the cutoff, not the slider position;
+D-term filtering shows the slider position on the left and its cutoffs on the right. The dynamic notch card also
+holds the count.
 
 ## Controls
 
 | Control                     | Type         | Betaflight setting / MSP                                                                                                                        | Values · default                                 | Notes                                                                                                                |
 | --------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| Gyro lowpass 2              | slider       | `simplified_gyro_filter_multiplier` → `gyro_lpf2_static_hz` = 500 Hz × slider · `MSP_SIMPLIFIED_TUNING` (140/141) + `MSP_FILTER_CONFIG` (92/93) | 0–2.0, step 0.1 · 1.0                            | 0 = filter off (`gyro_lpf2_static_hz = 0`). Resulting cutoff shown next to the position                              |
+| Gyro lowpass 2              | slider       | `simplified_gyro_filter_multiplier` → `gyro_lpf2_static_hz` = 500 Hz × slider · `MSP_SIMPLIFIED_TUNING` (140/141) + `MSP_FILTER_CONFIG` (92/93) | 0–2.0, step 0.1 · 1.0                            | 0 = filter off (`gyro_lpf2_static_hz = 0`). Only the resulting cutoff is shown                                       |
 | RPM filter min frequency    | slider       | `rpm_filter_min_hz` · `MSP_FILTER_CONFIG` byte 44                                                                                               | 30–200 Hz, step 5 · 100                          |                                                                                                                      |
 | Dynamic notch count         | button group | `dyn_notch_count` · byte 48                                                                                                                     | Off, 1–2 · app recommends 1 (firmware default 3) | The firmware takes up to 7; a higher count on the FC shows as 2 and the pinned-filters warning says saving lowers it |
 | Dynamic notch min frequency | slider       | `dyn_notch_min_hz` · bytes 41–42                                                                                                                | 20–250 Hz, step 5 · 100                          | Dimmed and disabled while the count is Off                                                                           |
-| D-term filtering            | slider       | `simplified_dterm_filter_multiplier` → `dterm_lpf1_dyn_min/max_hz`, `dterm_lpf1_static_hz`, `dterm_lpf2_static_hz`                              | 0.50–1.50, step 0.05 · 1.0                       | Range widens if the FC's value is outside. Resulting cutoffs shown (lowpass 1 min–max / lowpass 2)                   |
+| D-term filtering            | slider       | `simplified_dterm_filter_multiplier` → `dterm_lpf1_dyn_min/max_hz`, `dterm_lpf1_static_hz`, `dterm_lpf2_static_hz`                              | 0.50–1.50, step 0.05 · 1.0                       | Range widens if the FC's value is outside. Cutoffs (lowpass 1 min–max / lowpass 2) shown on the right                |
 | Yaw lowpass                 | slider       | `yaw_lowpass_hz` · bytes 3–4 (PID profile)                                                                                                      | 0–500 Hz, step 5 · 100                           | 0 = filter off. PT1 on the yaw P term                                                                                |
 
 Pinned on every save ("No other filters"): gyro lowpass 1 off (`gyro_lpf1_static_hz`, `gyro_lpf1_dyn_min/max_hz` = 0),
@@ -98,9 +100,10 @@ On real hardware:
   lowpass 1; the page says so before the first save.
 - **Yaw lowpass is a slider** (user request, 2026-09-22; it was left alone before): 0–500 Hz like the CLI, 0 = off.
   It is written with `MSP_SET_FILTER_CONFIG` like the rest and needs no pinning.
-- **Numbers first, no prose** (user request, 2026-09-22): the slider position and the resulting Hz are the large
-  text of each card, the cards sit in the order of SPEC §2 (gyro lowpass 2, RPM filter, dynamic notch, D-term,
-  yaw lowpass), and the descriptions of what each filter does were dropped along with the card groupings.
+- **Numbers first, no prose** (user request, 2026-09-22): the resulting Hz (and for D-term the slider position) are
+  the large monospace text of each card, the cards sit in the order of SPEC §2 (gyro lowpass 2, RPM filter, dynamic
+  notch, D-term, yaw lowpass), and the descriptions of what each filter does were dropped along with the card
+  groupings. The gyro slider's position is not shown at all — the cutoff says it.
 - **Slider 0–2**: Betaflight's multiplier range is 0.1–2.0 (CLI rejects < 10), so the step is 0.1 and 0 means "off".
 - **"Notch count (1 default)"**: the tab shows what the FC has and recommends 1; actually applying 1 is left to
   the drone-type "Apply defaults" step (SPEC §2), which doesn't exist yet.

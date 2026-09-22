@@ -21,8 +21,9 @@ describe('Filters tab', () => {
   it('shows stock Betaflight filters and warns about what saving changes', async () => {
     await openTab('Filters')
     expect(await screen.findAllByRole('slider')).toHaveLength(5)
-    expect(readout('1.0 · 500 Hz')).toBeInTheDocument()
-    expect(readout('1.00 · 75–150 / 150 Hz')).toBeInTheDocument()
+    expect(readout('500 Hz')).toBeInTheDocument() // gyro lowpass 2: the cutoff only
+    expect(readout('1.00')).toBeInTheDocument()
+    expect(readout('75–150 / 150 Hz')).toBeInTheDocument()
     expect(await slider('RPM filter min frequency')).toHaveAttribute('aria-valuenow', '100')
     expect(await slider('Yaw lowpass')).toHaveAttribute('aria-valuenow', '100')
     // stock firmware has 3 notches, the app offers 2 at most
@@ -44,7 +45,7 @@ describe('Filters tab', () => {
   it('saves sliders and the notch count without a reboot', async () => {
     const user = await openTab('Filters')
     await nudge(user, await slider('Gyro lowpass 2'), '{ArrowRight}{ArrowRight}')
-    expect(readout('1.2 · 600 Hz')).toBeInTheDocument()
+    expect(readout('600 Hz')).toBeInTheDocument()
     await nudge(user, await slider('D-term filtering'), '{ArrowLeft}')
     await user.click(notchCount('1'))
     await nudge(
@@ -57,8 +58,9 @@ describe('Filters tab', () => {
     expect(readout('90 Hz')).toBeInTheDocument()
     await saveWithoutReboot(user)
 
-    expect(readout('1.2 · 600 Hz')).toBeInTheDocument()
-    expect(readout('0.95 · 71–142 / 142 Hz')).toBeInTheDocument()
+    expect(readout('600 Hz')).toBeInTheDocument()
+    expect(readout('0.95')).toBeInTheDocument()
+    expect(readout('71–142 / 142 Hz')).toBeInTheDocument()
     expect(notchCount('1')).toHaveAttribute('aria-pressed', 'true')
     expect(notchCount('2')).toHaveAttribute('aria-pressed', 'false')
     expect(await slider('RPM filter min frequency')).toHaveAttribute('aria-valuenow', '80')
@@ -68,7 +70,7 @@ describe('Filters tab', () => {
     // still there after leaving the tab and coming back
     await user.click(screen.getByRole('link', { name: 'Setup' }))
     await user.click(await screen.findByRole('link', { name: 'Filters' }))
-    expect(await screen.findByText('1.2 · 600 Hz')).toBeInTheDocument()
+    expect(await screen.findByText('600 Hz')).toBeInTheDocument()
   })
 
   it('switches gyro lowpass 2 and the yaw lowpass off at the left end', async () => {
@@ -89,7 +91,7 @@ describe('Filters tab', () => {
     await nudge(user, await slider('RPM filter min frequency'), '{Home}{ArrowLeft}')
     expect(readout('30 Hz')).toBeInTheDocument()
     await nudge(user, await slider('Yaw lowpass'), '{End}{ArrowRight}')
-    expect(readout('500 Hz')).toBeInTheDocument()
+    expect(await slider('Yaw lowpass')).toHaveAttribute('aria-valuenow', '500') // gyro reads 500 Hz too
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
 
     await user.click(notchCount('Off'))

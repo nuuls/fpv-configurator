@@ -79,11 +79,7 @@ function Editor({
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <FilterCard
           title="Gyro lowpass 2"
-          readout={
-            draft.gyroLpf2 === 0
-              ? 'Off'
-              : `${position(draft.gyroLpf2, 1)} · ${hz(gyroLpf2Hz(draft.gyroLpf2))}`
-          }
+          readout={draft.gyroLpf2 === 0 ? 'Off' : hz(gyroLpf2Hz(draft.gyroLpf2))}
         >
           <FilterSlider
             label="Gyro lowpass 2"
@@ -130,7 +126,8 @@ function Editor({
 
         <FilterCard
           title="D-term filtering"
-          readout={`${position(draft.dterm, 2)} · ${dterm.lpf1MinHz}–${dterm.lpf1MaxHz} / ${hz(dterm.lpf2Hz)}`}
+          readout={position(draft.dterm, 2)}
+          detail={`${dterm.lpf1MinHz}–${dterm.lpf1MaxHz} / ${hz(dterm.lpf2Hz)}`}
         >
           <FilterSlider
             label="D-term filtering"
@@ -194,8 +191,10 @@ interface FilterCardProps {
   title: string
   /** What the readout is, when the title alone doesn't say ("min frequency"). */
   caption?: string
-  /** The slider position and the cutoff(s) it results in — the one thing to look at. */
+  /** The resulting cutoff, or the slider position when `detail` has the cutoffs — the one thing to look at. */
   readout: string
+  /** Right-aligned next to the readout: the cutoffs a slider position results in. */
+  detail?: string
   /** Extra control on the title row (the notch count). */
   aside?: ReactNode
   /** Filter switched off elsewhere: the readout and control stay visible but fade. */
@@ -204,7 +203,7 @@ interface FilterCardProps {
 }
 
 /** One filter: its name, the resulting value in large type, then its slider. */
-function FilterCard({ title, caption, readout, aside, dimmed, children }: FilterCardProps) {
+function FilterCard({ title, caption, readout, detail, aside, dimmed, children }: FilterCardProps) {
   return (
     <Card>
       <CardContent className="flex flex-col gap-8">
@@ -215,15 +214,19 @@ function FilterCard({ title, caption, readout, aside, dimmed, children }: Filter
           </h3>
           {aside}
         </div>
-        <span
-          data-slot="readout"
+        <div
           className={cn(
-            'text-3xl font-semibold tracking-tight tabular-nums xl:text-4xl',
+            'flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 font-mono text-3xl font-semibold tabular-nums xl:text-4xl',
             dimmed && 'opacity-50',
           )}
         >
-          {readout}
-        </span>
+          <span data-slot="readout">{readout}</span>
+          {detail && (
+            <span data-slot="readout" className="ml-auto text-right">
+              {detail}
+            </span>
+          )}
+        </div>
         {children}
       </CardContent>
     </Card>
