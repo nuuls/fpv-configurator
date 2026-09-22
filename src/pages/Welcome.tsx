@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { CircleAlert } from 'lucide-react'
+import { CircleAlert, Cpu, ListChecks, SlidersHorizontal } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { WebSerialTransport } from '@/lib/transport/webserial'
 import { useConnectionStore } from '@/stores/connection'
@@ -11,11 +12,9 @@ export function WelcomePage() {
   const serialSupported = WebSerialTransport.isSupported()
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col gap-4 pt-12">
+    <div className="mx-auto flex max-w-3xl flex-col gap-4 pt-12">
       <p className="text-muted-foreground text-sm">
-        A stripped-down Betaflight configurator. Most options are left out: PID tuning is three
-        sliders, there are four modes and one OSD profile, and ports are assigned by device instead
-        of by UART.
+        A stripped-down Betaflight configurator that runs in the browser.
       </p>
       <Card>
         <CardHeader>
@@ -42,9 +41,39 @@ export function WelcomePage() {
           <Notice tone="error">Connection failed: {error}</Notice>
         </div>
       )}
+
+      <div className="grid gap-4 pt-4 md:grid-cols-3">
+        {FEATURES.map((f) => (
+          <Card key={f.title}>
+            <CardHeader>
+              <f.icon className="text-muted-foreground size-5" />
+              <CardTitle>{f.title}</CardTitle>
+              <CardDescription>{f.text}</CardDescription>
+            </CardHeader>
+          </Card>
+        ))}
+      </div>
     </div>
   )
 }
+
+const FEATURES: { icon: LucideIcon; title: string; text: string }[] = [
+  {
+    icon: SlidersHorizontal,
+    title: 'Simplified setup',
+    text: 'Only the settings most pilots change. PID tuning is three sliders, there are four modes and one OSD profile, and ports are assigned by device instead of by UART.',
+  },
+  {
+    icon: ListChecks,
+    title: 'Finds config issues',
+    text: 'The Setup tab checks bidirectional DShot, accelerometer calibration, arm angle, RX-loss beepers and airmode, with a Fix button where it can. Settings changed elsewhere are listed with a reset to default.',
+  },
+  {
+    icon: Cpu,
+    title: 'ESC configuration',
+    text: 'Read and change Bluejay 0.21 and AM32 2.21 ESC settings through the flight controller, without a separate ESC configurator.',
+  },
+]
 
 function Notice({ tone = 'info', children }: { tone?: 'info' | 'error'; children: ReactNode }) {
   return (

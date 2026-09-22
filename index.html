@@ -7,13 +7,13 @@
     <title>FPV Configurator: a stripped-down Betaflight configurator</title>
     <meta
       name="description"
-      content="A stripped-down Betaflight configurator that runs in the browser. It keeps only the settings most pilots change: three PID sliders, a few filters, four modes, one OSD profile."
+      content="A stripped-down Betaflight configurator that runs in the browser. Simplified setup, checks for common config issues, and Bluejay / AM32 ESC settings without a separate app."
     />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="FPV Configurator" />
     <meta
       property="og:description"
-      content="A stripped-down Betaflight configurator that runs in the browser. It keeps only the settings most pilots change: three PID sliders, a few filters, four modes, one OSD profile."
+      content="A stripped-down Betaflight configurator that runs in the browser. Simplified setup, checks for common config issues, and Bluejay / AM32 ESC settings without a separate app."
     />
   </head>
   <body>
@@ -21,26 +21,23 @@
       <!-- Shown until the app loads (and to crawlers that don't run JavaScript); React replaces it. -->
       <main>
         <h1>FPV Configurator</h1>
+        <p>A stripped-down Betaflight configurator that runs in the browser.</p>
+        <h2>Simplified setup</h2>
         <p>
-          A stripped-down Betaflight configurator that runs in the browser. Most of Betaflight's
-          options are left out; what remains is what most pilots actually change. Connect the flight
-          controller over USB in Chrome or Edge.
+          Only the settings most pilots change. PID tuning is three sliders, there are four modes
+          and one OSD profile, and ports are assigned by device instead of by UART.
         </p>
-        <ul>
-          <li>PID tuning with three sliders: damping, pitch gains and master multiplier</li>
-          <li>
-            Filters cut down to gyro lowpass, RPM filter, dynamic notch, D-term and yaw lowpass
-          </li>
-          <li>One rate profile, synced across axes, with a curve graph</li>
-          <li>Four modes: arm, angle, turtle and beeper</li>
-          <li>Ports assigned by device: pick the receiver, VTX or GPS, then its UART</li>
-          <li>
-            Pre-flight checklist: bidirectional DShot, accelerometer, arm angle, beepers, airmode
-          </li>
-          <li>Bluejay and AM32 ESC settings through the flight controller</li>
-          <li>OSD with a short list of elements and one profile</li>
-          <li>Analog VTX tables from presets</li>
-        </ul>
+        <h2>Finds config issues</h2>
+        <p>
+          The Setup tab checks bidirectional DShot, accelerometer calibration, arm angle, RX-loss
+          beepers and airmode, with a Fix button where it can. Settings changed elsewhere are listed
+          with a reset to default.
+        </p>
+        <h2>ESC configuration</h2>
+        <p>
+          Read and change Bluejay 0.21 and AM32 2.21 ESC settings through the flight controller,
+          without a separate ESC configurator.
+        </p>
       </main>
     </div>
     <script type="module" src="/src/main.tsx"></script>
