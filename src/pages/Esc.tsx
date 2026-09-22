@@ -1,3 +1,4 @@
+import { CircleCheck, TriangleAlert } from 'lucide-react'
 import { Fragment, useState } from 'react'
 import { Notice } from '@/components/Notice'
 import { NumberInput } from '@/components/NumberInput'
@@ -7,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { useDraft } from '@/hooks/useDraft'
 import { describeError } from '@/hooks/useFcSnapshot'
@@ -22,16 +24,20 @@ import {
   editableGroups,
   numberToRaw,
   rawToNumber,
+  recommendedZone,
   setDraftRaw,
   toEscDraft,
   unevenSettings,
+  type EscControl,
   type EscDraft,
   type EscGroup,
   type EscOverview,
   type EscReport,
   type EscSettingDef,
+  type RecommendedZone,
 } from '@/lib/esc/model'
 import type { MspClient } from '@/lib/msp/client'
+import { cn } from '@/lib/utils'
 import { confirm } from '@/stores/confirm'
 import { useConnectionStore } from '@/stores/connection'
 import { confirmDiscardChanges } from '@/stores/unsaved'
@@ -387,10 +393,22 @@ function GroupEditor({ group, draft, onChange }: GroupEditorProps) {
               .map((def) => {
                 const disabled = def.enabled ? !def.enabled(raw) : false
                 const id = `esc-${group.firmware}-${def.key}`
+                const slider = def.control?.kind === 'number' && def.control.recommended
                 return (
-                  <div key={def.key} className="flex items-center justify-between gap-3 py-1.5">
+                  <div
+                    key={def.key}
+                    className={
+                      slider
+                        ? 'flex flex-col gap-2 py-3'
+                        : 'flex items-center justify-between gap-3 py-1.5'
+                    }
+                  >
                     <div>
-                      <label htmlFor={def.perMotor ? undefined : id} className="font-medium">
+                      <label
+                        id={`${id}-label`}
+                        htmlFor={def.perMotor || slider ? undefined : id}
+                        className="font-medium"
+                      >
                         {def.label}
                       </label>
                       {def.hint && <p className="text-muted-foreground text-xs">{def.hint}</p>}
@@ -471,6 +489,17 @@ function SettingControl({ id, def, raw, disabled, onChange }: SettingControlProp
       </NativeSelect>
     )
   }
+  if (control.recommended)
+    return (
+      <RecommendedSlider
+        labelledBy={`${id}-label`}
+        control={control}
+        recommended={control.recommended}
+        raw={raw}
+        disabled={disabled}
+        onChange={onChange}
+      />
+    )
   return (
     <div className="flex items-center gap-2">
       <NumberInput
@@ -484,6 +513,81 @@ function SettingControl({ id, def, raw, disabled, onChange }: SettingControlProp
         className="dark:bg-input/30 h-9 w-24 rounded-md border bg-transparent px-3 disabled:opacity-50"
       />
       {control.unit && <span className="text-muted-foreground">{control.unit}</span>}
+    </div>
+  )
+}
+
+type NumberControl = Extract<EscControl, { kind: 'number' }>
+
+const ZONE_STYLE: Record<RecommendedZone, { bar: string; text: string; icon: typeof CircleCheck }> =
+  {
+    low: { bar: 'bg-warning', text: 'text-warning', icon: TriangleAlert },
+    good: { bar: 'bg-success', text: 'text-success', icon: CircleCheck },
+    high: { bar: 'bg-warning', text: 'text-warning', icon: TriangleAlert },
+  }
+
+/** A number setting as a slider with its recommended range painted green under the track (like Motors' dynamic idle). */
+function RecommendedSlider({
+  labelledBy,
+  control,
+  recommended,
+  raw,
+  disabled,
+  onChange,
+}: {
+  labelledBy: string
+  control: NumberControl
+  recommended: { min: number; max: number }
+  raw: number
+  disabled: boolean
+  onChange: (raw: number) => void
+}) {
+  const value = rawToNumber(control, raw)
+  const clamp = (v: number) => Math.min(control.max, Math.max(control.min, v))
+  const percent = (v: number) => ((clamp(v) - control.min) / (control.max - control.min)) * 100
+  const zone = recommendedZone(recommended, value)
+  const range = `${recommended.min}–${recommended.max}`
+  const segments = [
+    { from: control.min, to: recommended.min, zone: 'low' },
+    { from: recommended.min, to: recommended.max, zone: 'good' },
+    { from: recommended.max, to: control.max, zone: 'high' },
+  ] as const
+  const { text, icon: Icon } = ZONE_STYLE[zone]
+
+  return (
+    <div role="group" aria-labelledby={labelledBy} className="flex flex-col gap-2">
+      <div className="font-mono tabular-nums">
+        {value}
+        {control.unit && ` ${control.unit}`}
+      </div>
+      <Slider
+        aria-labelledby={labelledBy}
+        min={control.min}
+        max={control.max}
+        step={control.step}
+        disabled={disabled}
+        value={[clamp(value)]}
+        onValueChange={([v]) => v !== undefined && onChange(numberToRaw(control, v))}
+      />
+      <div className="relative mx-2 h-1.5" aria-hidden="true">
+        {segments
+          .filter(({ from, to }) => to > from)
+          .map(({ from, to, zone }) => (
+            <div
+              key={zone}
+              className={cn('absolute h-full rounded-full', ZONE_STYLE[zone].bar)}
+              style={{ left: `${percent(from)}%`, right: `${100 - percent(to)}%` }}
+            />
+          ))}
+      </div>
+      <p className={cn('flex items-center gap-1.5', text)}>
+        <Icon className="size-4 shrink-0" />
+        <span className="text-foreground">
+          {zone === 'good'
+            ? `Recommended (${range})`
+            : `${zone === 'low' ? 'Below' : 'Above'} the recommended ${range}`}
+        </span>
+      </p>
     </div>
   )
 }

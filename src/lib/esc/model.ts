@@ -176,6 +176,8 @@ export type EscControl =
       unit: string
       scale: number
       offset: number
+      /** Shown as a slider with this range marked as recommended (inclusive, in shown numbers). */
+      recommended?: { min: number; max: number }
     }
 
 export interface EscSettingDef {
@@ -220,6 +222,16 @@ export function numberToRaw(
   return Math.min(255, Math.max(0, Math.round((limited - control.offset) / control.scale)))
 }
 
+export type RecommendedZone = 'low' | 'good' | 'high'
+
+/** Where a shown number lies relative to the control's recommended range. */
+export function recommendedZone(
+  range: { min: number; max: number },
+  value: number,
+): RecommendedZone {
+  return value < range.min ? 'low' : value > range.max ? 'high' : 'good'
+}
+
 type Editable = Pick<EscSettingDef, 'format' | 'control'>
 
 function number(range: {
@@ -229,6 +241,7 @@ function number(range: {
   unit?: string
   scale?: number
   offset?: number
+  recommended?: { min: number; max: number }
 }): Editable {
   const control = { kind: 'number', step: 1, unit: '', scale: 1, offset: 0, ...range } as const
   return {
@@ -326,7 +339,14 @@ const BLUEJAY_SETTINGS: EscSettingDef[] = [
     label: 'Minimum startup power',
     offset: 0x04,
     hint: 'Throttle the motor starts with.',
-    ...number({ min: 1000, max: 1125, step: 5, scale: 1000 / 2047, offset: 1000 }),
+    ...number({
+      min: 1000,
+      max: 1125,
+      step: 5,
+      scale: 1000 / 2047,
+      offset: 1000,
+      recommended: { min: 1025, max: 1050 },
+    }),
   },
   {
     key: 'startupPowerMax',
@@ -334,7 +354,14 @@ const BLUEJAY_SETTINGS: EscSettingDef[] = [
     offset: 0x07,
     hint: 'Throttle limit while the motor starts.',
     // The firmware's factor is 1000 / 255; 4 keeps the numbers round (ESC Configurator does the same).
-    ...number({ min: 1004, max: 1300, step: 4, scale: 4, offset: 1000 }),
+    ...number({
+      min: 1004,
+      max: 1300,
+      step: 4,
+      scale: 4,
+      offset: 1000,
+      recommended: { min: 1050, max: 1200 },
+    }),
   },
   {
     key: 'timing',

@@ -15,6 +15,7 @@ import {
   numberToRaw,
   rawToNumber,
   readPlan,
+  recommendedZone,
   setDraftRaw,
   toEscDraft,
   unevenSettings,
@@ -506,6 +507,10 @@ describe('editing', () => {
       numberToRaw(min, 0),
     ]).toEqual([51, 255, 255, 0])
     const max = numberControl(reports, 'Bluejay', 'startupPowerMax')
+    expect([min.recommended, max.recommended]).toEqual([
+      { min: 1025, max: 1050 },
+      { min: 1050, max: 1200 },
+    ])
     expect([
       rawToNumber(max, 5),
       numberToRaw(max, 1300),
@@ -524,6 +529,17 @@ describe('editing', () => {
     const ramp = numberControl(reports, 'AM32', 'maxRamp')
     expect([rawToNumber(ramp, 160), numberToRaw(ramp, 0.1), numberToRaw(ramp, 0)]).toEqual([
       16, 1, 1,
+    ])
+  })
+
+  it('rates a number against its recommended range, ends included', () => {
+    const range = { min: 1025, max: 1050 }
+    expect([1020, 1025, 1040, 1050, 1055].map((v) => recommendedZone(range, v))).toEqual([
+      'low',
+      'good',
+      'good',
+      'good',
+      'high',
     ])
   })
 

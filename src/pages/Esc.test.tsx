@@ -10,13 +10,16 @@ import { MockFlightController } from '@/lib/mock-fc/mockFc'
 import { MspClient } from '@/lib/msp/client'
 import { MockTransport } from '@/lib/transport/mock'
 import { EscReportList } from '@/pages/Esc'
-import { openTab, resetAppAfterEach } from '@/test/app'
+import { nudge, openTab, resetAppAfterEach } from '@/test/app'
 
 resetAppAfterEach()
 
 /** Reading waits more than a second for the ESCs to reach their bootloader, also with the mock's ESCs. */
 const combinedCard = () => screen.findByRole('group', { name: 'All ESCs' }, { timeout: 5000 })
 const card = (number: number) => screen.getByRole('group', { name: `ESC ${number}` })
+/** A setting shown as a slider with its recommended range. */
+const slider = (within_: HTMLElement, label: string) =>
+  within(within(within_).getByRole('group', { name: label })).getByRole('slider')
 
 /** The row of a setting (label and value) inside a card. */
 function setting(esc: HTMLElement, label: string): HTMLElement {
@@ -72,8 +75,10 @@ describe('ESC tab', () => {
     ).toBeInTheDocument()
     // What can be changed on Bluejay: the timing and both startup powers
     expect(within(all).getByLabelText('Motor timing')).toHaveDisplayValue('22.5° (medium high)')
-    expect(within(all).getByLabelText('Minimum startup power')).toHaveValue(1025)
-    expect(within(all).getByLabelText('Maximum startup power')).toHaveValue(1020)
+    expect(slider(all, 'Minimum startup power')).toHaveAttribute('aria-valuenow', '1025')
+    expect(slider(all, 'Maximum startup power')).toHaveAttribute('aria-valuenow', '1020')
+    expect(within(all).getByText('Recommended (1025–1050)')).toBeInTheDocument()
+    expect(within(all).getByText('Below the recommended 1050–1200')).toBeInTheDocument()
     expect(within(all).queryByLabelText('PWM frequency')).toBeNull()
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
     // Set per motor on purpose: listed by ESC instead of keeping the ESCs apart.
@@ -81,7 +86,7 @@ describe('ESC tab', () => {
       'ESC 1 NormalESC 2 ReversedESC 3 ReversedESC 4 Normal',
     )
 
-    expect(screen.getAllByRole('group')).toHaveLength(1)
+    expect(screen.getAllByRole('group', { name: /ESC|settings/ })).toHaveLength(1)
     expect(screen.queryByText('differs')).toBeNull()
     expect(screen.getByRole('button', { name: 'Read again' })).toBeEnabled()
   })
@@ -96,10 +101,9 @@ describe('ESC tab', () => {
         within(await combinedCard()).getByLabelText('Motor timing'),
         '15° (medium)',
       )
-      const max = screen.getByLabelText('Maximum startup power')
-      await user.clear(max)
-      await user.type(max, '1100')
-      await user.tab()
+      // 1020 → 1100: a page is ten steps of 4
+      await nudge(user, slider(document.body, 'Maximum startup power'), '{PageUp}{PageUp}')
+      expect(screen.getByText('Recommended (1050–1200)')).toBeInTheDocument()
       expect(screen.getByTitle('Unsaved changes')).toBeInTheDocument()
 
       // Not without a yes
@@ -125,7 +129,7 @@ describe('ESC tab', () => {
       )
       const all = await combinedCard()
       expect(within(all).getByLabelText('Motor timing')).toHaveDisplayValue('15° (medium)')
-      expect(within(all).getByLabelText('Maximum startup power')).toHaveValue(1100)
+      expect(slider(all, 'Maximum startup power')).toHaveAttribute('aria-valuenow', '1100')
       // Untouched: the direction of each motor
       expect(setting(all, 'Motor direction')).toHaveTextContent(
         'ESC 1 NormalESC 2 ReversedESC 3 ReversedESC 4 Normal',
