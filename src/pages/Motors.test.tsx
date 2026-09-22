@@ -75,12 +75,12 @@ describe('Motors tab — direction and swap', () => {
     await user.click(screen.getByRole('button', { name: 'Swap with motor 3' }))
     expect(
       screen.getByText(
-        'Motor 1 drives ESC output 3 · Motor 3 drives ESC output 1 — Save & Reboot to apply.',
+        'Motor 1 drives ESC output 3 · Motor 3 drives ESC output 1 — used here already; Save & Reboot to apply it on the flight controller.',
       ),
     ).toBeInTheDocument()
     expect(screen.queryByText(/Click the motor to swap/)).toBeNull()
-    // an unsaved edit locks the motor test
-    expect(screen.getByLabelText(/I have removed all propellers/)).toBeDisabled()
+    // a pending order is used on this side already, so the motor test stays available
+    expect(screen.getByLabelText(/I have removed all propellers/)).toBeEnabled()
 
     await saveAndReboot(user)
     expect(
@@ -93,5 +93,40 @@ describe('Motors tab — direction and swap', () => {
     await user.click(screen.getByRole('button', { name: 'Swap with motor 1' }))
     expect(screen.queryByText(/drives ESC output/)).toBeNull()
     expect(screen.getByRole('button', { name: 'Save & Reboot' })).toBeEnabled()
+  })
+
+  it('keeps testing through a pending order: the swapped motor takes its slider and RPM along', async () => {
+    const user = await openTab('Motors')
+    await user.click(await screen.findByLabelText('Bidirectional DShot'))
+    await saveAndReboot(user)
+    await user.click(await screen.findByLabelText(/I have removed all propellers/))
+    const slider = (motor: number) =>
+      within(screen.getByLabelText(`Motor ${motor}`)).getByRole('slider')
+    await nudge(user, slider(1), '{ArrowUp}{ArrowUp}')
+    expect(await screen.findByText('1800 rpm')).toBeInTheDocument() // mock: 1500 + 10 × 30, FC motor 1
+
+    // swap 1 ↔ 3 while it turns: the test stays on, and what was motor 1 is now motor 3 — same FC output
+    await user.click(screen.getByRole('button', { name: 'Swap motor 1' }))
+    await user.click(screen.getByRole('button', { name: 'Swap with motor 3' }))
+    expect(screen.getByLabelText(/I have removed all propellers/)).toBeChecked()
+    expect(slider(3)).toHaveAttribute('aria-valuenow', '1010')
+    expect(slider(1)).toHaveAttribute('aria-valuenow', '1000')
+    const disc = (motor: number) => screen.getByTitle(new RegExp(`^Motor ${motor} ·`))
+    expect(within(disc(3)).getByText('1800 rpm')).toBeInTheDocument()
+    expect(within(disc(1)).getByText('0 rpm')).toBeInTheDocument()
+
+    // moving the new motor 3 drives the FC's motor 1 (output 1), which the mock reports as its RPM
+    await nudge(user, slider(3), '{ArrowUp}')
+    expect(await within(disc(3)).findByText('1950 rpm')).toBeInTheDocument()
+
+    // saved: the FC uses the order itself, nothing is translated any more
+    await user.click(screen.getByLabelText(/I have removed all propellers/))
+    await saveAndReboot(user)
+    expect(
+      await screen.findByText('Motor 1 drives ESC output 3 · Motor 3 drives ESC output 1'),
+    ).toBeInTheDocument()
+    await user.click(screen.getByLabelText(/I have removed all propellers/))
+    await nudge(user, slider(3), '{ArrowUp}')
+    expect(await within(disc(3)).findByText('1650 rpm')).toBeInTheDocument()
   })
 })

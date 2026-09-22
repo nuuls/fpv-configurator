@@ -117,6 +117,36 @@ export function swapMotorOutputs(order: number[], a: number, b: number): number[
   return next
 }
 
+/** Everything but the output order differs — the edits that lock the motor test until saved. */
+export function motorSettingsChanged(draft: MotorsDraft, snapshot: MotorsSnapshot): boolean {
+  const { outputOrder: _draftOrder, ...settings } = draft
+  const { outputOrder: _fcOrder, ...current } = readMotors(snapshot)
+  return JSON.stringify(settings) !== JSON.stringify(current)
+}
+
+/**
+ * The pending order is applied on this side until it is saved: for each motor as the drawing shows it (the
+ * draft's order), the FC's motor index that currently drives the same ESC output — where its slider values
+ * go, where its RPM and its direction command come from. Identity once the draft matches the FC.
+ */
+export function fcMotorIndexes(fcOrder: number[], draftOrder: number[], count: number): number[] {
+  return Array.from({ length: count }, (_, i) => {
+    const output = draftOrder[i] ?? i
+    const index = fcOrder.slice(0, count).indexOf(output)
+    return index >= 0 ? index : i
+  })
+}
+
+/** Slider values by shown motor → the MSP_SET_MOTOR slots the FC expects (all 8; unused ones stopped). */
+export function toFcOutputs(values: number[], indexes: number[]): number[] {
+  const outputs = new Array<number>(MAX_MOTORS).fill(MOTOR_STOP)
+  values.forEach((value, i) => {
+    const index = indexes[i]
+    if (index !== undefined && index < MAX_MOTORS) outputs[index] = value
+  })
+  return outputs
+}
+
 /** The motors (1-based) that don't drive the output of the same number, for the hint under the drawing. */
 export function remappedMotors(
   order: number[],

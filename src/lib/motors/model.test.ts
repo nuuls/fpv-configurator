@@ -6,6 +6,9 @@ import { readMotorsSnapshot, saveMotors, setMotorDirection } from '@/lib/motors/
 import {
   decodeDshotCommand,
   decodeMotorOutputReordering,
+  fcMotorIndexes,
+  motorSettingsChanged,
+  toFcOutputs,
   DSHOT_CMD,
   DSHOT_CMD_TYPE,
   encodeDshotCommand,
@@ -51,6 +54,46 @@ describe('motor output reordering', () => {
     expect(swapMotorOutputs(IDENTITY, 2, 2)).toEqual(IDENTITY)
     expect(swapMotorOutputs(IDENTITY, 2, 9)).toEqual(IDENTITY) // no such motor
     expect(remappedMotors(IDENTITY, 4)).toEqual([])
+  })
+
+  it('routes shown motors to the FC motor that drives their output until the order is saved', () => {
+    const fcIdentity = IDENTITY
+    expect(fcMotorIndexes(fcIdentity, IDENTITY, 4)).toEqual([0, 1, 2, 3])
+    expect(fcMotorIndexes(fcIdentity, [2, 1, 0, 3, 4, 5, 6, 7], 4)).toEqual([2, 1, 0, 3])
+    // saved already: identity again
+    expect(fcMotorIndexes([2, 1, 0, 3, 4, 5, 6, 7], [2, 1, 0, 3, 4, 5, 6, 7], 4)).toEqual([
+      0, 1, 2, 3,
+    ])
+    // a pending change on top of a saved one
+    expect(fcMotorIndexes([1, 0, 2, 3, 4, 5, 6, 7], [2, 1, 0, 3, 4, 5, 6, 7], 4)).toEqual([
+      2, 0, 1, 3,
+    ])
+    expect(fcMotorIndexes([], [], 2)).toEqual([0, 1]) // nothing known: as is
+
+    expect(toFcOutputs([1010, 1000, 1000, 1000], [2, 1, 0, 3])).toEqual([
+      1000, 1000, 1010, 1000, 1000, 1000, 1000, 1000,
+    ])
+  })
+
+  it('tells settings edits (which lock the test) from a pending order (which does not)', () => {
+    const snapshot = {
+      advancedConfig: [1, 1, 0, 6, 0xe0, 0x01, 0x26, 0x02],
+      motorCount: 4,
+      maxThrottle: 2000,
+      minCommand: 1000,
+      poles: 14,
+      bidirDshot: false,
+      mixerMode: 3,
+      propsOut: false,
+      dynIdle: 0,
+      outputOrder: IDENTITY,
+    }
+    const draft = readMotors(snapshot)
+    expect(motorSettingsChanged(draft, snapshot)).toBe(false)
+    expect(
+      motorSettingsChanged({ ...draft, outputOrder: swapMotorOutputs(IDENTITY, 1, 2) }, snapshot),
+    ).toBe(false)
+    expect(motorSettingsChanged({ ...draft, poles: 12 }, snapshot)).toBe(true)
   })
 
   it('rejects two motors on the same output', () => {

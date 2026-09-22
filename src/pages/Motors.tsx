@@ -34,11 +34,14 @@ import {
   MOTOR_PROTOCOL_NAMES,
   MOTOR_STOP,
   MOTOR_TEST_MAX,
+  fcMotorIndexes,
+  motorSettingsChanged,
   readMotors,
   remappedMotors,
   SELECTABLE_PROTOCOLS,
   spinsClockwise,
   swapMotorOutputs,
+  toFcOutputs,
   validateMotors,
   type DroneType,
   type IdleZone,
@@ -210,7 +213,7 @@ function Editor({
         <MotorTest
           client={client}
           snapshot={snapshot}
-          blocked={dirty || saving}
+          blocked={motorSettingsChanged(draft, snapshot) || saving}
           dshot={isDshot(current)}
           outputOrder={draft.outputOrder}
           swapDisabled={saving}
@@ -287,7 +290,9 @@ function MotorTest({
   const [note, setNote] = useState<string | null>(null)
   // Swapping: the motor whose icon was clicked, waiting for the other one.
   const [pickFrom, setPickFrom] = useState<number | null>(null)
-  // Unsaved edits lock the test. Switch it off for good, so it never re-arms itself when unlocked.
+  // Where each shown motor lives on the FC while the pending order isn't saved yet.
+  const indexes = fcMotorIndexes(snapshot.outputOrder, outputOrder, count)
+  // Unsaved settings lock the test. Switch it off for good, so it never re-arms itself when unlocked.
   if (enabled && blocked) {
     setEnabled(false)
     setValues(new Array<number>(count).fill(MOTOR_STOP))
@@ -307,7 +312,7 @@ function MotorTest({
         while (pending.current) {
           const batch = pending.current
           pending.current = null
-          await setMotorOutputs(client, batch)
+          await setMotorOutputs(client, toFcOutputs(batch, indexes))
         }
       } catch {
         setError('Lost contact with the flight controller while testing — unplug the battery.')
@@ -372,14 +377,14 @@ function MotorTest({
       await setMotorOutputs(client, stopped)
       await sleep(DIRECTION_CHECK.stopMs)
       if (!alive()) return
-      await setMotorDirection(client, motor, toReversed)
+      await setMotorDirection(client, (indexes[motor - 1] ?? motor - 1) + 1, toReversed)
       setReversed(reversed.map((r, i) => (i === motor - 1 ? toReversed : r)))
       setNote(
         `Motor ${motor} set to ${toReversed ? 'reversed' : 'normal'}. Still the wrong way? Click again.`,
       )
       await sleep(DIRECTION_CHECK.settleMs)
       if (!alive()) return
-      await setMotorOutputs(client, values)
+      await setMotorOutputs(client, toFcOutputs(values, indexes))
     } catch {
       if (!alive()) return
       setError('Lost contact with the flight controller while testing — unplug the battery.')
@@ -394,6 +399,20 @@ function MotorTest({
       setPickFrom(pickFrom === motor ? null : motor)
       return
     }
+    // The two motors trade labels, not outputs: their slider values and what was sent to their ESCs go
+    // along, so nothing changes physically until the sliders move again.
+    const trade = <T,>(list: T[]) => {
+      const next = [...list]
+      const a = next[pickFrom - 1]
+      const b = next[motor - 1]
+      if (a !== undefined && b !== undefined) {
+        next[pickFrom - 1] = b
+        next[motor - 1] = a
+      }
+      return next
+    }
+    setValues(trade(values))
+    setReversed(trade(reversed))
     onSwap(pickFrom, motor)
     setPickFrom(null)
   }
@@ -462,7 +481,8 @@ function MotorTest({
       }
     />
   )
-  const rpmText = (motor: number) => (hasRpm ? `${telemetry?.[motor - 1]?.rpm ?? 0} rpm` : '— rpm')
+  const rpm = (motor: number) => telemetry?.[indexes[motor - 1] ?? motor - 1]?.rpm ?? 0
+  const rpmText = (motor: number) => (hasRpm ? `${rpm(motor)} rpm` : '— rpm')
 
   return (
     <Card className={active ? 'border-destructive' : undefined}>
@@ -546,7 +566,7 @@ function MotorTest({
                   {target(motor, 'absolute inset-[4%] rounded-full')}
                   {motorSlider(motor, true)}
                   <div className="relative font-mono text-xs tabular-nums">
-                    {hasRpm ? `${telemetry?.[motor - 1]?.rpm ?? 0} rpm` : output}
+                    {hasRpm ? `${rpm(motor)} rpm` : output}
                   </div>
                 </div>
               )
@@ -585,7 +605,8 @@ function MotorTest({
             {remapped
               .map(({ motor, output }) => `Motor ${motor} drives ESC output ${output}`)
               .join(' · ')}
-            {remapUnsaved && ' — Save & Reboot to apply.'}
+            {remapUnsaved &&
+              ' — used here already; Save & Reboot to apply it on the flight controller.'}
           </p>
         )}
         {note && <p className="text-muted-foreground">{note}</p>}

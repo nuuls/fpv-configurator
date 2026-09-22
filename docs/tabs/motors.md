@@ -42,8 +42,12 @@ Only 5" exists so far and every quad is treated as one until drone types (SPEC �
 - Motor direction is the one write that skips the save bar: it goes to the ESC, which keeps it itself. It needs
   the motor test switch (the ESC beeps and the motor twitches) — the same "props off" confirmation as spinning.
 - Motor test safety: locked until the switch is on; arming from the radio is blocked meanwhile; output is
-  capped at 1300; motors stop and the switch resets when it is turned off, on unsaved edits, on leaving the
-  tab, on closing the page, and on lost contact (with a "unplug the battery" message). A reboot always stops.
+  capped at 1300; motors stop and the switch resets when it is turned off, on unsaved setting edits, on leaving
+  the tab, on closing the page, and on lost contact (with a "unplug the battery" message). A reboot always stops.
+- A pending motor order is applied on this side until it is saved (`fcMotorIndexes` in `src/lib/motors/model.ts`):
+  each shown motor's slider, RPM and direction command go to the FC motor that drives its ESC output, so the whole
+  quad can be sorted out with the test running. A swap trades the two motors' slider values and direction flags
+  along with their outputs — nothing changes physically at that moment. Save & Reboot then hands the order to the FC.
 
 ## Hidden on purpose
 
@@ -65,9 +69,11 @@ Mock FC:
 - [x] Flip icon locked until motor control is on; a click stops the motors, sends 8 + 12 to that ESC (blocking),
       the mock ESC's stored direction flips (visible on the ESC tab), and the sliders' values are sent again; the
       next click sends 7 + 12; nothing is sent on a non-DShot protocol
-- [x] Swap icon on motor 1, then motor 3 → hint "Motor 1 drives ESC output 3 · Motor 3 drives ESC output 1 — Save &
-      Reboot to apply", test locked; Esc / the icon cancel pick mode; Save & Reboot persists `[2, 1, 0, 3, …]` and
-      the hint stays; swapping back clears it
+- [x] Swap icon on motor 1, then motor 3 → hint "Motor 1 drives ESC output 3 · Motor 3 drives ESC output 1 — used
+      here already; Save & Reboot to apply it on the flight controller", test stays available; Esc / the icon
+      cancel pick mode; Save & Reboot persists `[2, 1, 0, 3, …]` and the hint stays; swapping back clears it
+- [x] Swap 1 ↔ 3 while motor 1 turns: the test stays on, slider 3 now holds the value and shows the RPM, moving
+      it drives the FC's motor 1; after Save & Reboot slider 3 drives the FC's motor 3
 
 On real hardware — **props off**:
 
@@ -79,8 +85,8 @@ On real hardware — **props off**:
 - [ ] Settings match Betaflight Configurator after saving
 - [ ] A flip while the motor turns: it pauses for about a second and comes back the other way, also after a power
       cycle
-- [ ] After swapping two motors and rebooting, each slider spins the motor at its position; `get
-motor_output_reordering` matches
+- [ ] Swapping while a motor turns changes nothing physically; afterwards the sliders spin the motors as the
+      new order says, before and after Save & Reboot; `get motor_output_reordering` matches
 
 ## Decisions
 
@@ -98,4 +104,5 @@ motor_output_reordering` matches
   pause after stopping. No check spin of its own (user request): the motor is spun by hand and felt, the flip
   is clicked while it turns, and the motor comes back the other way.
 - Swap instead of Betaflight's full remap wizard: on a wrongly wired quad the fix is one or two swaps, and a
-  swap can't produce an invalid order.
+  swap can't produce an invalid order. The order is virtual until saved (user request): the whole quad is sorted
+  out with the motors running, then saved once.
