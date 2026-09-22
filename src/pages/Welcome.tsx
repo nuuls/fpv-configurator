@@ -17,7 +17,7 @@ export function WelcomePage() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 pt-12">
       <h1 className="pb-4 text-3xl font-bold tracking-tight text-balance">
-        A stripped-down Betaflight configurator that runs in the browser
+        A simplified Betaflight configurator with none of the nerd shit
       </h1>
       <Card>
         <CardHeader>
