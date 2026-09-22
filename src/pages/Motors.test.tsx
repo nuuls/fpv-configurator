@@ -114,6 +114,11 @@ describe('Motors tab — direction and swap', () => {
     const disc = (motor: number) => screen.getByTitle(new RegExp(`^Motor ${motor} ·`))
     expect(within(disc(3)).getByText('1800 rpm')).toBeInTheDocument()
     expect(within(disc(1)).getByText('0 rpm')).toBeInTheDocument()
+    // nothing was re-sent to the FC by the swap: a few telemetry polls later it's still the same motor turning
+    await new Promise((resolve) => setTimeout(resolve, 350))
+    expect(within(disc(3)).getByText('1800 rpm')).toBeInTheDocument()
+    expect(within(disc(1)).getByText('0 rpm')).toBeInTheDocument()
+    expect(screen.getAllByText('0 rpm')).toHaveLength(3)
 
     // moving the new motor 3 drives the FC's motor 1 (output 1), which the mock reports as its RPM
     await nudge(user, slider(3), '{ArrowUp}')

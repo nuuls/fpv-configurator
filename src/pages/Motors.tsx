@@ -301,10 +301,11 @@ function MotorTest({
   const active = enabled && !blocked
 
   // Sends the latest values; while a write is in flight newer values just replace the pending ones.
+  // Translated to FC slots right here, so a swap during an in-flight write can't route them with a stale order.
   const pending = useRef<number[] | null>(null)
   const sending = useRef(false)
   const send = (next: number[]) => {
-    pending.current = next
+    pending.current = toFcOutputs(next, indexes)
     if (sending.current) return
     sending.current = true
     void (async () => {
@@ -312,7 +313,7 @@ function MotorTest({
         while (pending.current) {
           const batch = pending.current
           pending.current = null
-          await setMotorOutputs(client, toFcOutputs(batch, indexes))
+          await setMotorOutputs(client, batch)
         }
       } catch {
         setError('Lost contact with the flight controller while testing — unplug the battery.')
