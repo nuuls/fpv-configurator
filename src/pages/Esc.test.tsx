@@ -73,6 +73,9 @@ describe('ESC tab', () => {
     expect(setting(all, 'PWM frequency')).toHaveTextContent(
       /^PWM frequency48 kHzFlight performance is greatly reduced with anything but 24 kHz/,
     )
+    expect(
+      within(setting(all, 'PWM frequency')).getByRole('link', { name: 'ESC Configurator' }),
+    ).toHaveAttribute('href', 'https://esc-configurator.com')
     // What can be changed on Bluejay: the timing and both startup powers
     expect(within(all).getByLabelText('Motor timing')).toHaveDisplayValue('22.5° (medium high)')
     expect(slider(all, 'Minimum startup power')).toHaveAttribute('aria-valuenow', '1025')
@@ -258,6 +261,11 @@ describe('ESCs that are not alike', () => {
       ),
       expect.stringMatching(/AM32 2.18 is not supported: this app only works with AM32 2.21/),
     ])
+    expect(
+      within(screen.getAllByRole('alert')[0] ?? document.body).getByRole('link', {
+        name: 'ESC Configurator',
+      }),
+    ).toHaveAttribute('href', 'https://esc-configurator.com')
     expect(within(card(1)).getByText('Bluejay 0.19')).toBeInTheDocument()
     expect(within(card(1)).getByText('Version not supported')).toBeInTheDocument()
     expect(within(card(3)).getByText('AM32 2.18')).toBeInTheDocument()

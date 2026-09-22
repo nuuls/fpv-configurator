@@ -190,7 +190,7 @@ export function EscReportList({
       )}
       {[...unsupported].map((description) => (
         <Notice key={description} tone="error">
-          {description}
+          <WithLinks text={description} />
         </Notice>
       ))}
       {overview.reason && <Notice tone="warning">{overview.reason}</Notice>}
@@ -351,13 +351,37 @@ function EscCard({
   )
 }
 
+const ESC_CONFIGURATOR = 'ESC Configurator'
+const ESC_CONFIGURATOR_URL = 'https://esc-configurator.com'
+
+/** Text from `lib/esc` with every "ESC Configurator" a link to it. */
+function WithLinks({ text }: { text: string }) {
+  return text.split(ESC_CONFIGURATOR).map((part, index) => (
+    <Fragment key={index}>
+      {index > 0 && (
+        <a
+          href={ESC_CONFIGURATOR_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="font-medium underline underline-offset-2"
+        >
+          {ESC_CONFIGURATOR}
+        </a>
+      )}
+      {part}
+    </Fragment>
+  ))
+}
+
 /** A setting's warning, below its label and value in a `<dl>` row that wraps. */
 function SettingWarning({ warning }: { warning: string | null }) {
   if (!warning) return null
   return (
     <dd className="border-primary/40 bg-primary/10 mt-1 flex basis-full gap-2 rounded-md border p-2 font-normal">
       <TriangleAlert className="text-warning mt-0.5 size-4 shrink-0" />
-      {warning}
+      <span>
+        <WithLinks text={warning} />
+      </span>
     </dd>
   )
 }

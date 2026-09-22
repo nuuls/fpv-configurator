@@ -849,7 +849,7 @@ export function describeEsc(raw: EscRawRead): EscReport {
         version,
         hardware,
         description: older
-          ? `Bluejay ${version} is too old: this app only works with Bluejay ${SUPPORTED_VERSION.Bluejay}. Update the ESCs with ESC Configurator (esc-configurator.com), then read them again.`
+          ? `Bluejay ${version} is too old: this app only works with Bluejay ${SUPPORTED_VERSION.Bluejay}. Update the ESCs with ESC Configurator, then read them again.`
           : `Bluejay ${version} is newer than this app knows: it only works with Bluejay ${SUPPORTED_VERSION.Bluejay}.`,
       }
     }
