@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
-import { CircleAlert, Cpu, ListChecks, SlidersHorizontal } from 'lucide-react'
+import { CircleAlert, Cpu, ListChecks, MonitorPlay, Plug, SlidersHorizontal } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { WebSerialTransport } from '@/lib/transport/webserial'
 import { useConnectionStore } from '@/stores/connection'
@@ -9,29 +10,48 @@ import { useConnectionStore } from '@/stores/connection'
 export function WelcomePage() {
   const error = useConnectionStore((s) => s.error)
   const notice = useConnectionStore((s) => s.notice)
+  const status = useConnectionStore((s) => s.status)
+  const connect = useConnectionStore((s) => s.connect)
   const serialSupported = WebSerialTransport.isSupported()
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 pt-12">
-      <p className="text-muted-foreground text-sm">
-        A stripped-down Betaflight configurator that runs in the browser.
-      </p>
+      <h1 className="pb-4 text-3xl font-bold tracking-tight text-balance">
+        A stripped-down Betaflight configurator that runs in the browser
+      </h1>
       <Card>
         <CardHeader>
           <CardTitle>No flight controller connected</CardTitle>
           <CardDescription>
-            Plug in your flight controller over USB and press <strong>Connect</strong>, or use{' '}
-            <strong>Connect Mock FC</strong> to explore the app with a simulated Betaflight board.
+            Plug in your flight controller over USB and connect it, or try the app in demo mode with
+            a simulated Betaflight board.
           </CardDescription>
         </CardHeader>
-        {!serialSupported && (
-          <CardContent>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              disabled={status !== 'disconnected' || !serialSupported}
+              onClick={() => void connect('serial')}
+            >
+              <Plug />
+              Connect FC
+            </Button>
+            <Button
+              variant="outline"
+              disabled={status !== 'disconnected'}
+              onClick={() => void connect('mock')}
+            >
+              <MonitorPlay />
+              Demo mode
+            </Button>
+          </div>
+          {!serialSupported && (
             <Notice>
               This browser doesn&apos;t support Web Serial. Use a Chromium-based browser (Chrome,
-              Edge, Brave) to connect to real hardware. The mock FC works everywhere.
+              Edge, Brave) to connect to real hardware. Demo mode works everywhere.
             </Notice>
-          </CardContent>
-        )}
+          )}
+        </CardContent>
       </Card>
 
       {notice && <Notice>{notice}</Notice>}
@@ -61,17 +81,17 @@ const FEATURES: { icon: LucideIcon; title: string; text: string }[] = [
   {
     icon: SlidersHorizontal,
     title: 'Simplified setup',
-    text: 'Only the settings most pilots change. PID tuning is three sliders, there are four modes and one OSD profile, and ports are assigned by device instead of by UART.',
+    text: 'Only the settings most pilots actually change. PID tuning, for example, is three sliders.',
   },
   {
     icon: ListChecks,
     title: 'Finds config issues',
-    text: 'The Setup tab checks bidirectional DShot, accelerometer calibration, arm angle, RX-loss beepers and airmode, with a Fix button where it can. Settings changed elsewhere are listed with a reset to default.',
+    text: 'Checks the settings a quad should not fly without, like bidirectional DShot and a calibrated accelerometer, and offers a fix.',
   },
   {
     icon: Cpu,
     title: 'ESC configuration',
-    text: 'Read and change Bluejay 0.21 and AM32 2.21 ESC settings through the flight controller, without a separate ESC configurator.',
+    text: 'Change Bluejay and AM32 ESC settings through the flight controller, without a separate app.',
   },
 ]
 

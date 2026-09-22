@@ -197,9 +197,10 @@ and closed with a menu button in the header; it also closes on picking a tab, ta
 The header shows the app name and "Source" as icons only, hides the firmware version, and puts the alpha warning
 on its own row.
 
-The welcome screen (no FC connected): a one-line description of the app, the connect card, then three cards with
-the core features (simplified setup, config issue checks, ESC configuration). `index.html` carries the same text as
-meta tags and as static text for search engines, replaced once the app loads.
+The welcome screen (no FC connected): the description of the app as its headline, the connect card with **Connect FC**
+and **Demo mode** (= mock FC), then three cards with the core features (simplified setup, config issue checks, ESC
+configuration). `index.html` carries the same text as meta tags and as static text for search engines, replaced once
+the app loads.
 
 A tab still marked TBD in §2 shows a "not specified yet" placeholder (`src/pages/PlaceholderPage.tsx`); currently none.
 _Assumed — change freely; the drone-type setup step has no place in the layout yet._

@@ -14,6 +14,14 @@ describe('App', () => {
     expect(screen.getByText('No flight controller connected')).toBeInTheDocument()
     // jsdom has no Web Serial, so real-hardware connect must be disabled.
     expect(screen.getByRole('button', { name: 'Connect' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Connect FC' })).toBeDisabled()
+  })
+
+  it('starts demo mode (the mock FC) from the welcome screen', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'Demo mode' }))
+    expect(await screen.findByRole('heading', { name: 'Setup' })).toBeInTheDocument()
   })
 
   it('connects to the mock FC, shows its identity and live telemetry, then disconnects', async () => {
