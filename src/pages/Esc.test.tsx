@@ -69,10 +69,10 @@ describe('ESC tab', () => {
     expect(within(all).getByText(/All 4 ESCs/)).toBeInTheDocument()
     expect(within(all).getByText('Bluejay 0.21.0')).toBeInTheDocument()
     expect(within(all).getByText('Z-H-30 · EFM8BB21')).toBeInTheDocument()
-    expect(setting(all, 'PWM frequency')).toHaveTextContent(/^PWM frequency48 kHz$/)
-    expect(
-      within(all).getByText(/48 kHz build. Flight performance is greatly reduced/),
-    ).toBeInTheDocument()
+    // The 48 kHz build: the warning sits in the PWM frequency row
+    expect(setting(all, 'PWM frequency')).toHaveTextContent(
+      /^PWM frequency48 kHzFlight performance is greatly reduced with anything but 24 kHz/,
+    )
     // What can be changed on Bluejay: the timing and both startup powers
     expect(within(all).getByLabelText('Motor timing')).toHaveDisplayValue('22.5° (medium high)')
     expect(slider(all, 'Minimum startup power')).toHaveAttribute('aria-valuenow', '1025')

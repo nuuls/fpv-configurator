@@ -49,6 +49,16 @@ function settingsOf(report: EscReport): Record<string, string> {
   return Object.fromEntries(report.settings.map((setting) => [setting.label, setting.value]))
 }
 
+/** Settings that come with a warning: label → warning. */
+function warningsOf(report: EscReport): Record<string, string> {
+  if (report.status !== 'ok') throw new Error(`expected a readable ESC, got ${report.status}`)
+  return Object.fromEntries(
+    report.settings.flatMap((setting) =>
+      setting.warning ? [[setting.label, setting.warning]] : [],
+    ),
+  )
+}
+
 describe('decodeDeviceInfo / readPlan', () => {
   it('reads signature (lo, hi), boot byte and interface mode', () => {
     expect(decodeDeviceInfo(Uint8Array.of(0xb2, 0xe8, 0x63, 1))).toEqual({
@@ -168,14 +178,12 @@ describe('describeEsc', () => {
     })
   })
 
-  it('warns about a Bluejay that is not the 24 kHz build', () => {
-    expect(describeEsc(rawRead(mockBluejayEsc()))).toMatchObject({
-      warnings: [expect.stringMatching(/48 kHz build.*greatly reduced/)],
-    })
-    expect(describeEsc(rawRead(mockBluejayEsc({ pwmKhz: 96 })))).toMatchObject({
-      warnings: [expect.stringContaining('96 kHz')],
-    })
-    expect(describeEsc(rawRead(mockBluejayEsc({ pwmKhz: 24 })))).toMatchObject({ warnings: [] })
+  it('warns at the PWM frequency of a Bluejay that is not the 24 kHz build', () => {
+    for (const pwmKhz of [48, 96] as const)
+      expect(warningsOf(describeEsc(rawRead(mockBluejayEsc({ pwmKhz }))))).toEqual({
+        'PWM frequency': expect.stringMatching(/greatly reduced with anything but 24 kHz/),
+      })
+    expect(warningsOf(describeEsc(rawRead(mockBluejayEsc({ pwmKhz: 24 }))))).toEqual({})
   })
 
   it('decodes BLHeli_S 16.7 (layout 33)', () => {
@@ -186,8 +194,8 @@ describe('describeEsc', () => {
       version: '16.7',
       hardware: 'A-H-30 · EFM8BB10',
       editable: false,
-      warnings: [],
     })
+    expect(warningsOf(report)).toEqual({})
     expect(settingsOf(report)).toEqual({
       'Motor direction': 'Normal',
       'Startup power': '0.50',
@@ -326,7 +334,6 @@ describe('describeEsc', () => {
       settings: [],
       note: expect.stringContaining('215'),
       editable: false,
-      warnings: [],
     })
   })
 
@@ -377,11 +384,13 @@ describe('combineReports', () => {
       version: '0.21.0',
       hardware: 'Z-H-30 · EFM8BB21',
     })
-    expect(overview).toMatchObject({ warnings: [expect.stringContaining('48 kHz')] })
     if (overview.view !== 'combined') return
     const values = Object.fromEntries(
       overview.settings.map((setting) => [setting.label, setting.values]),
     )
+    expect(
+      overview.settings.find((setting) => setting.label === 'PWM frequency')?.warning,
+    ).toContain('24 kHz build')
     expect(values['Motor direction']).toEqual(['Normal', 'Reversed', 'Reversed', 'Normal'])
     expect(values['PWM frequency']).toEqual(['48 kHz'])
     expect(overview.settings.map((setting) => setting.key)).toEqual(
@@ -589,7 +598,7 @@ describe('editing', () => {
       firmware: 'Bluejay',
       version: '0.21.0',
       editable: true,
-      warnings: esc.warnings,
     })
+    expect(warningsOf(after)).toEqual(warningsOf(esc))
   })
 })

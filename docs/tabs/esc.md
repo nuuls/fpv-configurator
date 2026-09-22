@@ -20,7 +20,6 @@ the AM32 configurator. BLHeli_S is only shown. Firmware is never flashed (SPEC "
 | All 4 ESCs — same firmware, same settings |
 | Bluejay 0.21.0                            |
 | Z-H-30 · EFM8BB21                         |
-| [! This Bluejay is the 48 kHz build …   ] |
 | Minimum startup power                     |   <- what can be changed
 | 1025                                      |
 | [-----o----------------------]            |      slider
@@ -34,6 +33,7 @@ the AM32 configurator. BLHeli_S is only shown. Firmware is never flashed (SPEC "
 | Motor direction             ESC 1 Normal  |
 |                             ESC 2 Reversed|
 | PWM frequency                      48 kHz |
+| [! Flight performance is greatly reduced …]|   <- warning in the row
 | …                                         |
 +-------------------------------------------+
                                             [Revert] [Save]
@@ -74,7 +74,7 @@ that can be changed:
 | Bluejay: minimum startup power | slider with recommended range                                   | byte 0x04; shown as 1000 + raw × 1000 / 2047                                                                                                                                                                                                 | 1000–1125, step 5 · 1010                        | Same for all Bluejay ESCs. 1025–1050 painted green under the track (the rest amber) with a line "Recommended (…)" / "Below / Above the recommended …", like dynamic idle on Motors                                                                 |
 | Bluejay: maximum startup power | slider with recommended range                                   | byte 0x07; shown as 1000 + raw × 4                                                                                                                                                                                                           | 1004–1300, step 4 · 1020                        | Same for all Bluejay ESCs. Recommended range 1050–1200, shown like the minimum                                                                                                                                                                     |
 | Bluejay: motor timing          | dropdown                                                        | byte 0x15                                                                                                                                                                                                                                    | 0° / 7.5° / 15° / 22.5° / 30° (raw 1–5) · 22.5° | Same for all Bluejay ESCs                                                                                                                                                                                                                          |
-| Bluejay: PWM frequency         | readout + warning                                               | byte 0x0A (`24 SHL PWM_FREQ`: what the firmware was built for)                                                                                                                                                                               | 24 / 48 / 96 kHz                                | Read-only, changing it means flashing. Anything but 24 kHz: warning that flight performance is greatly reduced, flash the 24 kHz build                                                                                                             |
+| Bluejay: PWM frequency         | readout + warning                                               | byte 0x0A (`24 SHL PWM_FREQ`: what the firmware was built for)                                                                                                                                                                               | 24 / 48 / 96 kHz                                | Read-only, changing it means flashing. Anything but 24 kHz: warning in the row (every card that shows it) that flight performance is greatly reduced, flash the 24 kHz build                                                                       |
 | AM32: all settings             | switch / dropdown / number, grouped as in the AM32 configurator | offsets of `Inc/eeprom.h`, see "AM32 settings" below                                                                                                                                                                                         | see below                                       | Same for all AM32 ESCs, except the motor direction: one dropdown per ESC                                                                                                                                                                           |
 | "Use them for all"             | button in a notice                                              | —                                                                                                                                                                                                                                            | —                                               | Only when ESCs of one firmware differ in a setting that can be changed: the editor shows ESC 1's values; the button puts them into the draft of the others                                                                                         |
 | Revert / Save                  | SaveBar (SPEC §5)                                               | 4-way `cmd_DevicePageErase` (SiLabs only), `cmd_DeviceWrite`, `cmd_DeviceRead`                                                                                                                                                               | —                                               | Save asks first ("Write the settings to the ESCs?", names the ESCs). No reboot of the FC, nothing is written to the FC                                                                                                                             |
@@ -144,7 +144,8 @@ AM32 settings (2.21, `eeprom_version` 4; offset · range as shown · what disabl
   which one; pressing Save again finishes the rest. Afterwards the page shows what was read back — no second read.
 - Only the settings block is ever erased or written; ESCs that were not changed, BLHeli_S, unsupported versions and
   AM32 on 128 k flash are never written to. Nothing on this tab changes the FC or needs a reboot.
-- Bluejay built for anything but 24 kHz PWM: a warning on the card(s) — it can only be fixed by flashing.
+- Bluejay built for anything but 24 kHz PWM: a warning in the PWM frequency row of the card(s) — it can only be fixed
+  by flashing.
 
 ## Hidden on purpose
 

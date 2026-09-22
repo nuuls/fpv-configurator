@@ -127,6 +127,8 @@ export interface EscSetting {
   value: string
   /** Meant to be different from motor to motor, so never flagged as "differs". */
   perMotor: boolean
+  /** Something about this value the pilot should fix, e.g. a PWM frequency that flies badly. */
+  warning: string | null
 }
 
 /** The only versions this app reads settings of and writes to (SPEC §2 "ESC"). BLHeli_S is shown, never changed. */
@@ -143,8 +145,6 @@ export type EscReport =
       settings: EscSetting[]
       /** Set when the settings can't be listed (layout newer or older than the ones we know). */
       note: string | null
-      /** Things about this ESC the pilot should fix, e.g. a PWM frequency that flies badly. */
-      warnings: string[]
       /** The settings block as read, and where it came from: what a change is patched into and written back to. */
       block: Uint8Array
       plan: EscReadPlan
@@ -197,6 +197,8 @@ export interface EscSettingDef {
   hint?: string
   /** false greys the control out: another setting (looked up by key, raw value) makes it meaningless. */
   enabled?: (raw: (key: string) => number) => boolean
+  /** Shown with the value when the pilot should change it. */
+  warning?: (raw: number) => string | null
 }
 
 const onOff: Format = (raw) => (raw ? 'On' : 'Off')
@@ -322,7 +324,6 @@ const BLHELI_S_SETTINGS: EscSettingDef[] = [
 
 /** PWM frequency Bluejay should be built for; SPEC §2: anything else flies a lot worse. */
 export const BLUEJAY_GOOD_PWM_KHZ = 24
-const BLUEJAY_PWM_OFFSET = 0x0a
 
 /** Bluejay 0.21, settings layout 208 (`Bluejay.asm`). Ranges and steps of the editable ones as in ESC Configurator. */
 const BLUEJAY_SETTINGS: EscSettingDef[] = [
@@ -330,9 +331,14 @@ const BLUEJAY_SETTINGS: EscSettingDef[] = [
   {
     key: 'pwmFrequency',
     label: 'PWM frequency',
-    offset: BLUEJAY_PWM_OFFSET,
+    offset: 0x0a,
     // Not a setting: the byte tells what the firmware was built for (`24 SHL PWM_FREQ`). Changing it means flashing.
     format: (raw) => (raw === 24 || raw === 48 || raw === 96 ? `${raw} kHz` : null),
+    warning: (raw) =>
+      raw === BLUEJAY_GOOD_PWM_KHZ
+        ? null
+        : `Flight performance is greatly reduced with anything but ${BLUEJAY_GOOD_PWM_KHZ} kHz — ` +
+          `flash the ${BLUEJAY_GOOD_PWM_KHZ} kHz build of Bluejay ${SUPPORTED_VERSION.Bluejay} with ESC Configurator.`,
   },
   {
     key: 'startupPowerMin',
@@ -715,18 +721,15 @@ function listSettings(
     if (raw === undefined) continue // shorter block than expected
     const value = def.format(raw)
     if (value !== null)
-      settings.push({ key: def.key, label: def.label, value, perMotor: def.perMotor ?? false })
+      settings.push({
+        key: def.key,
+        label: def.label,
+        value,
+        perMotor: def.perMotor ?? false,
+        warning: def.warning?.(raw) ?? null,
+      })
   }
   return settings
-}
-
-function warningsFor(firmware: EscFirmware, bytes: Uint8Array): string[] {
-  const pwm = bytes[BLUEJAY_PWM_OFFSET]
-  if (firmware !== 'Bluejay' || pwm === undefined || pwm === BLUEJAY_GOOD_PWM_KHZ) return []
-  return [
-    `This Bluejay is the ${pwm} kHz build. Flight performance is greatly reduced with anything but ${BLUEJAY_GOOD_PWM_KHZ} kHz — ` +
-      `flash the ${BLUEJAY_GOOD_PWM_KHZ} kHz build of Bluejay ${SUPPORTED_VERSION.Bluejay} with ESC Configurator.`,
-  ]
 }
 
 function report(
@@ -749,7 +752,6 @@ function report(
     note: known
       ? null
       : `Settings layout ${layoutRevision} is not known to this app — the settings can't be shown.`,
-    warnings: known ? warningsFor(firmware, raw.settings) : [],
     block: raw.settings,
     plan: raw.plan,
     editable: known && raw.plan.writable && defs.some((def) => def.control),
@@ -762,7 +764,6 @@ export function withBlock(esc: ReadableEsc, block: Uint8Array): ReadableEsc {
     ...esc,
     block,
     settings: listSettings(SETTINGS[esc.firmware], block, esc.layoutRevision),
-    warnings: warningsFor(esc.firmware, block),
   }
 }
 
@@ -875,6 +876,8 @@ export interface CombinedEscSetting {
   label: string
   /** One value when every ESC has the same; one per ESC, in motor order, for a `perMotor` setting that varies. */
   values: string[]
+  /** The first ESC's warning for the value. */
+  warning: string | null
 }
 
 /** How the page shows a finished read: one view for ESCs that are all alike, otherwise a card per ESC. */
@@ -887,7 +890,6 @@ export type EscOverview =
       hardware: string
       settings: CombinedEscSetting[]
       note: string | null
-      warnings: string[]
     }
   /** `reason`: why the ESCs can't share a view, unless the cards say so themselves (an ESC that wasn't read). */
   | { view: 'separate'; reason: string | null }
@@ -929,13 +931,13 @@ export function combineReports(reports: EscReport[]): EscOverview {
 
   const settings: CombinedEscSetting[] = []
   const differing: string[] = []
-  for (const { key, label, perMotor } of rows.values()) {
+  for (const { key, label, perMotor, warning } of rows.values()) {
     const values = escs.map(
       (esc) => esc.settings.find((setting) => setting.key === key)?.value ?? '—',
     )
     const same = values.every((value) => value === values[0])
     if (!same && !perMotor) differing.push(label)
-    settings.push({ key, label, values: same ? values.slice(0, 1) : values })
+    settings.push({ key, label, values: same ? values.slice(0, 1) : values, warning })
   }
   if (differing.length > 0) {
     return {
@@ -951,7 +953,6 @@ export function combineReports(reports: EscReport[]): EscOverview {
     hardware: first.hardware,
     settings,
     note: first.note,
-    warnings: first.warnings,
   }
 }
 

@@ -253,7 +253,6 @@ function CombinedEscCard({ overview, group, draft, onChange }: CombinedEscCardPr
       </CardHeader>
       <CardContent className="text-sm">
         {overview.note && <p className="text-muted-foreground">{overview.note}</p>}
-        <Warnings warnings={overview.warnings} />
         {group && (
           <>
             <div className="mt-3">
@@ -264,7 +263,10 @@ function CombinedEscCard({ overview, group, draft, onChange }: CombinedEscCardPr
         )}
         <dl className="divide-y">
           {readOnly.map((setting) => (
-            <div key={setting.key} className="flex items-baseline justify-between gap-3 py-1.5">
+            <div
+              key={setting.key}
+              className="flex flex-wrap items-baseline justify-between gap-x-3 py-1.5"
+            >
               <dt className="text-muted-foreground">{setting.label}</dt>
               <dd className="text-right font-medium">
                 {setting.values.length === 1 ? (
@@ -280,6 +282,7 @@ function CombinedEscCard({ overview, group, draft, onChange }: CombinedEscCardPr
                   </ul>
                 )}
               </dd>
+              <SettingWarning warning={setting.warning} />
             </div>
           ))}
         </dl>
@@ -320,10 +323,12 @@ function EscCard({
       {report.status === 'ok' && (
         <CardContent className="text-sm">
           {report.note && <p className="text-muted-foreground">{report.note}</p>}
-          <Warnings warnings={report.warnings} />
           <dl className="divide-y">
             {report.settings.map((setting) => (
-              <div key={setting.key} className="flex items-baseline justify-between gap-3 py-1.5">
+              <div
+                key={setting.key}
+                className="flex flex-wrap items-baseline justify-between gap-x-3 py-1.5"
+              >
                 <dt className="text-muted-foreground">{setting.label}</dt>
                 <dd className="flex items-baseline gap-2 text-right font-medium">
                   {setting.value}
@@ -336,6 +341,7 @@ function EscCard({
                     </Badge>
                   )}
                 </dd>
+                <SettingWarning warning={setting.warning} />
               </div>
             ))}
           </dl>
@@ -345,12 +351,15 @@ function EscCard({
   )
 }
 
-function Warnings({ warnings }: { warnings: string[] }) {
-  return warnings.map((warning) => (
-    <Notice key={warning} tone="warning">
+/** A setting's warning, below its label and value in a `<dl>` row that wraps. */
+function SettingWarning({ warning }: { warning: string | null }) {
+  if (!warning) return null
+  return (
+    <dd className="border-primary/40 bg-primary/10 mt-1 flex basis-full gap-2 rounded-md border p-2 font-normal">
+      <TriangleAlert className="text-warning mt-0.5 size-4 shrink-0" />
       {warning}
-    </Notice>
-  ))
+    </dd>
+  )
 }
 
 interface GroupEditorProps {
