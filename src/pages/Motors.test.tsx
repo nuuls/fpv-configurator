@@ -8,6 +8,8 @@ resetAppAfterEach()
 
 /** The flip stops, waits, sends, waits, spins for a while and stops again — in real time. */
 const FLIP_MS = DIRECTION_CHECK.stopMs + DIRECTION_CHECK.settleMs + DIRECTION_CHECK.spinMs
+/** The mock's motor_idle is 5.5 %, so the check spin runs at 1055. */
+const CHECK_VALUE = '1055'
 
 describe('Motors tab — direction and swap', () => {
   it('flips a motor direction with one click once motor control is on, then spins it to show', async () => {
@@ -35,13 +37,10 @@ describe('Motors tab — direction and swap', () => {
       ),
     ).toBeInTheDocument()
     // the check spin shows on motor 2 (and the "all motors" readout), then everything stops again
-    await waitFor(
-      () => expect(screen.getAllByText(String(DIRECTION_CHECK.spinValue))).toHaveLength(2),
-      { timeout: 2000 },
-    )
-    await waitFor(() => expect(screen.queryByText(String(DIRECTION_CHECK.spinValue))).toBeNull(), {
-      timeout: FLIP_MS,
+    await waitFor(() => expect(screen.getAllByText(CHECK_VALUE)).toHaveLength(2), {
+      timeout: 2000,
     })
+    await waitFor(() => expect(screen.queryByText(CHECK_VALUE)).toBeNull(), { timeout: FLIP_MS })
     expect(flip()).toBeEnabled()
     expect(screen.getByLabelText(/I have removed all propellers/)).toBeChecked()
 

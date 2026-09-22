@@ -25,6 +25,7 @@ import {
 } from '@/lib/motors/io'
 import {
   DIRECTION_CHECK,
+  directionCheckValue,
   DYN_IDLE_MAX,
   DYN_IDLE_MIN,
   DYN_IDLE_ZONES,
@@ -379,7 +380,8 @@ function MotorTest({
       )
       await sleep(DIRECTION_CHECK.settleMs)
       if (!alive()) return
-      const spinning = stopped.map((v, i) => (i === motor - 1 ? DIRECTION_CHECK.spinValue : v))
+      const checkValue = directionCheckValue(snapshot)
+      const spinning = stopped.map((v, i) => (i === motor - 1 ? checkValue : v))
       setValues(spinning)
       await setMotorOutputs(client, spinning)
       await sleep(DIRECTION_CHECK.spinMs)
