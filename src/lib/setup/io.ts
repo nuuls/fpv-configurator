@@ -1,3 +1,5 @@
+import { readDiff, runCliCommands } from '@/lib/diff/io'
+import { externalOnly, type DiffReport } from '@/lib/diff/model'
 import { decodeMotorConfig } from '@/lib/motors/model'
 import { readFeatures, readStatus, saveToEeprom, writeFeatures } from '@/lib/msp/api'
 import { MspErrorResponse, type MspClient } from '@/lib/msp/client'
@@ -8,6 +10,7 @@ import {
   encodeSetArmingConfig,
   encodeSetBeeperConfig,
   readSetup,
+  resetScript,
   withAirmode,
   type SetupDraft,
   type SetupSnapshot,
@@ -21,14 +24,30 @@ export async function readSetupSnapshot(client: MspClient): Promise<SetupSnapsho
   // Not the board info from connect: the accelerometer may have been calibrated since.
   const board = decodeBoardInfo(await client.request(MSP.BOARD_INFO))
   const status = await readStatus(client)
+  const beeperConfig = await readBeeperConfig(client)
+  const external = await readExternalChanges(client)
   return {
     advancedConfig,
     armingConfig,
-    beeperConfig: await readBeeperConfig(client),
+    beeperConfig,
     features,
     bidirDshot,
     hasAccelerometer: (status.sensors & 1) !== 0,
     accCalibrated: (board.configurationProblems & CONFIGURATION_PROBLEM.ACC_NEEDS_CALIBRATION) === 0,
+    ...external,
+  }
+}
+
+/**
+ * The diff of the FC's CLI (as the Diff Checker reads it) without what this app manages. The CLI isn't there while
+ * the FC is armed; the rest of the tab doesn't depend on it, so a failure is reported instead of thrown.
+ */
+async function readExternalChanges(client: MspClient): Promise<Pick<SetupSnapshot, 'external' | 'externalError'>> {
+  try {
+    const report: DiffReport = await readDiff(client)
+    return { external: externalOnly(report), externalError: null }
+  } catch (cause) {
+    return { external: null, externalError: cause instanceof Error ? cause.message : String(cause) }
   }
 }
 
@@ -42,9 +61,10 @@ async function readBeeperConfig(client: MspClient): Promise<number[] | null> {
   }
 }
 
-/** Writes only the messages whose setting changed, then saves. */
+/** Writes only the messages whose setting changed and the resets of external changes (through the CLI), then saves. */
 export async function saveSetup(client: MspClient, snapshot: SetupSnapshot, draft: SetupDraft): Promise<void> {
   const saved = readSetup(snapshot)
+  await runCliCommands(client, resetScript(snapshot, draft))
   if (draft.pidDenom !== saved.pidDenom)
     await client.request(MSP.SET_ADVANCED_CONFIG, encodeSetAdvancedConfig(snapshot, draft))
   if (draft.armAngle !== null && draft.armAngle !== saved.armAngle)

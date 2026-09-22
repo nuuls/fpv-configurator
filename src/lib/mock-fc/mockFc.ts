@@ -168,6 +168,10 @@ export function defaultMockConfig(): MockFcConfig {
       rc_smoothing_auto_factor_throttle: '30',
       feedforward_smooth_factor: '65',
       dyn_idle_min_rpm: '0', // Betaflight default: dynamic idle off
+      // Changed in Betaflight Configurator — no tab of this app manages them (Betaflight defaults: 0, METRIC)
+      crashflip_motor_percent: '50',
+      osd_units: 'IMPERIAL',
+      anti_gravity_gain: '80', // a profile setting at its default, for tests that change it
     },
     boardAlignment: { roll: 0, pitch: 0, yaw: 0 },
     blackbox: { supported: true, device: BLACKBOX_DEVICE.FLASH, sampleRate: 1, fieldsDisabledMask: 0 },
@@ -224,7 +228,8 @@ function defaultOsd(): MockFcConfig['osd'] {
 
 /**
  * What the CLI's `defaults` would leave behind, i.e. what its `diff` compares with: `defaultMockConfig` minus the
- * setup — only the USB port speaks MSP, no modes, no telemetry.
+ * setup — only the USB port speaks MSP, no modes, no telemetry, and the two settings changed outside this app at
+ * their Betaflight defaults.
  */
 export function firmwareDefaultConfig(): MockFcConfig {
   const config = defaultMockConfig()
@@ -232,9 +237,15 @@ export function firmwareDefaultConfig(): MockFcConfig {
     ...config,
     ports: config.ports.map(({ identifier }) => port(identifier, identifier === 20 ? PORT_FUNCTION.MSP : 0)),
     features: FEATURE.RX_SERIAL | FEATURE.OSD | FEATURE.AIRMODE,
+    settings: { ...config.settings, crashflip_motor_percent: '0', osd_units: 'METRIC' },
     modeSlots: config.modeSlots.map(() => ({ boxId: 0, auxChannel: 0, start: 900, end: 900 })),
   }
 }
+
+/** The mock has one profile of each kind, but takes a switch to any the firmware would have. */
+const CLI_PROFILE_SWITCH = /^(profile|rateprofile|battery_profile) [0-3]$/
+const CLI_SET = /^set (\S+)\s*=\s*(.*)$/
+const CLI_FEATURE = /^feature (-?)(\w+)$/
 
 export interface MockFcOptions {
   /** Injectable clock so tests get deterministic telemetry. */
@@ -648,7 +659,26 @@ export class MockFlightController {
   /** Output of a CLI command, null for the ones the mock doesn't have. */
   private runCliCommand(command: string): string | null {
     const diff = /^diff all( defaults)?$/.exec(command)
-    return diff ? renderDiff(this.running, firmwareDefaultConfig(), diff[1] !== undefined) : null
+    if (diff) return renderDiff(this.running, firmwareDefaultConfig(), diff[1] !== undefined)
+    // `set` changes the running config like the firmware's cliSet, for the variables the mock keeps by name.
+    const set = CLI_SET.exec(command)
+    if (set) {
+      const [, name = '', value = ''] = set
+      if (!(name in this.running.settings)) return '###ERROR IN set: INVALID NAME###\r\n'
+      this.running.settings[name] = value
+      return `${name} set to ${value}\r\n`
+    }
+    // `feature NAME` / `feature -NAME` like cliFeature, for the features the mock knows.
+    const feature = CLI_FEATURE.exec(command)
+    if (feature) {
+      const [, off, name = ''] = feature
+      const bit = (FEATURE as Record<string, number>)[name]
+      if (bit === undefined) return '###ERROR IN feature: INVALID NAME###\r\n'
+      this.running.features = (off ? this.running.features & ~bit : this.running.features | bit) >>> 0
+      return `${off ? 'Disabled' : 'Enabled'} ${name}\r\n`
+    }
+    if (CLI_PROFILE_SWITCH.test(command)) return `${command}\r\n`
+    return null
   }
 
   private serialRxProvider(): number {

@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
+import { externalOnly, parseDiff } from '@/lib/diff/model'
 import { defaultMockConfig, MockFlightController } from '@/lib/mock-fc/mockFc'
 import { readFcInfo, readStatus, sendReboot } from '@/lib/msp/api'
 import { MspClient } from '@/lib/msp/client'
 import { FEATURE } from '@/lib/msp/messages'
 import { calibrateAccelerometer } from '@/lib/orientation/io'
 import { MockTransport } from '@/lib/transport/mock'
+import type { Transport } from '@/lib/transport/types'
 import { readSetupSnapshot, saveSetup } from './io'
 import {
   applyFix,
@@ -12,11 +14,15 @@ import {
   encodeSetAdvancedConfig,
   encodeSetArmingConfig,
   encodeSetBeeperConfig,
+  externalChanges,
   formatLoopRate,
   pidLoopOptions,
   preflightChecks,
   readSetup,
+  resetScript,
   withAirmode,
+  withAllResets,
+  withReset,
   type SetupSnapshot,
 } from './model'
 
@@ -35,6 +41,8 @@ const allGood = (): SetupSnapshot => ({
   bidirDshot: true,
   hasAccelerometer: true,
   accCalibrated: true,
+  external: null,
+  externalError: null,
 })
 
 describe('PID loop frequency', () => {
@@ -169,7 +177,14 @@ describe('pre-flight checklist', () => {
     let draft = readSetup(snapshot)
     for (const id of failing(snapshot)) draft = applyFix(draft, id)
     // 0x0a = disarming + RX loss muted: only the RX bits are cleared, in the beeper and in the DShot beacon flags
-    expect(draft).toEqual({ pidDenom: 1, armAngle: 180, beeperOffFlags: 1 << 3, dshotBeaconOffFlags: 1 << 24, airmode: true })
+    expect(draft).toEqual({
+      pidDenom: 1,
+      armAngle: 180,
+      beeperOffFlags: 1 << 3,
+      dshotBeaconOffFlags: 1 << 24,
+      airmode: true,
+      resets: [],
+    })
     expect(preflightChecks(snapshot, draft).map((check) => [check.ok, check.pending])).toEqual([
       [true, false],
       [true, false],
@@ -226,5 +241,221 @@ describe('pre-flight checklist', () => {
     const snapshot = await readSetupSnapshot(client)
     await saveSetup(client, snapshot, applyFix(readSetup(snapshot), 'airmode'))
     expect(fc.savedConfig).toEqual({ ...config, features: config.features | FEATURE.AIRMODE })
+  })
+})
+
+describe('changed outside this app', () => {
+  /** What the CLI prints for a quad set up in Betaflight Configurator: a tuning change, a setup change, a LED. */
+  const DIFF = [
+    '# name: Whoop',
+    '',
+    '# feature',
+    '#feature -LED_STRIP',
+    'feature LED_STRIP',
+    '',
+    '# led',
+    'led 0 0,0::C:2',
+    '',
+    '# master',
+    '#set small_angle = 25',
+    'set small_angle = 180',
+    '#set crashflip_motor_percent = 0',
+    'set crashflip_motor_percent = 50',
+    '',
+    'profile 1',
+    '',
+    '# profile 1',
+    '#set anti_gravity_gain = 80',
+    'set anti_gravity_gain = 100',
+    '#set simplified_d_gain = 100',
+    'set simplified_d_gain = 120',
+    '',
+    '# restore original profile selection',
+    'profile 0',
+    '',
+    'rateprofile 0',
+    '',
+    '# rateprofile 0',
+    '#set tpa_rate = 65',
+    'set tpa_rate = 50',
+    '',
+    '# restore original rateprofile selection',
+    'rateprofile 0',
+  ].join('\r\n')
+  const withDiff = (): SetupSnapshot => ({ ...allGood(), external: externalOnly(parseDiff(DIFF)) })
+
+  it('lists what no tab manages, resettable where the CLI can put the default back', () => {
+    const snapshot = withDiff()
+    expect(externalChanges(snapshot, readSetup(snapshot))).toEqual([
+      {
+        section: 'name',
+        key: null,
+        label: 'name',
+        name: 'name',
+        value: 'Whoop',
+        defaultValue: '-',
+        reset: false,
+      },
+      {
+        section: 'feature',
+        key: 'feature: feature LED_STRIP',
+        label: 'feature LED_STRIP',
+        name: 'feature',
+        value: 'LED_STRIP',
+        defaultValue: '-LED_STRIP',
+        reset: false,
+      },
+      {
+        section: 'led',
+        key: null,
+        label: 'led 0 0,0::C:2',
+        name: 'led 0 0,0::C:2',
+        value: null,
+        defaultValue: null,
+        reset: false,
+      },
+      {
+        section: 'master',
+        key: 'master: crashflip_motor_percent',
+        label: 'crashflip_motor_percent',
+        name: 'crashflip_motor_percent',
+        value: '50',
+        defaultValue: '0',
+        reset: false,
+      },
+      {
+        section: 'profile 1',
+        key: 'profile 1: anti_gravity_gain',
+        label: 'anti_gravity_gain',
+        name: 'anti_gravity_gain',
+        value: '100',
+        defaultValue: '80',
+        reset: false,
+      },
+      {
+        section: 'rateprofile 0',
+        key: 'rateprofile 0: tpa_rate',
+        label: 'tpa_rate',
+        name: 'tpa_rate',
+        value: '50',
+        defaultValue: '65',
+        reset: false,
+      },
+    ])
+  })
+
+  it('lists nothing without a diff', () => {
+    expect(externalChanges(allGood(), readSetup(allGood()))).toEqual([])
+    expect(resetScript(allGood(), readSetup(allGood()))).toEqual([])
+  })
+
+  it('marks resets in the draft and turns them into CLI lines, profile switches restored', () => {
+    const snapshot = withDiff()
+    let draft = withReset(readSetup(snapshot), 'profile 1: anti_gravity_gain', true)
+    expect(externalChanges(snapshot, draft).map((change) => change.reset)).toEqual([false, false, false, false, true, false])
+    expect(resetScript(snapshot, draft)).toEqual(['profile 1', 'set anti_gravity_gain = 80', 'profile 0'])
+
+    draft = withAllResets(snapshot, draft)
+    expect(draft.resets).toEqual([
+      'feature: feature LED_STRIP',
+      'master: crashflip_motor_percent',
+      'profile 1: anti_gravity_gain',
+      'rateprofile 0: tpa_rate',
+    ])
+    expect(resetScript(snapshot, draft)).toEqual([
+      'feature -LED_STRIP',
+      'set crashflip_motor_percent = 0',
+      'profile 1',
+      'set anti_gravity_gain = 80',
+      'rateprofile 0',
+      'set tpa_rate = 65',
+      'profile 0',
+      'rateprofile 0',
+    ])
+
+    draft = withReset(draft, 'profile 1: anti_gravity_gain', false)
+    expect(draft.resets).toEqual(['feature: feature LED_STRIP', 'master: crashflip_motor_percent', 'rateprofile 0: tpa_rate'])
+    expect(withReset(draft, 'master: crashflip_motor_percent', true).resets).toEqual(draft.resets)
+  })
+
+  it('reads the mock FC: two features and two settings changed in Betaflight Configurator, nothing a tab manages', async () => {
+    const { client } = await connect(new MockFlightController())
+    const snapshot = await readSetupSnapshot(client)
+    expect(snapshot.externalError).toBeNull()
+    expect(externalChanges(snapshot, readSetup(snapshot)).map((change) => [change.name, change.defaultValue, change.value])).toEqual([
+      ['feature', '-TELEMETRY', 'TELEMETRY'],
+      ['feature', '-ESC_SENSOR', 'ESC_SENSOR'],
+      ['crashflip_motor_percent', '0', '50'],
+      ['osd_units', 'METRIC', 'IMPERIAL'],
+    ])
+  })
+
+  it('resets one setting on the mock FC and leaves the others, across a reboot', async () => {
+    const fc = new MockFlightController()
+    const { transport, client } = await connect(fc)
+    const snapshot = await readSetupSnapshot(client)
+    await saveSetup(client, snapshot, withReset(readSetup(snapshot), 'master: osd_units', true))
+    const dropped = new Promise<void>((resolve) => transport.onClose(resolve))
+    await sendReboot(client)
+    await dropped
+
+    const after = await readSetupSnapshot((await connect(fc)).client)
+    expect(externalChanges(after, readSetup(after)).map((change) => change.label)).toEqual([
+      'feature TELEMETRY',
+      'feature ESC_SENSOR',
+      'crashflip_motor_percent',
+    ])
+    const before = defaultMockConfig()
+    expect(fc.savedConfig).toEqual({
+      ...before,
+      settings: { ...before.settings, osd_units: 'METRIC' },
+    })
+  })
+
+  it('resets a profile setting through the profile switch, and everything with Reset all', async () => {
+    const config = defaultMockConfig()
+    config.settings.anti_gravity_gain = '100'
+    const fc = new MockFlightController({ config })
+    const { client } = await connect(fc)
+    const snapshot = await readSetupSnapshot(client)
+    const draft = withAllResets(snapshot, readSetup(snapshot))
+    expect(resetScript(snapshot, draft)).toEqual([
+      'feature -TELEMETRY',
+      'feature -ESC_SENSOR',
+      'set crashflip_motor_percent = 0',
+      'set osd_units = METRIC',
+      'profile 0',
+      'set anti_gravity_gain = 80',
+      'profile 0',
+    ])
+    await saveSetup(client, snapshot, draft)
+    expect(fc.savedConfig.settings).toEqual({
+      ...config.settings,
+      crashflip_motor_percent: '0',
+      osd_units: 'METRIC',
+      anti_gravity_gain: '80',
+    })
+    expect(fc.savedConfig.features).toBe((config.features & ~(FEATURE.TELEMETRY | FEATURE.ESC_SENSOR)) >>> 0)
+    // the link is back to MSP
+    expect((await readFcInfo(client)).variant).toBe('BTFL')
+  })
+
+  it('goes on without the CLI (the FC ignores the STX while armed) and says so', async () => {
+    const inner = new MockTransport(new MockFlightController(), 0)
+    // An armed FC doesn't answer the STX; MSP keeps working.
+    const armed: Transport = {
+      label: inner.label,
+      open: () => inner.open(),
+      close: () => inner.close(),
+      write: (data) => (data[0] === 0x02 ? Promise.resolve() : inner.write(data)),
+      onData: (listener) => inner.onData(listener),
+      onClose: (listener) => inner.onClose(listener),
+    }
+    await armed.open()
+    const snapshot = await readSetupSnapshot(new MspClient(armed))
+    expect(snapshot.external).toBeNull()
+    expect(snapshot.externalError).toContain('did not start its command line')
+    expect(preflightChecks(snapshot, readSetup(snapshot))).toHaveLength(5)
+    expect(externalChanges(snapshot, readSetup(snapshot))).toEqual([])
   })
 })

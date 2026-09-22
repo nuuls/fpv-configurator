@@ -65,7 +65,10 @@ Coloured like `git diff`: a section is a "file"; in a line the default is marked
   report, without reading again. The switch keeps its position over "Read again" and a reconnect, not over leaving
   the tab. Empty state with it on: "No differences — every setting is at its default."
 - Also left out of the view: what the CLI prints for pasting the diff into another FC (`batch start`, `defaults nosave`,
-  `profile 0` restores, `save`, `mcu_id`, `signature`). "Copy as text" keeps them.
+  `profile 0` restores, `save`, `mcu_id`, `signature`). "Copy as text" keeps them. The restore lines are kept in the
+  parsed report (`restore`) for the Setup tab's resets.
+- The Setup tab reads the same diff for its "Changed outside this app" list (`externalOnly` — the diff minus what the
+  tabs write) and runs its resets through the same CLI session (`runCliCommands`); this tab stays read-only.
 - Errors: no STX echo within 1 s → "did not start its command line" (the FC ignores it while armed); output that
   stops for 3 s without ETX → error; an ETX is sent in both cases so the port doesn't stay in CLI mode. `###ERROR…`
   and `ERR_CMD_NA` lines from the CLI are shown as errors.
@@ -83,11 +86,12 @@ Coloured like `git diff`: a section is a "file"; in a line the default is marked
 
 Checkable with **Connect Mock FC** (so the mock has to support it):
 
-- [x] Open the tab → "0 tuning differences · 6 other hidden" and the empty state: the mock's telemetry, UART2/UART3
-      and two modes are setup, so there are no cards
-- [x] Motors → Bidirectional DShot on, props out → Save & Reboot → Diff Checker → "1 tuning difference · 7 other
+- [x] Open the tab → "0 tuning differences · 8 other hidden" and the empty state: the mock's telemetry, UART2/UART3,
+      two modes and two settings changed in Betaflight Configurator (`crashflip_motor_percent`, `osd_units`) are
+      setup, so there are no cards
+- [x] Motors → Bidirectional DShot on, props out → Save & Reboot → Diff Checker → "1 tuning difference · 9 other
       hidden", `master` lists only `set dshot_bidir = OFF → ON` (not `yaw_motors_reversed`)
-- [x] Show hidden differences on → "0 tuning differences · 6 other shown", sections `feature`, `serial`, `aux` …
+- [x] Show hidden differences on → "0 tuning differences · 8 other shown", sections `feature`, `serial`, `aux` …
       appear with their lines, no empty state; it stays on over Read again; off → hidden again
 - [x] Read again reads again; Copy full diff puts the complete raw CLI output on the clipboard
 - [x] Afterwards other tabs load as usual (the FC is back in MSP)

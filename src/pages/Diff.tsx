@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
+import { DiffArrow as Arrow, DiffValue } from '@/components/DiffValue'
 import { Notice } from '@/components/Notice'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -8,7 +9,6 @@ import { describeError } from '@/hooks/useFcSnapshot'
 import { readDiff } from '@/lib/diff/io'
 import { countDifferences, tuningOnly, type DiffEntry, type DiffReport, type DiffSection } from '@/lib/diff/model'
 import type { MspClient } from '@/lib/msp/client'
-import { cn } from '@/lib/utils'
 import { useConnectionStore } from '@/stores/connection'
 
 type ReadState = { phase: 'reading' } | { phase: 'done'; report: DiffReport } | { phase: 'failed'; message: string }
@@ -89,11 +89,10 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
-/** The two sides of a difference, coloured as `git diff` does: what it was (the default) and what it is now. */
-const SIDES = {
-  default: 'bg-destructive/25',
-  current: 'bg-success/25',
-} as const
+/** Coloured as `git diff` does: the default is what it was, the FC's value what it is now. */
+function Value({ side, children }: { side: 'default' | 'current'; children: string }) {
+  return <DiffValue side={side === 'default' ? 'before' : 'after'}>{children}</DiffValue>
+}
 
 function DiffReportView({ report, all }: { report: DiffReport; all: boolean }) {
   return (
@@ -164,14 +163,4 @@ function EntryLine({ entry }: { entry: DiffEntry }) {
   }
   // Commands other than `set` (feature, serial, aux, …) stay the lines the CLI printed.
   return <Value side={entry.isDefault ? 'default' : 'current'}>{entry.line}</Value>
-}
-
-/** `<del>` / `<ins>` say which side it is without the colour. */
-function Value({ side, children }: { side: keyof typeof SIDES; children: ReactNode }) {
-  const Tag = side === 'default' ? 'del' : 'ins'
-  return <Tag className={cn('rounded-sm px-1 no-underline', SIDES[side])}>{children}</Tag>
-}
-
-function Arrow() {
-  return <span className="text-muted-foreground"> → </span>
 }

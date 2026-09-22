@@ -53,7 +53,7 @@ export class MockCliSession {
 const BAUD_RATES = [0, 9600, 19200, 38400, 57600, 115200, 230400, 250000, 400000, 460800, 500000, 921600, 1000000, 1500000, 2000000, 2470000]
 
 /** CLI variables of `MockFcConfig.settings` that live in a PID profile. */
-const PROFILE_SETTINGS = new Set(['feedforward_smooth_factor', 'dyn_idle_min_rpm'])
+const PROFILE_SETTINGS = new Set(['feedforward_smooth_factor', 'dyn_idle_min_rpm', 'anti_gravity_gain'])
 
 function serialLine(port: SerialPortConfig): string {
   const name = port.identifier === 20 ? 'VCP' : `UART${port.identifier - 50}`

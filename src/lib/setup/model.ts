@@ -1,4 +1,8 @@
-/** PID loop frequency and pre-flight checklist on the Setup tab — docs/tabs/setup.md. Layouts: Betaflight 2026.6 msp.c. */
+/**
+ * PID loop frequency, pre-flight checklist and the settings changed outside this app, on the Setup tab —
+ * docs/tabs/setup.md. Layouts: Betaflight 2026.6 msp.c.
+ */
+import { canReset, changeKey, parseFlag, resetCommands, type DiffEntry, type DiffReport } from '@/lib/diff/model'
 import { ByteReader, ByteWriter } from '@/lib/msp/bytes'
 import { FEATURE } from '@/lib/msp/messages'
 
@@ -35,6 +39,10 @@ export interface SetupSnapshot {
   hasAccelerometer: boolean
   /** From the configuration problems in MSP_BOARD_INFO; calibrating happens on the Orientation tab. */
   accCalibrated: boolean
+  /** `diff all defaults` without what this app manages (`externalOnly`). null: the CLI couldn't be read. */
+  external: DiffReport | null
+  /** Why `external` is null. */
+  externalError: string | null
 }
 
 export interface SetupDraft {
@@ -46,6 +54,8 @@ export interface SetupDraft {
   /** null: no beeper config, or one that ends before the DShot beacon. */
   dshotBeaconOffFlags: number | null
   airmode: boolean
+  /** `changeKey`s of the external changes to put back to their defaults on save. */
+  resets: string[]
 }
 
 export function readSetup(snapshot: SetupSnapshot): SetupDraft {
@@ -58,6 +68,7 @@ export function readSetup(snapshot: SetupSnapshot): SetupDraft {
     beeperOffFlags,
     dshotBeaconOffFlags: beeperOffFlags !== null && beeper.remaining >= 4 ? beeper.u32() : null,
     airmode: (snapshot.features & FEATURE.AIRMODE) !== 0,
+    resets: [],
   }
 }
 
@@ -188,6 +199,77 @@ export function preflightChecks(snapshot: SetupSnapshot, draft: SetupDraft): Pre
       ...here((d) => d.airmode, true),
     },
   ]
+}
+
+// ---- Changed outside this app ----
+
+/** One line of the "Changed outside this app" list: a difference no tab of this app manages. */
+export interface ExternalChange {
+  /** CLI section: `master`, `profile 1`, `led`, … */
+  section: string
+  /** `changeKey` of a change the app can put back; null for the others (the craft name, `resource`, `led`, …). */
+  key: string | null
+  /** Names the row: a setting's name, otherwise the command line. */
+  label: string
+  /** `set name = value` → the name; `feature TELEMETRY` → `feature`; any other command → the whole line. */
+  name: string
+  /** The setting's value, or the flag (`-TELEMETRY`); null for other commands (the line says it all). */
+  value: string | null
+  /** What the reset would put back: the setting's default, the opposite flag. */
+  defaultValue: string | null
+  /** Marked for reset in the draft. */
+  reset: boolean
+}
+
+export function externalChanges(snapshot: SetupSnapshot, draft: SetupDraft): ExternalChange[] {
+  const report = snapshot.external
+  if (!report) return []
+  const changes: ExternalChange[] = []
+  for (const section of report.sections) {
+    for (const entry of section.entries) {
+      const key = canReset(report, section, entry) ? changeKey(section, entry) : null
+      changes.push({
+        section: section.title,
+        key,
+        ...describe(entry),
+        reset: key !== null && draft.resets.includes(key),
+      })
+    }
+  }
+  return changes
+}
+
+function describe(entry: DiffEntry): Pick<ExternalChange, 'label' | 'name' | 'value' | 'defaultValue'> {
+  if (entry.kind === 'setting')
+    return {
+      label: entry.name,
+      name: entry.name,
+      value: entry.value,
+      defaultValue: entry.defaultValue,
+    }
+  const flag = parseFlag(entry.line)
+  if (flag) return { label: entry.line, name: flag.command, value: flag.flag, defaultValue: flag.opposite }
+  return { label: entry.line, name: entry.line, value: null, defaultValue: null }
+}
+
+/** Draft with this external change marked for reset (or not). */
+export function withReset(draft: SetupDraft, key: string, reset: boolean): SetupDraft {
+  if (draft.resets.includes(key) === reset) return draft
+  return {
+    ...draft,
+    resets: reset ? [...draft.resets, key] : draft.resets.filter((k) => k !== key),
+  }
+}
+
+/** Draft with every resettable external change marked. */
+export function withAllResets(snapshot: SetupSnapshot, draft: SetupDraft): SetupDraft {
+  const keys = externalChanges(snapshot, draft).flatMap((change) => (change.key === null ? [] : [change.key]))
+  return { ...draft, resets: keys }
+}
+
+/** The CLI lines that carry out the draft's resets; empty when there are none. */
+export function resetScript(snapshot: SetupSnapshot, draft: SetupDraft): string[] {
+  return snapshot.external && draft.resets.length > 0 ? resetCommands(snapshot.external, new Set(draft.resets)) : []
 }
 
 // ---- MSP_SET_ARMING_CONFIG (62) / MSP_SET_BEEPER_CONFIG (185): read-modify-write ----

@@ -31,6 +31,8 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
 		- Arm angle is set to 180
 		- Beeper and DShot beacon are enabled on RX set and RX loss
 		- Airmode is on
+	- List of everything changed outside this app (differs from the Betaflight defaults, not managed by any tab — e.g.
+	  via Betaflight Configurator), each with a Reset to the recommended (= Betaflight default) value
 
 - FC Orientation
 	- 3D view

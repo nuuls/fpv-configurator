@@ -13,7 +13,7 @@ const lines =(section: string) =>
 describe('Diff Checker tab', () => {
   it("hides the mock FC's setup: features, serial ports and modes are no tuning", async () => {
     await openTab('Diff Checker')
-    expect(await screen.findByText(/^0 tuning differences · 6 other hidden · MOCK\/MOCKF405 · Betaflight \/ /)).toBeInTheDocument()
+    expect(await screen.findByText(/^0 tuning differences · 8 other hidden · MOCK\/MOCKF405 · Betaflight \/ /)).toBeInTheDocument()
     expect(screen.getByText(/^No tuning differences/)).toBeInTheDocument()
     expect(screen.queryAllByRole('group')).toEqual([])
   })
@@ -26,7 +26,7 @@ describe('Diff Checker tab', () => {
 
     await user.click(screen.getByRole('link', { name: 'Diff Checker' }))
     // yaw_motors_reversed is setup, not tuning
-    expect(await screen.findByText(/^1 tuning difference · 7 other hidden/)).toBeInTheDocument()
+    expect(await screen.findByText(/^1 tuning difference · 9 other hidden/)).toBeInTheDocument()
     expect(lines('master')).toEqual(['set dshot_bidir = OFF → ON'])
     const master = within(screen.getByRole('group', { name: 'master' }))
     expect(master.getByText('OFF').tagName).toBe('DEL') // the default, red
@@ -40,23 +40,23 @@ describe('Diff Checker tab', () => {
 
   it('shows the hidden setup differences while "Show hidden differences" is on', async () => {
     const user = await openTab('Diff Checker')
-    await screen.findByText(/^0 tuning differences · 6 other hidden/)
+    await screen.findByText(/^0 tuning differences · 8 other hidden/)
     const toggle = screen.getByRole('switch', { name: 'Show hidden differences' })
     expect(toggle).not.toBeChecked()
 
     await user.click(toggle)
-    expect(screen.getByText(/^0 tuning differences · 6 other shown/)).toBeInTheDocument()
+    expect(screen.getByText(/^0 tuning differences · 8 other shown/)).toBeInTheDocument()
     expect(screen.queryByText(/^No tuning differences/)).toBeNull()
     expect(lines('serial')).toContain('serial UART2 64 115200 57600 0 115200')
     const shown = screen.getAllByRole('group').flatMap((group) => within(group).getAllByRole('listitem'))
-    expect(shown.length).toBeGreaterThanOrEqual(6)
+    expect(shown.length).toBeGreaterThanOrEqual(8)
 
     // stays on for the next read
     await user.click(screen.getByRole('button', { name: 'Read again' }))
-    expect(await screen.findByText(/^0 tuning differences · 6 other shown/)).toBeInTheDocument()
+    expect(await screen.findByText(/^0 tuning differences · 8 other shown/)).toBeInTheDocument()
 
     await user.click(toggle)
-    expect(screen.getByText(/^0 tuning differences · 6 other hidden/)).toBeInTheDocument()
+    expect(screen.getByText(/^0 tuning differences · 8 other hidden/)).toBeInTheDocument()
     expect(screen.queryAllByRole('group')).toEqual([])
   })
 
