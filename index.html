@@ -19,7 +19,18 @@
         color: oklch(0.985 0 0);
         font-family: ui-sans-serif, system-ui, sans-serif;
       }
+      /* The fallback text below is for crawlers and browsers without JavaScript; hide it while the app loads. */
+      #root > main {
+        display: none;
+      }
     </style>
+    <noscript>
+      <style>
+        #root > main {
+          display: block;
+        }
+      </style>
+    </noscript>
     <meta property="og:type" content="website" />
     <meta property="og:title" content="FPV Configurator" />
     <meta
@@ -29,7 +40,7 @@
   </head>
   <body>
     <div id="root">
-      <!-- Shown until the app loads (and to crawlers that don't run JavaScript); React replaces it. -->
+      <!-- For crawlers and browsers without JavaScript (hidden otherwise, see <head>); React replaces it. -->
       <main>
         <h1>FPV Configurator</h1>
         <p>A simplified Betaflight configurator with none of the nerd shit.</p>
