@@ -9,6 +9,17 @@
       name="description"
       content="A stripped-down Betaflight configurator that runs in the browser. Simplified setup, checks for common config issues, and Bluejay / AM32 ESC settings without a separate app."
     />
+    <!-- Dark from the first paint: the stylesheet only arrives with the app bundle (injected by JS in dev),
+         so without this the browser shows its default white page first. Values match .dark in index.css. -->
+    <meta name="color-scheme" content="dark" />
+    <style>
+      html {
+        color-scheme: dark;
+        background: oklch(0.145 0 0);
+        color: oklch(0.985 0 0);
+        font-family: ui-sans-serif, system-ui, sans-serif;
+      }
+    </style>
     <meta property="og:type" content="website" />
     <meta property="og:title" content="FPV Configurator" />
     <meta
