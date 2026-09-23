@@ -199,7 +199,9 @@ on its own row.
 
 The welcome screen (no FC connected): the description of the app as its headline, the connect card with **Connect FC**
 and **Demo mode** (= mock FC), then three cards with the core features (simplified setup, config issue checks, ESC
-configuration). `index.html` carries the same text as meta tags and as static text for search engines, replaced once
+configuration), and a footer: created and maintained by Nils Vo, a link to the source on GitHub, the projects the
+app builds on (Betaflight, ESC firmware, libraries — each linked to its GitHub repo) and a disclaimer (not
+affiliated with Betaflight, no warranty, props off, you are responsible for the aircraft). `index.html` carries the same text as meta tags and as static text for search engines, replaced once
 the app loads.
 
 A tab still marked TBD in §2 shows a "not specified yet" placeholder (`src/pages/PlaceholderPage.tsx`); currently none.
