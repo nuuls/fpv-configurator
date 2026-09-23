@@ -114,6 +114,7 @@ export type CheckId = 'bidirDshot' | 'accCalibrated' | 'armAngle' | 'beeper' | '
 
 export interface PreflightCheck {
   id: CheckId
+  /** States what the check found: "Airmode is on" when it passes, "Airmode is off" when it fails. */
   label: string
   /** What the draft has, e.g. "25°". */
   detail: string
@@ -162,6 +163,7 @@ export function preflightChecks(snapshot: SetupSnapshot, draft: SetupDraft): Pre
       { name: 'DShot beacon', off: muted(d.dshotBeaconOffFlags ?? 0) },
     ].filter(({ off }) => off.length > 0)
   const beeperOk = (d: SetupDraft) => d.beeperOffFlags !== null && beeperMuted(d).length === 0
+  const accOk = snapshot.hasAccelerometer && snapshot.accCalibrated
   const here = (ok: (d: SetupDraft) => boolean, available: boolean) => ({
     ok: ok(draft),
     pending: ok(draft) && !ok(saved),
@@ -171,7 +173,9 @@ export function preflightChecks(snapshot: SetupSnapshot, draft: SetupDraft): Pre
   return [
     {
       id: 'bidirDshot',
-      label: 'Bidirectional DShot is enabled',
+      label: snapshot.bidirDshot
+        ? 'Bidirectional DShot is enabled'
+        : 'Bidirectional DShot is not enabled',
       detail: snapshot.bidirDshot ? 'On' : 'Off',
       ok: snapshot.bidirDshot,
       pending: false,
@@ -179,13 +183,13 @@ export function preflightChecks(snapshot: SetupSnapshot, draft: SetupDraft): Pre
     },
     {
       id: 'accCalibrated',
-      label: 'Accelerometer is calibrated',
+      label: accOk ? 'Accelerometer is calibrated' : 'Accelerometer is not calibrated',
       detail: !snapshot.hasAccelerometer
         ? 'No accelerometer'
         : snapshot.accCalibrated
           ? 'Calibrated'
           : 'Not calibrated',
-      ok: snapshot.hasAccelerometer && snapshot.accCalibrated,
+      ok: accOk,
       pending: false,
       fix:
         snapshot.accCalibrated || !snapshot.hasAccelerometer
@@ -194,13 +198,17 @@ export function preflightChecks(snapshot: SetupSnapshot, draft: SetupDraft): Pre
     },
     {
       id: 'armAngle',
-      label: `Arm angle is ${ARM_ANGLE_ANY}°`,
+      label: armAngleOk(draft)
+        ? `Arm angle is ${ARM_ANGLE_ANY}°`
+        : `Arm angle is not ${ARM_ANGLE_ANY}°`,
       detail: draft.armAngle === null ? 'Not reported' : `${draft.armAngle}°`,
       ...here(armAngleOk, draft.armAngle !== null),
     },
     {
       id: 'beeper',
-      label: 'Beeper and DShot beacon sound on RX set and RX loss',
+      label: beeperOk(draft)
+        ? 'Beeper and DShot beacon sound on RX set and RX loss'
+        : 'Beeper or DShot beacon is silent on RX set or RX loss',
       detail:
         draft.beeperOffFlags === null
           ? 'No beeper support'
@@ -213,7 +221,7 @@ export function preflightChecks(snapshot: SetupSnapshot, draft: SetupDraft): Pre
     },
     {
       id: 'airmode',
-      label: 'Airmode is on',
+      label: draft.airmode ? 'Airmode is on' : 'Airmode is off',
       detail: draft.airmode ? 'On' : 'Off',
       ...here((d) => d.airmode, true),
     },

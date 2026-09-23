@@ -19,8 +19,8 @@ everything that was changed outside this app (Betaflight Configurator, CLI) with
 | Pre-flight checklist                                  |
 |  2 of 5 settings need attention.                      |
 |  ✓ Airmode is on                                  On  |
-|  ! Arm angle is 180°                        25° [Fix] |
-|  ! Bidirectional DShot is enabled  Off [Open Motors]  |
+|  ! Arm angle is not 180°                    25° [Fix] |
+|  ! Bidirectional DShot is not enabled  Off [Open Motors] |
 +-------------------------------------------------------+
 | Changed outside this app                  [Reset all] |
 |  3 changes made outside this app. 1 to reset once saved. |
@@ -62,6 +62,9 @@ it will be.
 - Live readouts keep working while the setting loads or if reading it fails.
 - The checklist is read together with the PID loop frequency, every time the tab opens (so a calibration done on
   Orientation shows up), and sums up as "N of 5 settings need attention." or "All set."
+- A row states what was found: a passing check reads "Bidirectional DShot is enabled", a failing one "Bidirectional
+  DShot is not enabled" (likewise "Accelerometer is not calibrated", "Arm angle is not 180°", "Airmode is off",
+  "Beeper or DShot beacon is silent on RX set or RX loss").
 - A failing check either links to the tab that owns the setting (**Open Motors**, **Open Orientation**) or, for
   the three settings no tab owns, has a **Fix** button. Fix is a local edit like any other (SPEC §5): the row
   passes marked "not saved yet", the tab becomes dirty, Revert takes it back, **Save & Reboot** writes it.

@@ -13,13 +13,15 @@ describe('Setup tab: pre-flight checklist', () => {
     await openTab('Setup')
     expect(await screen.findByText('4 of 5 settings need attention.')).toBeInTheDocument()
     expect(
-      within(row('Bidirectional DShot is enabled')).getByRole('link', { name: 'Open Motors' }),
+      within(row('Bidirectional DShot is not enabled')).getByRole('link', { name: 'Open Motors' }),
     ).toBeInTheDocument()
     expect(
-      within(row('Accelerometer is calibrated')).getByRole('link', { name: 'Open Orientation' }),
+      within(row('Accelerometer is not calibrated')).getByRole('link', {
+        name: 'Open Orientation',
+      }),
     ).toBeInTheDocument()
-    expect(row('Arm angle is 180°')).toHaveTextContent('25°')
-    expect(row(/Beeper/)).toHaveTextContent(
+    expect(row('Arm angle is not 180°')).toHaveTextContent('25°')
+    expect(row('Beeper or DShot beacon is silent on RX set or RX loss')).toHaveTextContent(
       'Beeper off for RX set · DShot beacon off for RX set and RX loss',
     )
     expect(row('Airmode is on')).toHaveTextContent('On')
@@ -31,19 +33,19 @@ describe('Setup tab: pre-flight checklist', () => {
     const user = await openTab('Setup')
     await screen.findByText('4 of 5 settings need attention.')
 
-    await user.click(within(row('Arm angle is 180°')).getByRole('button', { name: 'Fix' }))
-    expect(row('Arm angle is 180°')).toHaveTextContent('180° · not saved yet')
+    await user.click(within(row(/Arm angle/)).getByRole('button', { name: 'Fix' }))
+    expect(row(/Arm angle/)).toHaveTextContent('180° · not saved yet')
     await user.click(screen.getByRole('button', { name: 'Revert' }))
-    expect(row('Arm angle is 180°')).toHaveTextContent('25°')
+    expect(row(/Arm angle/)).toHaveTextContent('25°')
 
-    await user.click(within(row('Arm angle is 180°')).getByRole('button', { name: 'Fix' }))
+    await user.click(within(row(/Arm angle/)).getByRole('button', { name: 'Fix' }))
     await user.click(within(row(/Beeper/)).getByRole('button', { name: 'Fix' }))
     expect(screen.getByText('2 of 5 settings need attention.')).toBeInTheDocument()
     await saveAndReboot(user)
 
     expect(await screen.findByText('2 of 5 settings need attention.')).toBeInTheDocument()
-    expect(row('Arm angle is 180°')).toHaveTextContent('180°')
-    expect(row('Arm angle is 180°')).not.toHaveTextContent('not saved yet')
+    expect(row(/Arm angle/)).toHaveTextContent('180°')
+    expect(row(/Arm angle/)).not.toHaveTextContent('not saved yet')
     expect(within(row(/Beeper/)).queryByRole('button')).toBeNull()
     expect(row(/Beeper/)).toHaveTextContent(/On$/)
   })
@@ -51,7 +53,7 @@ describe('Setup tab: pre-flight checklist', () => {
   it('sees an accelerometer calibrated on the Orientation tab', async () => {
     const user = await openTab('Setup')
     await screen.findByText('4 of 5 settings need attention.')
-    await user.click(within(row('Accelerometer is calibrated')).getByRole('link'))
+    await user.click(within(row('Accelerometer is not calibrated')).getByRole('link'))
     await user.click(await screen.findByRole('button', { name: 'Calibrate accelerometer' }))
     expect(
       await screen.findByText('Calibration finished and saved.', {}, { timeout: 3000 }),

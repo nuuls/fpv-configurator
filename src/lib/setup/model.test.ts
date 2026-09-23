@@ -125,6 +125,34 @@ describe('pre-flight checklist', () => {
     expect(checks.every((check) => check.ok && !check.pending && check.fix === null)).toBe(true)
   })
 
+  it('words a failing check as what is wrong', () => {
+    const labels = (snapshot: SetupSnapshot) =>
+      preflightChecks(snapshot, readSetup(snapshot)).map((check) => check.label)
+    expect(labels(allGood())).toEqual([
+      'Bidirectional DShot is enabled',
+      'Accelerometer is calibrated',
+      'Arm angle is 180°',
+      'Beeper and DShot beacon sound on RX set and RX loss',
+      'Airmode is on',
+    ])
+    expect(
+      labels({
+        ...allGood(),
+        armingConfig: [5, 0, 25, 0],
+        beeperConfig: [0, 2, 0, 0, 1, 0, 0, 0, 0],
+        features: FEATURE.OSD,
+        bidirDshot: false,
+        accCalibrated: false,
+      }),
+    ).toEqual([
+      'Bidirectional DShot is not enabled',
+      'Accelerometer is not calibrated',
+      'Arm angle is not 180°',
+      'Beeper or DShot beacon is silent on RX set or RX loss',
+      'Airmode is off',
+    ])
+  })
+
   it('sends bidirectional DShot and the accelerometer to their own tabs', () => {
     const checks = preflightChecks(
       { ...allGood(), bidirDshot: false, accCalibrated: false },
