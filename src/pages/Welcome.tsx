@@ -15,7 +15,7 @@ export function WelcomePage() {
   const serialSupported = WebSerialTransport.isSupported()
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4 pt-12">
+    <div className="mx-auto flex min-h-full max-w-3xl flex-col gap-4 pt-12">
       <h1 className="pb-4 text-3xl font-bold tracking-tight text-balance">
         A simplified Betaflight configurator with none of the nerd shit
       </h1>
@@ -74,23 +74,21 @@ export function WelcomePage() {
         ))}
       </div>
 
-      <footer className="text-muted-foreground mt-8 flex flex-col gap-3 border-t py-6 text-xs">
+      <footer className="text-muted-foreground mt-auto flex flex-col gap-3 border-t pt-6 text-xs">
         <p>
           Created and maintained by{' '}
           <ExternalLink href="https://github.com/nuuls">Nils Vo</ExternalLink> ·{' '}
           <ExternalLink href={SOURCE_URL}>Source code on GitHub</ExternalLink> · AGPL-3.0 license
         </p>
-        {CREDITS.map((group) => (
-          <p key={group.title}>
-            {group.title}:{' '}
-            {group.projects.map((project, i) => (
-              <span key={project.name}>
-                {i > 0 && ', '}
-                <ExternalLink href={project.url}>{project.name}</ExternalLink>
-              </span>
-            ))}
-          </p>
-        ))}
+        <p>
+          Built on the work of{' '}
+          {CREDITS.map((project, i) => (
+            <span key={project.name}>
+              {i > 0 && ', '}
+              <ExternalLink href={project.url}>{project.name}</ExternalLink>
+            </span>
+          ))}
+        </p>
         <p>
           Disclaimer: this is an independent project, not affiliated with or endorsed by Betaflight
           or any of the projects above. It is provided as is, without any warranty. Wrong settings
@@ -105,45 +103,14 @@ export function WelcomePage() {
 
 const SOURCE_URL = 'https://github.com/nuuls/fpv-configurator'
 
-/** Projects this app builds on, shown in the footer. Libraries mirror package.json. */
-const CREDITS: { title: string; projects: { name: string; url: string }[] }[] = [
-  {
-    title: 'Built on the work of',
-    projects: [
-      { name: 'Betaflight', url: 'https://github.com/betaflight/betaflight' },
-      {
-        name: 'Betaflight Configurator',
-        url: 'https://github.com/betaflight/betaflight-configurator',
-      },
-      { name: 'Betaflight presets', url: 'https://github.com/betaflight/firmware-presets' },
-      { name: 'Bluejay', url: 'https://github.com/bird-sanctuary/bluejay' },
-      { name: 'AM32', url: 'https://github.com/am32-firmware/AM32' },
-      { name: 'ESC Configurator', url: 'https://github.com/stylesuxx/esc-configurator' },
-    ],
-  },
-  {
-    title: 'Made with',
-    projects: [
-      { name: 'React', url: 'https://github.com/facebook/react' },
-      { name: 'React Router', url: 'https://github.com/remix-run/react-router' },
-      { name: 'Zustand', url: 'https://github.com/pmndrs/zustand' },
-      { name: 'Tailwind CSS', url: 'https://github.com/tailwindlabs/tailwindcss' },
-      { name: 'shadcn/ui', url: 'https://github.com/shadcn-ui/ui' },
-      { name: 'Radix UI', url: 'https://github.com/radix-ui/primitives' },
-      { name: 'Lucide', url: 'https://github.com/lucide-icons/lucide' },
-      { name: 'class-variance-authority', url: 'https://github.com/joe-bell/cva' },
-      { name: 'clsx', url: 'https://github.com/lukeed/clsx' },
-      { name: 'tailwind-merge', url: 'https://github.com/dcastil/tailwind-merge' },
-      { name: 'tw-animate-css', url: 'https://github.com/Wombosvideo/tw-animate-css' },
-      { name: 'Vite', url: 'https://github.com/vitejs/vite' },
-      { name: 'TypeScript', url: 'https://github.com/microsoft/TypeScript' },
-      { name: 'Vitest', url: 'https://github.com/vitest-dev/vitest' },
-      { name: 'Testing Library', url: 'https://github.com/testing-library' },
-      { name: 'jsdom', url: 'https://github.com/jsdom/jsdom' },
-      { name: 'Oxlint', url: 'https://github.com/oxc-project/oxc' },
-      { name: 'Prettier', url: 'https://github.com/prettier/prettier' },
-    ],
-  },
+/** Projects this app builds on, shown in the footer. */
+const CREDITS: { name: string; url: string }[] = [
+  { name: 'Betaflight', url: 'https://github.com/betaflight/betaflight' },
+  { name: 'Betaflight Configurator', url: 'https://github.com/betaflight/betaflight-configurator' },
+  { name: 'Betaflight presets', url: 'https://github.com/betaflight/firmware-presets' },
+  { name: 'Bluejay', url: 'https://github.com/bird-sanctuary/bluejay' },
+  { name: 'AM32', url: 'https://github.com/am32-firmware/AM32' },
+  { name: 'ESC Configurator', url: 'https://github.com/stylesuxx/esc-configurator' },
 ]
 
 function ExternalLink({ href, children }: { href: string; children: ReactNode }) {
