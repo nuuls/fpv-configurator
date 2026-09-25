@@ -86,12 +86,12 @@ Coloured like `git diff`: a section is a "file"; in a line the default is marked
 
 Checkable with **Connect Mock FC** (so the mock has to support it):
 
-- [x] Open the tab → "0 tuning differences · 8 other hidden" and the empty state: the mock's telemetry, UART2/UART3,
-      two modes and two settings changed in Betaflight Configurator (`crashflip_motor_percent`, `yaw_control_reversed`) are
-      setup, so there are no cards
-- [x] Motors → Bidirectional DShot on, props out → Save & Reboot → Diff Checker → "1 tuning difference · 9 other
+- [x] Open the tab → "0 tuning differences · 7 other hidden" and the empty state: the mock's telemetry, UART2/UART3,
+      two modes and the setting changed in Betaflight Configurator (`crashflip_motor_percent`) are setup, so there
+      are no cards
+- [x] Motors → Bidirectional DShot on, props out → Save & Reboot → Diff Checker → "1 tuning difference · 8 other
       hidden", `master` lists only `set dshot_bidir = OFF → ON` (not `yaw_motors_reversed`)
-- [x] Show hidden differences on → "0 tuning differences · 8 other shown", sections `feature`, `serial`, `aux` …
+- [x] Show hidden differences on → "0 tuning differences · 7 other shown", sections `feature`, `serial`, `aux` …
       appear with their lines, no empty state; it stays on over Read again; off → hidden again
 - [x] Read again reads again; Copy full diff puts the complete raw CLI output on the clipboard
 - [x] Afterwards other tabs load as usual (the FC is back in MSP)

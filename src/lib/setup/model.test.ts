@@ -451,7 +451,7 @@ describe('changed outside this app', () => {
     expect(withReset(draft, 'master: crashflip_motor_percent', true).resets).toEqual(draft.resets)
   })
 
-  it('reads the mock FC: two settings changed in Betaflight Configurator; its features and the app-managed setup do not count', async () => {
+  it('reads the mock FC: a setting changed in Betaflight Configurator; its features and the app-managed setup do not count', async () => {
     const { client } = await connect(new MockFlightController())
     const snapshot = await readSetupSnapshot(client)
     expect(snapshot.externalError).toBeNull()
@@ -461,14 +461,13 @@ describe('changed outside this app', () => {
         change.defaultValue,
         change.value,
       ]),
-    ).toEqual([
-      ['crashflip_motor_percent', '0', '50'],
-      ['yaw_control_reversed', 'OFF', 'ON'],
-    ])
+    ).toEqual([['crashflip_motor_percent', '0', '50']])
   })
 
   it('resets one setting on the mock FC and leaves the others, across a reboot', async () => {
-    const fc = new MockFlightController()
+    const config = defaultMockConfig()
+    config.settings.yaw_control_reversed = 'ON'
+    const fc = new MockFlightController({ config })
     const { transport, client } = await connect(fc)
     const snapshot = await readSetupSnapshot(client)
     await saveSetup(
@@ -484,11 +483,7 @@ describe('changed outside this app', () => {
     expect(externalChanges(after, readSetup(after)).map((change) => change.label)).toEqual([
       'crashflip_motor_percent',
     ])
-    const before = defaultMockConfig()
-    expect(fc.savedConfig).toEqual({
-      ...before,
-      settings: { ...before.settings, yaw_control_reversed: 'OFF' },
-    })
+    expect(fc.savedConfig).toEqual(defaultMockConfig())
   })
 
   it('resets a profile setting through the profile switch, and everything with Reset all', async () => {
@@ -500,7 +495,6 @@ describe('changed outside this app', () => {
     const draft = withAllResets(snapshot, readSetup(snapshot))
     expect(resetScript(snapshot, draft)).toEqual([
       'set crashflip_motor_percent = 0',
-      'set yaw_control_reversed = OFF',
       'profile 0',
       'set anti_gravity_gain = 80',
       'profile 0',
@@ -509,7 +503,6 @@ describe('changed outside this app', () => {
     expect(fc.savedConfig.settings).toEqual({
       ...config.settings,
       crashflip_motor_percent: '0',
-      yaw_control_reversed: 'OFF',
       anti_gravity_gain: '80',
     })
     expect(fc.savedConfig.features).toBe(config.features)

@@ -71,54 +71,45 @@ const externalRow = (name: string) => within(externalList()).getByRole('listitem
 describe('Setup tab: changed outside this app', () => {
   it("lists the settings changed in Betaflight Configurator, default → value; the mock's features do not count", async () => {
     await openTab('Setup')
-    expect(await screen.findByText('2 changes made outside this app.')).toBeInTheDocument()
+    expect(await screen.findByText('1 change made outside this app.')).toBeInTheDocument()
     expect(externalRow('crashflip_motor_percent')).toHaveTextContent('master')
     expect(externalRow('crashflip_motor_percent')).toHaveTextContent('0 → 50')
-    expect(within(externalRow('yaw_control_reversed')).getByText('OFF').tagName).toBe('DEL') // the default, red
-    expect(within(externalRow('yaw_control_reversed')).getByText('ON').tagName).toBe('INS') // what is set, green
+    expect(within(externalRow('crashflip_motor_percent')).getByText('0').tagName).toBe('DEL') // the default, red
+    expect(within(externalRow('crashflip_motor_percent')).getByText('50').tagName).toBe('INS') // what is set, green
     expect(within(externalList()).queryByRole('listitem', { name: /feature/ })).toBeNull()
     expect(screen.getByRole('button', { name: 'Reset all' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Save & Reboot' })).toBeDisabled()
   })
 
-  it('resets one setting with Save & Reboot; Keep and Revert take resets back', async () => {
+  it('resets a setting with Save & Reboot; Keep and Revert take resets back', async () => {
     const user = await openTab('Setup')
-    await screen.findByText('2 changes made outside this app.')
+    await screen.findByText('1 change made outside this app.')
+    const crashflip = () => externalRow('crashflip_motor_percent')
 
-    await user.click(
-      within(externalRow('yaw_control_reversed')).getByRole('button', { name: 'Reset' }),
-    )
+    await user.click(within(crashflip()).getByRole('button', { name: 'Reset' }))
     expect(
-      screen.getByText('2 changes made outside this app. 1 to reset once saved.'),
+      screen.getByText('1 change made outside this app. 1 to reset once saved.'),
     ).toBeInTheDocument()
-    expect(externalRow('yaw_control_reversed')).toHaveTextContent('ON → OFF · not saved yet')
-    expect(within(externalRow('yaw_control_reversed')).getByText('OFF').tagName).toBe('INS') // what it will be
-    await user.click(
-      within(externalRow('yaw_control_reversed')).getByRole('button', { name: 'Keep' }),
-    )
-    expect(externalRow('yaw_control_reversed')).toHaveTextContent('OFF → ON')
+    expect(crashflip()).toHaveTextContent('50 → 0 · not saved yet')
+    expect(within(crashflip()).getByText('0').tagName).toBe('INS') // what it will be
+    await user.click(within(crashflip()).getByRole('button', { name: 'Keep' }))
+    expect(crashflip()).toHaveTextContent('0 → 50')
     expect(screen.getByRole('button', { name: 'Save & Reboot' })).toBeDisabled()
 
     await user.click(screen.getByRole('button', { name: 'Reset all' }))
     expect(
-      screen.getByText('2 changes made outside this app. 2 to reset once saved.'),
+      screen.getByText('1 change made outside this app. 1 to reset once saved.'),
     ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reset all' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'Revert' }))
-    expect(screen.getByText('2 changes made outside this app.')).toBeInTheDocument()
+    expect(screen.getByText('1 change made outside this app.')).toBeInTheDocument()
 
-    await user.click(
-      within(externalRow('yaw_control_reversed')).getByRole('button', { name: 'Reset' }),
-    )
+    await user.click(within(crashflip()).getByRole('button', { name: 'Reset' }))
     await saveAndReboot(user)
-    expect(await screen.findByText('1 change made outside this app.')).toBeInTheDocument()
-    expect(externalRow('crashflip_motor_percent')).toHaveTextContent('0 → 50')
-    expect(
-      within(externalList()).queryByRole('listitem', { name: 'yaw_control_reversed' }),
-    ).toBeNull()
+    expect(await screen.findByText('Nothing was changed outside this app.')).toBeInTheDocument()
 
     // the Diff Checker sees the same FC
     await user.click(screen.getByRole('link', { name: 'Diff Checker' }))
-    expect(await screen.findByText(/^0 tuning differences · 7 other hidden/)).toBeInTheDocument()
+    expect(await screen.findByText(/^0 tuning differences · 6 other hidden/)).toBeInTheDocument()
   })
 })

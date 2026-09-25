@@ -192,9 +192,9 @@ export function defaultMockConfig(): MockFcConfig {
       tpa_mode: 'D',
       tpa_rate: '65',
       tpa_breakpoint: '1350',
-      // Changed in Betaflight Configurator — no tab of this app manages them (Betaflight defaults: 0, OFF)
+      // Changed in Betaflight Configurator — no tab of this app manages it (Betaflight default: 0)
       crashflip_motor_percent: '50',
-      yaw_control_reversed: 'ON',
+      yaw_control_reversed: 'OFF', // Betaflight default; for tests that change a setting outside this app
       osd_units: 'METRIC', // Betaflight default; the OSD tab manages it
       anti_gravity_gain: '80', // a profile setting at its default, for tests that change it
     },
@@ -276,8 +276,8 @@ function defaultOsd(): MockFcConfig['osd'] {
 
 /**
  * What the CLI's `defaults` would leave behind, i.e. what its `diff` compares with: `defaultMockConfig` minus the
- * setup — only the USB port speaks MSP, no modes, no telemetry, and the two settings changed outside this app at
- * their Betaflight defaults.
+ * setup — only the USB port speaks MSP, no modes, no telemetry, and the setting changed outside this app at
+ * its Betaflight default.
  */
 export function firmwareDefaultConfig(): MockFcConfig {
   const config = defaultMockConfig()
@@ -287,7 +287,7 @@ export function firmwareDefaultConfig(): MockFcConfig {
       port(identifier, identifier === 20 ? PORT_FUNCTION.MSP : 0),
     ),
     features: FEATURE.RX_SERIAL | FEATURE.OSD | FEATURE.AIRMODE,
-    settings: { ...config.settings, crashflip_motor_percent: '0', yaw_control_reversed: 'OFF' },
+    settings: { ...config.settings, crashflip_motor_percent: '0' },
     modeSlots: config.modeSlots.map(() => ({ boxId: 0, auxChannel: 0, start: 900, end: 900 })),
   }
 }

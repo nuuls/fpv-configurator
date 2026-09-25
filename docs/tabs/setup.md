@@ -25,7 +25,7 @@ everything that was changed outside this app (Betaflight Configurator, CLI) with
 | Changed outside this app                  [Reset all] |
 |  3 changes made outside this app. 1 to reset once saved. |
 |  master   crashflip_motor_percent        [0] → [50] [Reset] |
-|  master   yaw_control_reversed  [ON] → [OFF] · not saved yet [Keep] |
+|  profile 0  anti_gravity_gain  [100] → [80] · not saved yet [Keep] |
 |  led      led 0 0,0::C:2      Only in Betaflight Configurator |
 +-------------------------------------------------------+
                                   [Revert] [Save & Reboot]
@@ -163,14 +163,16 @@ Checkable with **Connect Mock FC**:
       config (beeper on, beacon off) fails the check
 - [x] Turning airmode off on the mock and fixing it writes only the feature mask (unit test)
 
-- [x] Changed outside this app: "2 changes made outside this app." — `crashflip_motor_percent` 0 → 50,
-      `yaw_control_reversed` OFF → ON, each with Reset; Reset all enabled; the app's own setup (ports, modes, `dshot_bidir`, …)
-      and the mock's features (`TELEMETRY`, `ESC_SENSOR`) aren't listed
-- [x] Reset `yaw_control_reversed` → "ON → OFF · not saved yet" and "1 to reset once saved.", Keep takes it back;
-      Reset all marks both, Revert unmarks them; Reset `yaw_control_reversed` → Save & Reboot → "1 change made outside
-      this app.", Diff Checker reads "0 tuning differences · 7 other hidden"
+- [x] Changed outside this app: "1 change made outside this app." — `crashflip_motor_percent` 0 → 50 with Reset;
+      Reset all enabled; the app's own setup (ports, modes, `dshot_bidir`, `osd_units`, …) and the mock's features
+      (`TELEMETRY`, `ESC_SENSOR`) aren't listed
+- [x] Reset `crashflip_motor_percent` → "50 → 0 · not saved yet" and "1 to reset once saved.", Keep takes it back;
+      Reset all marks it, Revert unmarks it; Reset → Save & Reboot → "Nothing was changed outside this app.",
+      Diff Checker reads "0 tuning differences · 6 other hidden"
+- [x] Resetting one of two changes (mock with `yaw_control_reversed = ON`) leaves the other, across a reboot (unit
+      test)
 - [x] Reset all on a mock with `anti_gravity_gain = 100` in profile 0 sends `set crashflip_motor_percent = 0`,
-      `set yaw_control_reversed = OFF`, `profile 0`, `set anti_gravity_gain = 80`, `profile 0`, and leaves the features
+      `profile 0`, `set anti_gravity_gain = 80`, `profile 0`, and leaves the features
       alone; afterwards the FC is back on MSP (unit test)
 - [x] The craft name, `led` lines and a setting without a printed default have no Reset; calibrations
       (`vbat_scale`, `acc_calibration`, …) and features aren't listed; an unknown name makes the save fail with the

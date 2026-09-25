@@ -52,7 +52,7 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
 const ascii = (text: string) => new TextEncoder().encode(text)
 
 describe('readDiff against the mock FC', () => {
-  it('reports the setup of the default mock: telemetry, the receiver and ESC sensor ports, two modes, two settings', async () => {
+  it('reports the setup of the default mock: telemetry, the receiver and ESC sensor ports, two modes, one setting', async () => {
     const report = await readDiff(await openMock())
 
     expect(report.firmware).toContain('Betaflight')
@@ -66,7 +66,7 @@ describe('readDiff against the mock FC', () => {
       { kind: 'command', line: 'serial UART3 0 115200 57600 0 115200', isDefault: true },
       { kind: 'command', line: 'serial UART3 1024 115200 57600 0 115200', isDefault: false },
     ])
-    expect(countDifferences(report)).toBe(8)
+    expect(countDifferences(report)).toBe(7)
   })
 
   it('reports nothing for an FC at its defaults', async () => {
@@ -85,7 +85,6 @@ describe('readDiff against the mock FC', () => {
     expect(report.sections.find((s) => s.title === 'master')?.entries).toEqual([
       { kind: 'setting', name: 'align_board_yaw', value: '90', defaultValue: '0' },
       { kind: 'setting', name: 'crashflip_motor_percent', value: '50', defaultValue: '0' },
-      { kind: 'setting', name: 'yaw_control_reversed', value: 'ON', defaultValue: 'OFF' },
     ])
     expect(report.sections.find((s) => s.title === 'profile 0')?.entries).toEqual([
       { kind: 'setting', name: 'dyn_idle_min_rpm', value: '35', defaultValue: '0' },
@@ -104,12 +103,13 @@ describe('runCliCommands against the mock FC', () => {
   it('changes the running config, not the saved one', async () => {
     const fc = new MockFlightController()
     const client = await openMock(fc)
-    await runCliCommands(client, ['profile 0', 'set yaw_control_reversed = OFF', 'profile 0'])
+    await runCliCommands(client, ['profile 0', 'set yaw_control_reversed = ON', 'profile 0'])
     const master = (await readDiff(client)).sections.find((s) => s.title === 'master')
     expect(master?.entries.map((e) => (e.kind === 'setting' ? e.name : e.line))).toEqual([
       'crashflip_motor_percent',
+      'yaw_control_reversed',
     ])
-    expect(fc.savedConfig.settings.yaw_control_reversed).toBe('ON')
+    expect(fc.savedConfig.settings.yaw_control_reversed).toBe('OFF')
     expect((await readFcInfo(client)).variant).toBe('BTFL')
   })
 
