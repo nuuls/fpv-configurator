@@ -131,7 +131,7 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
     - All other settings hidden; a warning with a reset to default when one is not on its default
   - AM32
     - Only support 2.21, show error otherwise
-    - Editable: 3D mode, PWM type, PWM frequency (slider), Motor KV, Motor poles
+    - Editable: PWM type, PWM frequency (slider), Motor KV, Motor poles
     - All other settings hidden; a warning with a reset to default when one is not on its default
   - Motor direction is ignored completely: not shown, not compared between ESCs
 

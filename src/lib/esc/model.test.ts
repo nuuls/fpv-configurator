@@ -477,7 +477,6 @@ describe('editing', () => {
       'powerRating',
     ])
     expect(groups[1]?.settings.map((def) => def.key)).toEqual([
-      'bidirectional',
       'variablePwm',
       'pwmFrequency',
       'motorKv',
@@ -495,7 +494,7 @@ describe('editing', () => {
       'beaconStrength',
       'beaconDelay',
     ])
-    expect(groups[1]?.defaults).toHaveLength(33)
+    expect(groups[1]?.defaults).toHaveLength(34)
   })
 
   it('finds the settings that are not on the default and puts them back', () => {
@@ -503,6 +502,7 @@ describe('editing', () => {
       mockBluejayEsc(),
       withMockSettings(mockBluejayEsc(), { 0x1f: 3, 0x23: 7 }),
       mockAm32Esc(),
+      withMockSettings(mockAm32Esc(), { 18: 1 }), // 3D mode
     ])
     const [bluejay, am32] = editableGroups(reports)
     if (!bluejay || !am32) throw new Error('no groups')
@@ -510,10 +510,11 @@ describe('editing', () => {
     const keys = (esc: number, group: EscGroup, from = draft) =>
       offDefault(from, esc, group).map((def) => def.key)
     // The mocks are on the firmware's defaults
-    expect([keys(0, bluejay), keys(1, bluejay), keys(2, am32)]).toEqual([
+    expect([keys(0, bluejay), keys(1, bluejay), keys(2, am32), keys(3, am32)]).toEqual([
       [],
       ['demag', 'temperature'],
       [],
+      ['bidirectional'],
     ])
 
     const reset = resetToDefaults(draft, [1], offDefault(draft, 1, bluejay))

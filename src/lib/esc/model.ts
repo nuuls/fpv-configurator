@@ -450,7 +450,13 @@ const AM32_SETTINGS: EscSettingDef[] = [
     defaultRaw: 0,
     ...shown(toggle),
   },
-  { key: 'bidirectional', label: 'Bidirectional (3D) mode', offset: 18, ...toggle },
+  {
+    key: 'bidirectional',
+    label: 'Bidirectional (3D) mode',
+    offset: 18,
+    defaultRaw: 0,
+    ...shown(toggle),
+  },
   {
     key: 'variablePwm',
     label: 'PWM type',

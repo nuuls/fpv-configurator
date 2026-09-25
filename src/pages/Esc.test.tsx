@@ -104,7 +104,7 @@ describe('ESC tab', () => {
     expect(within(bluejay).queryByLabelText('PWM frequency')).toBeNull()
     // AM32: only the motor settings
     const am32 = card(2)
-    expect(within(am32).getByLabelText('Bidirectional (3D) mode')).not.toBeChecked()
+    expect(within(am32).queryByText(/3D/)).toBeNull() // on its default: off
     expect(within(am32).getByLabelText('PWM type')).toHaveDisplayValue('Variable')
     expect(slider(am32, 'PWM frequency')).toHaveAttribute('aria-valuenow', '24')
     expect(within(am32).getByLabelText('Motor KV')).toHaveValue(2220)
