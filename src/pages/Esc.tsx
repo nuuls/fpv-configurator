@@ -194,39 +194,48 @@ export function EscReportList({
         </Notice>
       ))}
       {overview.reason && <Notice tone="warning">{overview.reason}</Notice>}
-      <div className="mt-4 grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {reports.map((report, index) => (
-          <EscCard
-            key={index}
-            number={index + 1}
-            report={report}
-            differing={differing[index] ?? new Set()}
-          />
-        ))}
-      </div>
       {groups.map((group) => (
-        <Card
-          key={group.firmware}
-          role="group"
-          aria-label={`${group.firmware} settings`}
-          className="mt-4 max-w-xl"
-        >
-          <CardHeader>
-            <CardTitle>
-              Change {group.firmware} {group.version} settings
-            </CardTitle>
-            <CardDescription>
-              {group.escs.length === 1
-                ? `ESC ${group.escs.map((esc) => esc + 1).join()}`
-                : `ESC ${group.escs.map((esc) => esc + 1).join(', ')} — set up alike`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm">
-            <GroupEditor group={group} draft={draft} onChange={onChange} />
-          </CardContent>
-        </Card>
+        <UnevenNotice key={group.firmware} group={group} draft={draft} onChange={onChange} />
       ))}
+      <div className="mt-4 grid items-start gap-4 lg:grid-cols-2">
+        {reports.map((report, index) => {
+          const group = groups.find((other) => other.escs.includes(index))
+          return (
+            <EscCard
+              key={index}
+              number={index + 1}
+              report={report}
+              differing={differing[index] ?? new Set()}
+              group={group && { ...group, escs: [index] }}
+              compareWith={group?.escs[0]}
+              draft={draft}
+              onChange={onChange}
+            />
+          )
+        })}
+      </div>
     </>
+  )
+}
+
+/** ESCs of one firmware that differ in a setting this app changes: which, and a button that levels them. */
+function UnevenNotice({ group, draft, onChange }: GroupEditorProps) {
+  const uneven = unevenSettings(draft, group)
+  const first = group.escs[0] ?? 0
+  if (uneven.length === 0) return null
+  return (
+    <Notice tone="warning">
+      Not the same on the {group.firmware} ESCs ({group.escs.map((esc) => esc + 1).join(', ')}):{' '}
+      {uneven.join(', ')}.{' '}
+      <Button
+        size="sm"
+        variant="outline"
+        className="ml-1"
+        onClick={() => onChange(alignGroup(draft, group))}
+      >
+        Use ESC {first + 1}&apos;s for all
+      </Button>
+    </Notice>
   )
 }
 
@@ -258,7 +267,7 @@ function CombinedEscCard({ overview, group, draft, onChange }: CombinedEscCardPr
             <div className="mt-3">
               <GroupEditor group={group} draft={draft} onChange={onChange} />
             </div>
-            <h3 className="mt-6 mb-1 font-medium">Other settings</h3>
+            {readOnly.length > 0 && <h3 className="mt-6 mb-1 font-medium">Other settings</h3>}
           </>
         )}
         <dl className="divide-y">
@@ -291,15 +300,23 @@ function CombinedEscCard({ overview, group, draft, onChange }: CombinedEscCardPr
   )
 }
 
-function EscCard({
-  number,
-  report,
-  differing,
-}: {
+interface EscCardProps {
   number: number
   report: EscReport
+  /** Keys of the settings (as read) that are not what the first ESC with this firmware has. */
   differing: Set<string>
-}) {
+  /** This ESC's editable settings, if its firmware has any: edited at the top of the card. */
+  group: EscGroup | undefined
+  /** The first ESC with the same firmware: an edited value that isn't the same as there is marked. */
+  compareWith: number | undefined
+  draft: EscDraft
+  onChange: (draft: EscDraft) => void
+}
+
+function EscCard({ number, report, differing, group, compareWith, draft, onChange }: EscCardProps) {
+  const edited = new Set(group?.settings.map((def) => def.key))
+  const readOnly =
+    report.status === 'ok' ? report.settings.filter((setting) => !edited.has(setting.key)) : []
   return (
     <Card role="group" aria-label={`ESC ${number}`}>
       <CardHeader>
@@ -323,8 +340,21 @@ function EscCard({
       {report.status === 'ok' && (
         <CardContent className="text-sm">
           {report.note && <p className="text-muted-foreground">{report.note}</p>}
+          {group && (
+            <>
+              <div className="mt-3">
+                <GroupEditor
+                  group={group}
+                  draft={draft}
+                  onChange={onChange}
+                  compareWith={compareWith}
+                />
+              </div>
+              {readOnly.length > 0 && <h3 className="mt-6 mb-1 font-medium">Other settings</h3>}
+            </>
+          )}
           <dl className="divide-y">
-            {report.settings.map((setting) => (
+            {readOnly.map((setting) => (
               <div
                 key={setting.key}
                 className="flex flex-wrap items-baseline justify-between gap-x-3 py-1.5"
@@ -393,30 +423,26 @@ interface GroupEditorProps {
 }
 
 /** The settings of ESCs that are edited as one. A change goes to all of them, except for what is set per motor. */
-function GroupEditor({ group, draft, onChange }: GroupEditorProps) {
+function GroupEditor({
+  group,
+  draft,
+  onChange,
+  compareWith,
+}: GroupEditorProps & { compareWith?: number | undefined }) {
   const first = group.escs[0] ?? 0
-  const uneven = unevenSettings(draft, group)
   const raw = (key: string) => {
     const def = group.settings.find((other) => other.key === key)
     return def ? draftRaw(draft, first, def) : 0
   }
+  const differs = (def: EscSettingDef) =>
+    !def.perMotor &&
+    compareWith !== undefined &&
+    draftRaw(draft, first, def) !== draftRaw(draft, compareWith, def)
+  const perMotorList = group.escs.length > 1
   const sections = [...new Set(group.settings.map((def) => def.group))]
 
   return (
     <>
-      {uneven.length > 0 && (
-        <Notice tone="warning">
-          Not the same on these ESCs: {uneven.join(', ')}. ESC {first + 1}&apos;s values are shown.{' '}
-          <Button
-            size="sm"
-            variant="outline"
-            className="ml-1"
-            onClick={() => onChange(alignGroup(draft, group))}
-          >
-            Use them for all
-          </Button>
-        </Notice>
-      )}
       {sections.map((section) => (
         <Fragment key={section ?? ''}>
           {section && <h3 className="mt-6 mb-1 font-medium">{section}</h3>}
@@ -425,7 +451,7 @@ function GroupEditor({ group, draft, onChange }: GroupEditorProps) {
               .filter((def) => def.group === section)
               .map((def) => {
                 const disabled = def.enabled ? !def.enabled(raw) : false
-                const id = `esc-${group.firmware}-${def.key}`
+                const id = `esc-${group.escs.join('-')}-${def.key}`
                 const slider = def.control?.kind === 'number' && def.control.recommended
                 return (
                   <div
@@ -439,14 +465,22 @@ function GroupEditor({ group, draft, onChange }: GroupEditorProps) {
                     <div>
                       <label
                         id={`${id}-label`}
-                        htmlFor={def.perMotor || slider ? undefined : id}
+                        htmlFor={(def.perMotor && perMotorList) || slider ? undefined : id}
                         className="font-medium"
                       >
                         {def.label}
                       </label>
+                      {differs(def) && (
+                        <Badge
+                          className="ml-2 py-0"
+                          title="Not the same as on the first ESC with this firmware"
+                        >
+                          differs
+                        </Badge>
+                      )}
                       {def.hint && <p className="text-muted-foreground text-xs">{def.hint}</p>}
                     </div>
-                    {def.perMotor ? (
+                    {def.perMotor && perMotorList ? (
                       <ul className="flex flex-col items-end gap-1.5">
                         {group.escs.map((esc) => (
                           <li key={esc} className="flex items-center gap-2">

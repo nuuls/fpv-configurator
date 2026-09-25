@@ -24,8 +24,6 @@ resetAppAfterEach()
 const escCard = (number: number) =>
   screen.findByRole('group', { name: `ESC ${number}` }, { timeout: 5000 })
 const card = (number: number) => screen.getByRole('group', { name: `ESC ${number}` })
-/** The editor of one firmware's settings, below the cards. */
-const editor = (firmware: string) => screen.getByRole('group', { name: `${firmware} settings` })
 /** A setting shown as a slider with its recommended range. */
 const slider = (within_: HTMLElement, label: string) =>
   within(within(within_).getByRole('group', { name: label })).getByRole('slider')
@@ -89,18 +87,21 @@ describe('ESC tab', () => {
     expect(within(card(2)).getByText('AM32 2.21')).toBeInTheDocument()
     expect(within(card(2)).getByText('MOCK_ESC_F051')).toBeInTheDocument()
 
-    // What can be changed on Bluejay: the timing and both startup powers
-    const bluejayEditor = editor('Bluejay')
-    expect(within(bluejayEditor).getByText('ESC 1')).toBeInTheDocument()
+    // What can be changed is changed on the ESC's card. Bluejay: the timing and both startup powers
+    const bluejayEditor = card(1)
     expect(within(bluejayEditor).getByLabelText('Motor timing')).toHaveDisplayValue(
       '22.5° (medium high)',
     )
     expect(slider(bluejayEditor, 'Minimum startup power')).toHaveAttribute('aria-valuenow', '1025')
     expect(slider(bluejayEditor, 'Maximum startup power')).toHaveAttribute('aria-valuenow', '1020')
     expect(within(bluejayEditor).queryByLabelText('PWM frequency')).toBeNull()
+    expect(within(bluejayEditor).getAllByText('Motor timing')).toHaveLength(1)
+    expect(screen.queryByRole('group', { name: /settings/ })).toBeNull()
     // AM32: every setting of the AM32 configurator
-    const am32Editor = editor('AM32')
-    expect(within(am32Editor).getByLabelText('ESC 2')).toHaveDisplayValue('Normal')
+    const am32Editor = card(2)
+    expect(within(am32Editor).getByLabelText('Motor direction')).toHaveDisplayValue('Normal')
+    // Every AM32 setting can be changed: nothing is left to only show
+    expect(within(am32Editor).queryByText('Other settings')).toBeNull()
     expect(within(am32Editor).getByLabelText('Motor KV')).toHaveValue(2220)
     expect(within(am32Editor).getByLabelText('Signal protocol')).toHaveDisplayValue('DShot')
 
@@ -115,14 +116,11 @@ describe('ESC tab', () => {
       const user = await openTab('ESC')
       await user.click(screen.getByRole('button', { name: 'Read ESCs' }))
       await escCard(1)
-      await user.selectOptions(
-        within(editor('Bluejay')).getByLabelText('Motor timing'),
-        '15° (medium)',
-      )
+      await user.selectOptions(within(card(1)).getByLabelText('Motor timing'), '15° (medium)')
       // 1020 → 1100: a page is ten steps of 4
-      await nudge(user, slider(editor('Bluejay'), 'Maximum startup power'), '{PageUp}{PageUp}')
+      await nudge(user, slider(card(1), 'Maximum startup power'), '{PageUp}{PageUp}')
       expect(screen.getByText('Recommended (1050–1200)')).toBeInTheDocument()
-      const kv = within(editor('AM32')).getByLabelText('Motor KV')
+      const kv = within(card(2)).getByLabelText('Motor KV')
       await user.clear(kv)
       await user.type(kv, '1940')
       await user.tab()
@@ -147,17 +145,12 @@ describe('ESC tab', () => {
         { timeout: 5000 },
       )
       await escCard(1)
-      expect(within(editor('Bluejay')).getByLabelText('Motor timing')).toHaveDisplayValue(
-        '15° (medium)',
-      )
-      expect(slider(editor('Bluejay'), 'Maximum startup power')).toHaveAttribute(
-        'aria-valuenow',
-        '1100',
-      )
-      expect(within(editor('AM32')).getByLabelText('Motor KV')).toHaveValue(1940)
+      expect(within(card(1)).getByLabelText('Motor timing')).toHaveDisplayValue('15° (medium)')
+      expect(slider(card(1), 'Maximum startup power')).toHaveAttribute('aria-valuenow', '1100')
+      expect(within(card(2)).getByLabelText('Motor KV')).toHaveValue(1940)
       // Untouched: the direction of each motor
       expect(setting(card(1), 'Motor direction')).toHaveTextContent(/^Motor directionNormal$/)
-      expect(within(editor('AM32')).getByLabelText('ESC 2')).toHaveDisplayValue('Normal')
+      expect(within(card(2)).getByLabelText('Motor direction')).toHaveDisplayValue('Normal')
     },
   )
 
@@ -165,7 +158,7 @@ describe('ESC tab', () => {
     const user = await openTab('ESC')
     await user.click(screen.getByRole('button', { name: 'Read ESCs' }))
     await escCard(1)
-    const timing = within(editor('Bluejay')).getByLabelText('Motor timing')
+    const timing = within(card(1)).getByLabelText('Motor timing')
     await user.selectOptions(timing, '0° (low)')
     await user.click(screen.getByRole('button', { name: 'Revert' }))
     expect(timing).toHaveDisplayValue('22.5° (medium high)')
@@ -215,28 +208,22 @@ describe('ESCs that are not alike', () => {
     expect(screen.queryByRole('group', { name: 'All ESCs' })).toBeNull()
     expect(screen.getByText(/don't all run the same firmware/)).toBeInTheDocument()
 
+    // What can be changed is changed on the card; BLHeli_S is only shown.
     expect(within(card(1)).getByText('Bluejay 0.21.0')).toBeInTheDocument()
     expect(within(card(1)).getByText('Z-H-30 · EFM8BB21')).toBeInTheDocument()
     expect(setting(card(1), 'Motor direction')).toHaveTextContent('Normal')
-    expect(setting(card(1), 'Motor timing')).toHaveTextContent('22.5°')
+    expect(within(card(1)).getByLabelText('Motor timing')).toHaveDisplayValue('22.5° (medium high)')
+    expect(setting(card(2), 'Motor direction')).toHaveTextContent('Reversed')
 
     expect(within(card(3)).getByText('BLHeli_S 16.7')).toBeInTheDocument()
     expect(setting(card(3), 'Startup power')).toHaveTextContent('0.50')
+    expect(within(card(3)).queryByRole('combobox')).toBeNull()
+    expect(within(card(3)).queryByText('Other settings')).toBeNull()
 
     expect(within(card(4)).getByText('AM32 2.21')).toBeInTheDocument()
     expect(within(card(4)).getByText('MOCK_ESC_F051')).toBeInTheDocument()
-    expect(setting(card(4), 'Motor KV')).toHaveTextContent('2220')
-
-    // One editor per firmware that can be changed; BLHeli_S is only shown.
-    expect(
-      within(screen.getByRole('group', { name: 'Bluejay settings' })).getByText(
-        'ESC 1, 2 — set up alike',
-      ),
-    ).toBeInTheDocument()
-    expect(
-      within(screen.getByRole('group', { name: 'AM32 settings' })).getByLabelText('Motor KV'),
-    ).toHaveValue(2220)
-    expect(screen.queryByRole('group', { name: 'BLHeli_S settings' })).toBeNull()
+    expect(within(card(4)).getByLabelText('Motor KV')).toHaveValue(2220)
+    expect(within(card(4)).getByLabelText('Motor direction')).toHaveDisplayValue('Normal')
   })
 
   it('offers every setting of the AM32 configurator, the motor direction per ESC', async () => {
@@ -278,7 +265,7 @@ describe('ESCs that are not alike', () => {
     expect(poles).toHaveValue(36)
   })
 
-  it("shows ESC 1's values when editable settings differ, and can use them for all", async () => {
+  it("edits every ESC on its own card, marks what differs, and can use ESC 1's settings for all", async () => {
     const user = userEvent.setup()
     render(
       <Editable
@@ -288,13 +275,24 @@ describe('ESCs that are not alike', () => {
         ])}
       />,
     )
-    expect(setting(card(2), 'Motor timing')).toHaveTextContent(/7.5°.*differs/)
-    const editor = screen.getByRole('group', { name: 'Bluejay settings' })
-    expect(within(editor).getByText(/Not the same on these ESCs: Motor timing/)).toBeInTheDocument()
-    expect(within(editor).getByLabelText('Motor timing')).toHaveDisplayValue('22.5° (medium high)')
+    expect(within(card(2)).getByLabelText('Motor timing')).toHaveDisplayValue('7.5° (medium low)')
+    expect(within(card(2)).getByText('differs')).toBeInTheDocument()
+    expect(within(card(1)).queryByText('differs')).toBeNull()
+    expect(
+      screen.getByText(/Not the same on the Bluejay ESCs \(1, 2\): Motor timing/),
+    ).toBeInTheDocument()
 
-    await user.click(within(editor).getByRole('button', { name: 'Use them for all' }))
-    expect(within(editor).queryByText(/Not the same on these ESCs/)).toBeNull()
+    // A change goes to the ESC of its card only
+    await user.selectOptions(within(card(1)).getByLabelText('Motor timing'), '7.5° (medium low)')
+    expect(screen.queryByText('differs')).toBeNull()
+    expect(screen.queryByText(/Not the same on the Bluejay ESCs/)).toBeNull()
+    await user.selectOptions(within(card(1)).getByLabelText('Motor timing'), '30° (high)')
+    expect(within(card(2)).getByLabelText('Motor timing')).toHaveDisplayValue('7.5° (medium low)')
+
+    await user.click(screen.getByRole('button', { name: "Use ESC 1's for all" }))
+    expect(within(card(2)).getByLabelText('Motor timing')).toHaveDisplayValue('30° (high)')
+    expect(screen.queryByText(/Not the same on the Bluejay ESCs/)).toBeNull()
+    expect(screen.queryByText('differs')).toBeNull()
   })
 
   it('tells to update ESCs whose firmware version it does not work with, and offers nothing to change on them', async () => {
