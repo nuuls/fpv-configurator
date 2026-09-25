@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FPV Configurator: a stripped-down Betaflight configurator</title>
+    <title>FPV Configurator: a simplified Betaflight configurator without all the nerd shit</title>
     <meta
       name="description"
-      content="A stripped-down Betaflight configurator that runs in the browser. Simplified setup, checks for common config issues, and Bluejay / AM32 ESC settings without a separate app."
+      content="A simplified Betaflight configurator without all the nerd shit. Simplified setup, finds config issues, and Bluejay / AM32 ESC configuration through the flight controller, right in the browser."
     />
     <!-- Dark from the first paint: the stylesheet only arrives with the app bundle (injected by JS in dev),
          so without this the browser shows its default white page first. Values match .dark in index.css. -->
@@ -35,15 +35,14 @@
     <meta property="og:title" content="FPV Configurator" />
     <meta
       property="og:description"
-      content="A stripped-down Betaflight configurator that runs in the browser. Simplified setup, checks for common config issues, and Bluejay / AM32 ESC settings without a separate app."
+      content="A simplified Betaflight configurator without all the nerd shit. Simplified setup, finds config issues, and Bluejay / AM32 ESC configuration through the flight controller, right in the browser."
     />
   </head>
   <body>
     <div id="root">
       <!-- For crawlers and browsers without JavaScript (hidden otherwise, see <head>); React replaces it. -->
       <main>
-        <h1>FPV Configurator</h1>
-        <p>A simplified Betaflight configurator without all the nerd shit.</p>
+        <h1>A simplified Betaflight configurator without all the nerd shit</h1>
         <h2>Simplified setup</h2>
         <p>
           Only the settings pilots actually touch. PID tuning is three sliders, not a spaceship
@@ -59,6 +58,30 @@
           Change Bluejay and AM32 settings right here, through the flight controller. No second
           configurator. And it double checks your settings as well.
         </p>
+        <footer>
+          <p>
+            Created and maintained by <a href="https://github.com/nuuls">Nils Vo</a> ·
+            <a href="https://github.com/nuuls/fpv-configurator">Source code on GitHub</a> · AGPL-3.0
+            license
+          </p>
+          <p>
+            Built on the work of
+            <a href="https://github.com/betaflight/betaflight">Betaflight</a>,
+            <a href="https://github.com/betaflight/betaflight-configurator"
+              >Betaflight Configurator</a
+            >, <a href="https://github.com/betaflight/firmware-presets">Betaflight presets</a>,
+            <a href="https://github.com/bird-sanctuary/bluejay">Bluejay</a>,
+            <a href="https://github.com/am32-firmware/AM32">AM32</a>,
+            <a href="https://github.com/stylesuxx/esc-configurator">ESC Configurator</a>
+          </p>
+          <p>
+            Disclaimer: this is an independent project, not affiliated with or endorsed by
+            Betaflight or any of the projects above. It is provided as is, without any warranty.
+            Wrong settings can make a drone fly away or spin up its motors unexpectedly — take the
+            propellers off while configuring, and check everything before you fly. You are
+            responsible for your aircraft.
+          </p>
+        </footer>
       </main>
     </div>
     <script type="module" src="/src/main.tsx"></script>
