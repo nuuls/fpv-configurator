@@ -595,14 +595,15 @@ describe('editing', () => {
     ])
   })
 
-  it('greys out the AM32 PWM frequency when the PWM follows the RPM', () => {
+  it('hides the AM32 PWM frequency when the PWM follows the RPM', () => {
     const [group] = editableGroups(read([mockAm32Esc()]))
-    const enabled = (key: string, values: Record<string, number>) =>
-      group?.settings.find((def) => def.key === key)?.enabled?.((other) => values[other] ?? 0)
+    const visible = (key: string, values: Record<string, number>) =>
+      group?.settings.find((def) => def.key === key)?.visible?.((other) => values[other] ?? 0)
     expect([
-      enabled('pwmFrequency', { variablePwm: 2 }),
-      enabled('pwmFrequency', { variablePwm: 1 }),
-    ]).toEqual([false, true])
+      visible('pwmFrequency', { variablePwm: 2 }),
+      visible('pwmFrequency', { variablePwm: 1 }),
+      visible('pwmFrequency', { variablePwm: 0 }),
+    ]).toEqual([false, true, true])
   })
 
   it('knows that variable AM32 PWM goes up to twice the frequency', () => {

@@ -285,13 +285,11 @@ describe('ESCs that are not alike', () => {
     expect(screen.queryByText(/Motor direction/)).toBeNull()
   })
 
-  it('offers the motor settings of AM32, and keeps the PWM frequency out of it when the PWM follows the RPM', async () => {
+  it('offers the motor settings of AM32, and hides the PWM frequency when the PWM follows the RPM', async () => {
     const user = userEvent.setup()
     render(<Editable reports={await readReports([mockAm32Esc(), mockAm32Esc()])} />)
     const all = screen.getByRole('group', { name: 'All ESCs' })
-    const pwm = slider(all, 'PWM frequency')
     const pwmGroup = within(all).getByRole('group', { name: 'PWM frequency' })
-    expect(pwm).not.toHaveAttribute('data-disabled')
     // Variable: the ESC goes up to twice the frequency, shown as a range and a bar on from the thumb
     expect(pwmGroup).toHaveTextContent('24–48 kHz')
     // 8–144 kHz track: from 24 kHz (11.8 %) to 48 kHz (29.4 %)
@@ -304,8 +302,9 @@ describe('ESCs that are not alike', () => {
     expect(within(pwmGroup).queryByTestId('slider-reach')).toBeNull()
 
     await user.selectOptions(within(all).getByLabelText('PWM type'), 'By RPM')
-    expect(pwm).toHaveAttribute('data-disabled')
-    expect(within(pwmGroup).queryByTestId('slider-reach')).toBeNull()
+    expect(within(all).queryByText('PWM frequency')).toBeNull()
+    await user.selectOptions(within(all).getByLabelText('PWM type'), 'Variable')
+    expect(slider(all, 'PWM frequency')).toHaveAttribute('aria-valuenow', '24')
 
     // A number is kept inside what the ESC takes
     const poles = within(all).getByLabelText('Motor poles')

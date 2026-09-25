@@ -198,7 +198,7 @@ export interface EscSettingDef {
   defaultRaw?: number
   hint?: string
   /** false greys the control out: another setting (looked up by key, raw value) makes it meaningless. */
-  enabled?: (raw: (key: string) => number) => boolean
+  visible?: (raw: (key: string) => number) => boolean
   /**
    * How far the ESC takes the value by itself while running (in shown numbers), e.g. variable PWM up to twice the
    * frequency; null when it stays where it is set.
@@ -462,7 +462,8 @@ const AM32_SETTINGS: EscSettingDef[] = [
     label: 'PWM frequency',
     offset: 24,
     hint: 'Variable PWM runs between this frequency and twice as much.',
-    enabled: (raw) => raw('variablePwm') < 2,
+    // "By RPM": the firmware picks the frequency itself
+    visible: (raw) => raw('variablePwm') < 2,
     // `variable_pwm` 1: the timer period follows the RPM between the set one and half of it (`Src/main.c`)
     reach: (value, raw) => (raw('variablePwm') === 1 ? value * 2 : null),
     ...number({ min: 8, max: 144, unit: 'kHz', slider: true }),

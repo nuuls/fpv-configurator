@@ -496,46 +496,48 @@ function GroupEditor({
 
   return (
     <div className="divide-y">
-      {group.settings.map((def) => {
-        const disabled = def.enabled ? !def.enabled(raw) : false
-        const id = `esc-${group.escs.join('-')}-${def.key}`
-        const slider =
-          def.control?.kind === 'number' && (def.control.slider || def.control.recommended)
-        return (
-          <div
-            key={def.key}
-            className={
-              slider ? 'flex flex-col gap-2 py-3' : 'flex items-center justify-between gap-3 py-1.5'
-            }
-          >
-            <div>
-              <label id={`${id}-label`} htmlFor={slider ? undefined : id} className="font-medium">
-                {def.label}
-              </label>
-              {differs(def) && (
-                <Badge
-                  className="ml-2 py-0"
-                  title="Not the same as on the first ESC with this firmware"
-                >
-                  differs
-                </Badge>
-              )}
-              {def.hint && <p className="text-muted-foreground text-xs">{def.hint}</p>}
+      {group.settings
+        .filter((def) => def.visible?.(raw) ?? true)
+        .map((def) => {
+          const id = `esc-${group.escs.join('-')}-${def.key}`
+          const slider =
+            def.control?.kind === 'number' && (def.control.slider || def.control.recommended)
+          return (
+            <div
+              key={def.key}
+              className={
+                slider
+                  ? 'flex flex-col gap-2 py-3'
+                  : 'flex items-center justify-between gap-3 py-1.5'
+              }
+            >
+              <div>
+                <label id={`${id}-label`} htmlFor={slider ? undefined : id} className="font-medium">
+                  {def.label}
+                </label>
+                {differs(def) && (
+                  <Badge
+                    className="ml-2 py-0"
+                    title="Not the same as on the first ESC with this firmware"
+                  >
+                    differs
+                  </Badge>
+                )}
+                {def.hint && <p className="text-muted-foreground text-xs">{def.hint}</p>}
+              </div>
+              {/* a long hint next to it must not squeeze the control */}
+              <div className={slider ? undefined : 'shrink-0'}>
+                <SettingControl
+                  id={id}
+                  def={def}
+                  raw={draftRaw(draft, first, def)}
+                  reach={(value) => def.reach?.(value, raw) ?? null}
+                  onChange={(next) => onChange(setDraftRaw(draft, group.escs, def, next))}
+                />
+              </div>
             </div>
-            {/* a long hint next to it must not squeeze the control */}
-            <div className={slider ? undefined : 'shrink-0'}>
-              <SettingControl
-                id={id}
-                def={def}
-                raw={draftRaw(draft, first, def)}
-                reach={(value) => def.reach?.(value, raw) ?? null}
-                disabled={disabled}
-                onChange={(next) => onChange(setDraftRaw(draft, group.escs, def, next))}
-              />
-            </div>
-          </div>
-        )
-      })}
+          )
+        })}
     </div>
   )
 }
@@ -546,30 +548,17 @@ interface SettingControlProps {
   raw: number
   /** How far the ESC takes a number by itself (see `EscSettingDef.reach`). */
   reach: (value: number) => number | null
-  disabled: boolean
   onChange: (raw: number) => void
 }
 
-function SettingControl({ id, def, raw, reach, disabled, onChange }: SettingControlProps) {
+function SettingControl({ id, def, raw, reach, onChange }: SettingControlProps) {
   const { control } = def
   if (!control) return null
   if (control.kind === 'switch')
-    return (
-      <Switch
-        id={id}
-        checked={raw !== 0}
-        disabled={disabled}
-        onCheckedChange={(on) => onChange(on ? 1 : 0)}
-      />
-    )
+    return <Switch id={id} checked={raw !== 0} onCheckedChange={(on) => onChange(on ? 1 : 0)} />
   if (control.kind === 'select') {
     return (
-      <NativeSelect
-        id={id}
-        value={raw}
-        disabled={disabled}
-        onChange={(e) => onChange(Number(e.target.value))}
-      >
+      <NativeSelect id={id} value={raw} onChange={(e) => onChange(Number(e.target.value))}>
         {/* a value the list doesn't have stays selectable as what it is */}
         {!control.options.some((option) => option.raw === raw) && (
           <NativeSelectOption value={raw}>{def.format(raw)}</NativeSelectOption>
@@ -589,7 +578,6 @@ function SettingControl({ id, def, raw, reach, disabled, onChange }: SettingCont
         control={control}
         raw={raw}
         reach={reach(rawToNumber(control, raw))}
-        disabled={disabled}
         onChange={onChange}
       />
     )
@@ -601,9 +589,8 @@ function SettingControl({ id, def, raw, reach, disabled, onChange }: SettingCont
         max={control.max}
         step={control.step}
         value={rawToNumber(control, raw)}
-        disabled={disabled}
         onValueChange={(value) => onChange(numberToRaw(control, value))}
-        className="dark:bg-input/30 h-9 w-24 rounded-md border bg-transparent px-3 disabled:opacity-50"
+        className="dark:bg-input/30 h-9 w-24 rounded-md border bg-transparent px-3"
       />
       {control.unit && <span className="text-muted-foreground">{control.unit}</span>}
     </div>
@@ -628,20 +615,18 @@ function NumberSlider({
   control,
   raw,
   reach,
-  disabled,
   onChange,
 }: {
   labelledBy: string
   control: NumberControl
   raw: number
   reach: number | null
-  disabled: boolean
   onChange: (raw: number) => void
 }) {
   const value = rawToNumber(control, raw)
   const clamp = (v: number) => Math.min(control.max, Math.max(control.min, v))
   const percent = (v: number) => ((clamp(v) - control.min) / (control.max - control.min)) * 100
-  const reaches = reach !== null && reach > value && !disabled
+  const reaches = reach !== null && reach > value
 
   return (
     <div role="group" aria-labelledby={labelledBy} className="flex flex-col gap-2">
@@ -656,7 +641,6 @@ function NumberSlider({
           min={control.min}
           max={control.max}
           step={control.step}
-          disabled={disabled}
           value={[clamp(value)]}
           onValueChange={([v]) => v !== undefined && onChange(numberToRaw(control, v))}
           // above the reach bar, which is painted over the track
