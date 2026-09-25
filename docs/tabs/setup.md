@@ -25,7 +25,7 @@ everything that was changed outside this app (Betaflight Configurator, CLI) with
 | Changed outside this app                  [Reset all] |
 |  3 changes made outside this app. 1 to reset once saved. |
 |  master   crashflip_motor_percent        [0] → [50] [Reset] |
-|  master   osd_units  [IMPERIAL] → [METRIC] · not saved yet [Keep] |
+|  master   yaw_control_reversed  [ON] → [OFF] · not saved yet [Keep] |
 |  led      led 0 0,0::C:2      Only in Betaflight Configurator |
 +-------------------------------------------------------+
                                   [Revert] [Save & Reboot]
@@ -78,7 +78,7 @@ it will be.
   writes — the allow-list `MANAGED_SETTINGS` / `MANAGED_COMMANDS` in `lib/diff/model.ts` (`externalOnly`), built
   from the "Betaflight setting / MSP" columns of every tab spec: e.g. `pid_process_denom`, `small_angle`,
   `serialrx_provider`, `align_board_*`, `rc_smoothing*`, the filter cutoffs Filters pins, `simplified_*`, the PIDs
-  and rates, `motor_*`, `dshot_bidir`, `osd_*_pos`, `vtx_*`, `blackbox_device`; the commands `serial`, `aux`,
+  and rates, `motor_*`, `dshot_bidir`, `osd_*_pos`, `osd_units`, `vtx_*`, `blackbox_device`; the commands `serial`, `aux`,
   `vtxtable`, `beeper`/`beacon` RX_SET and RX_LOST. Everything else that differs is listed: other `set` variables
   of `master`, the PID / rate / battery profiles, other beeper conditions, and lines such as `led`, `map`,
   `resource`, `mmix`, `adjrange`, plus the craft name. **A tab that starts writing a new setting must add it to
@@ -163,14 +163,14 @@ Checkable with **Connect Mock FC**:
       config (beeper on, beacon off) fails the check
 - [x] Turning airmode off on the mock and fixing it writes only the feature mask (unit test)
 
-- [x] Changed outside this app: "2 changes made outside this app." — `crashflip_motor_percent` 0 → 50, `osd_units`
-      METRIC → IMPERIAL, each with Reset; Reset all enabled; the app's own setup (ports, modes, `dshot_bidir`, …)
+- [x] Changed outside this app: "2 changes made outside this app." — `crashflip_motor_percent` 0 → 50,
+      `yaw_control_reversed` OFF → ON, each with Reset; Reset all enabled; the app's own setup (ports, modes, `dshot_bidir`, …)
       and the mock's features (`TELEMETRY`, `ESC_SENSOR`) aren't listed
-- [x] Reset `osd_units` → "IMPERIAL → METRIC · not saved yet" and "1 to reset once saved.", Keep takes it back;
-      Reset all marks both, Revert unmarks them; Reset `osd_units` → Save & Reboot → "1 change made outside
+- [x] Reset `yaw_control_reversed` → "ON → OFF · not saved yet" and "1 to reset once saved.", Keep takes it back;
+      Reset all marks both, Revert unmarks them; Reset `yaw_control_reversed` → Save & Reboot → "1 change made outside
       this app.", Diff Checker reads "0 tuning differences · 7 other hidden"
 - [x] Reset all on a mock with `anti_gravity_gain = 100` in profile 0 sends `set crashflip_motor_percent = 0`,
-      `set osd_units = METRIC`, `profile 0`, `set anti_gravity_gain = 80`, `profile 0`, and leaves the features
+      `set yaw_control_reversed = OFF`, `profile 0`, `set anti_gravity_gain = 80`, `profile 0`, and leaves the features
       alone; afterwards the FC is back on MSP (unit test)
 - [x] The craft name, `led` lines and a setting without a printed default have no Reset; calibrations
       (`vbat_scale`, `acc_calibration`, …) and features aren't listed; an unknown name makes the save fail with the

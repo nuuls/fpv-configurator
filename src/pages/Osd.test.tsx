@@ -59,6 +59,22 @@ describe('OSD tab', () => {
     expect(screen.getByLabelText('Warnings Y')).toHaveValue(10)
   })
 
+  it('shows the units the FC uses and saves another choice without a reboot', async () => {
+    const user = await openTab('OSD')
+    const units = await screen.findByLabelText('Units')
+    expect(units).toHaveDisplayValue('Metric (m, km/h)')
+    await user.click(screen.getByLabelText('Altitude'))
+    const altitude = () => within(preview()).getByRole('button', { name: /^Altitude,/ })
+    expect(altitude()).toHaveTextContent('12.3m')
+
+    await user.selectOptions(units, 'Imperial (ft, mph)')
+    expect(altitude()).toHaveTextContent('40.4ft')
+    await saveWithoutReboot(user)
+    expect(screen.getByLabelText('Units')).toHaveDisplayValue('Imperial (ft, mph)')
+    expect(altitude()).toHaveTextContent('40.4ft')
+    expect(screen.queryByLabelText('Unsaved changes')).toBeNull()
+  })
+
   it('blocks saving a position outside the screen', async () => {
     const user = await openTab('OSD')
     const x = await screen.findByLabelText('Warnings X')

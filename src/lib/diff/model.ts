@@ -278,6 +278,7 @@ const MANAGED_SETTINGS = new Set([
   'dyn_idle_min_rpm',
   // OSD
   'osd_tim2',
+  'osd_units',
   // Analog VTX
   'vtx_band',
   'vtx_channel',

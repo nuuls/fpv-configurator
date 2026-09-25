@@ -52,8 +52,10 @@ export interface Cell {
 export interface OsdElementDef {
   index: number
   label: string
-  /** What the preview draws, one character per cell. */
+  /** What the preview draws, one character per cell (metric units). */
   sample: string
+  /** The sample per `osd_units` (imperial, metric, British) for elements that show a unit. */
+  samples?: readonly [string, string, string]
   hint?: string
   /** Only drawn by the firmware with a GPS, so only listed when one is set up in the Ports tab. */
   gps?: boolean
@@ -77,6 +79,12 @@ const element = (
 const gpsElement = (...args: Parameters<typeof element>): OsdElementDef => ({
   ...element(...args),
   gps: true,
+})
+
+/** Samples in imperial, metric and British units; British is metric with the speed in mph. */
+const withUnits = (def: OsdElementDef, imperial: string, british = def.sample): OsdElementDef => ({
+  ...def,
+  samples: [imperial, def.sample, british],
 })
 
 const CUSTOM_MESSAGE_HINT =
@@ -113,10 +121,17 @@ export const OSD_ELEMENTS: OsdElementDef[] = [
     (c) => ({ x: right(c, 6), y: fromBottom(c, 2) }),
     'Band, channel and power.',
   ),
-  element('ALTITUDE', 'Altitude', '12.3m', (c) => ({ x: right(c, 5), y: 2 })),
+  withUnits(
+    element('ALTITUDE', 'Altitude', '12.3m', (c) => ({ x: right(c, 5), y: 2 })),
+    '40.4ft',
+  ),
   // osdAddActiveElements adds exactly these `if (sensors(SENSOR_GPS))`; the lap timer is a separate build option.
   gpsElement('GPS_SATS', 'GPS satellites', 'SAT14', () => ({ x: 1, y: 2 })),
-  gpsElement('GPS_SPEED', 'GPS speed', '67KPH', () => ({ x: 1, y: 3 })),
+  withUnits(
+    gpsElement('GPS_SPEED', 'GPS speed', '67KPH', () => ({ x: 1, y: 3 })),
+    '42MPH',
+    '42MPH',
+  ),
   gpsElement('GPS_LAT', 'GPS latitude', 'N48.2081743', (c) => ({
     x: centred(c, 11),
     y: fromBottom(c, 2),
@@ -132,16 +147,30 @@ export const OSD_ELEMENTS: OsdElementDef[] = [
     (c) => ({ x: right(c, 5) - 3, y: 3 }),
     'Arrow pointing home.',
   ),
-  gpsElement('HOME_DIST', 'Home distance', 'H120m', (c) => ({ x: right(c, 5), y: 3 })),
-  gpsElement('FLIGHT_DIST', 'Flight distance', '1.24km', (c) => ({ x: right(c, 6), y: 4 })),
-  gpsElement(
-    'EFFICIENCY',
-    'Efficiency',
-    '42mAh/km',
-    (c) => ({ x: 1, y: fromBottom(c, 3) }),
-    'Battery used per distance.',
+  withUnits(
+    gpsElement('HOME_DIST', 'Home distance', 'H120m', (c) => ({ x: right(c, 5), y: 3 })),
+    'H394ft',
+  ),
+  withUnits(
+    gpsElement('FLIGHT_DIST', 'Flight distance', '1.24km', (c) => ({ x: right(c, 6), y: 4 })),
+    '0.77mi',
+  ),
+  withUnits(
+    gpsElement(
+      'EFFICIENCY',
+      'Efficiency',
+      '42mAh/km',
+      (c) => ({ x: 1, y: fromBottom(c, 3) }),
+      'Battery used per distance.',
+    ),
+    '68mAh/mi',
   ),
 ]
+
+/** What the preview draws for this element with these `osd_units`. */
+export function sampleFor(def: OsdElementDef, units: number): string {
+  return def.samples?.[units] ?? def.sample
+}
 
 const VTX_CHANNEL = elementIndex('VTX_CHANNEL')
 const TIMER_2_ELEMENT = elementIndex('ITEM_TIMER_2')
@@ -188,6 +217,10 @@ export function encodePosition({ x, y, profiles, variant }: ElementPosition): nu
 export const VIDEO_SYSTEM = { AUTO: 0, PAL: 1, NTSC: 2, HD: 3 } as const
 export const VIDEO_SYSTEM_NAMES = ['Auto', 'PAL', 'NTSC', 'HD']
 
+/** `osd_unit_e`, byte 2 of MSP_OSD_CONFIG; the names are the CLI values of `osd_units`. */
+export const OSD_UNITS = { IMPERIAL: 0, METRIC: 1, BRITISH: 2 } as const
+export const OSD_UNIT_NAMES = ['IMPERIAL', 'METRIC', 'BRITISH']
+
 const FLAG_OSD_FEATURE = 1 << 0
 const FLAG_DEVICE_DETECTED = 1 << 5
 
@@ -196,6 +229,8 @@ export interface OsdConfig {
   supported: boolean
   deviceDetected: boolean
   videoSystem: number
+  /** `osd_units`: an `OSD_UNITS` value. */
+  units: number
   /** Raw `item_pos` per element, by firmware index. */
   positions: number[]
   /** Raw timer configs: source (bits 0–3), precision (4–7), alarm (8–15). */
@@ -210,6 +245,7 @@ export function decodeOsdConfig(payload: Uint8Array): OsdConfig {
     supported: false,
     deviceDetected: false,
     videoSystem: VIDEO_SYSTEM.AUTO,
+    units: OSD_UNITS.METRIC,
     positions: [],
     timers: [],
     profileCount: 1,
@@ -222,7 +258,8 @@ export function decodeOsdConfig(payload: Uint8Array): OsdConfig {
   config.supported = (flags & FLAG_OSD_FEATURE) !== 0
   config.deviceDetected = (flags & FLAG_DEVICE_DETECTED) !== 0
   config.videoSystem = r.u8()
-  r.skip(5) // units, rssi alarm, capacity alarm (u16), unused
+  config.units = r.u8()
+  r.skip(4) // rssi alarm, capacity alarm (u16), unused
   const itemCount = r.u8()
   r.skip(2) // altitude alarm
   for (let i = 0; i < itemCount && r.remaining >= 2; i++) config.positions.push(r.u16())
@@ -246,7 +283,7 @@ export function encodeOsdConfig(config: OsdConfig): Uint8Array {
   w.u8(
     (config.supported ? FLAG_OSD_FEATURE : 0) | (config.deviceDetected ? FLAG_DEVICE_DETECTED : 0),
   )
-  w.u8(config.videoSystem).zeros(5).u8(config.positions.length).zeros(2)
+  w.u8(config.videoSystem).u8(config.units).zeros(4).u8(config.positions.length).zeros(2)
   for (const position of config.positions) w.u16(position)
   w.u8(0) // no statistics
   w.u8(config.timers.length)
@@ -333,6 +370,8 @@ export interface OsdDraft {
   elements: ElementDraft[]
   /** Switch off every element this app doesn't manage. */
   hideOthers: boolean
+  /** `osd_units`: an `OSD_UNITS` value. */
+  units: number
 }
 
 const selectedProfileBit = (config: OsdConfig) => 1 << (config.selectedProfile - 1)
@@ -349,6 +388,7 @@ export function toDraft(snapshot: OsdSnapshot): OsdDraft {
   const { config } = snapshot
   return {
     hideOthers: false,
+    units: config.units,
     elements: availableElements(snapshot).map((def) => {
       const { x, y, profiles } = decodePosition(config.positions[def.index] ?? 0)
       return { index: def.index, x, y, shown: (profiles & selectedProfileBit(config)) !== 0 }
@@ -421,7 +461,21 @@ const TIMER_SOURCE_MASK = 0x000f
 const TIMER_SOURCE_TOTAL_ARMED = 1
 const TIMER_SOURCE_LAST_ARMED = 2
 
-/** Everything that has to be sent so the FC matches the draft; empty when nothing differs. */
+/**
+ * `set osd_units = …` when the draft changes the units, else null. The general settings message (addr -1) would
+ * also write the video system, alarms and warnings, so the one CLI variable is set instead.
+ */
+export function unitsSetting(
+  snapshot: OsdSnapshot,
+  draft: OsdDraft,
+): { name: string; value: string } | null {
+  const value = OSD_UNIT_NAMES[draft.units]
+  return draft.units === snapshot.config.units || value === undefined
+    ? null
+    : { name: 'osd_units', value }
+}
+
+/** Element and timer writes so the FC matches the draft; empty when nothing differs. */
 export function planOsdWrites(snapshot: OsdSnapshot, draft: OsdDraft): OsdWrite[] {
   const { config } = snapshot
   const writes: OsdWrite[] = []

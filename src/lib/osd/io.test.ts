@@ -13,6 +13,7 @@ import {
   otherVisibleElements,
   setElementCell,
   setElementShown,
+  OSD_UNITS,
   toDraft,
   VIDEO_SYSTEM,
 } from './model'
@@ -31,6 +32,7 @@ describe('OSD against the mock FC', () => {
       supported: true,
       deviceDetected: true,
       videoSystem: VIDEO_SYSTEM.AUTO,
+      units: OSD_UNITS.METRIC,
     })
     expect(snapshot.canvas).toEqual({ cols: 30, rows: 16 })
     expect(toDraft(snapshot).elements.filter((el) => el.shown)).toEqual([
@@ -127,6 +129,15 @@ describe('OSD against the mock FC', () => {
       variant: 0,
     })
     expect(fc.savedConfig.osd.timers).toEqual([0x0a00, 0x0a01])
+  })
+
+  it('saves the units with osd_units, without touching the elements', async () => {
+    const { fc, client } = await connect()
+    const snapshot = await readOsdSnapshot(client)
+    await saveOsd(client, snapshot, { ...toDraft(snapshot), units: OSD_UNITS.IMPERIAL })
+    expect(fc.savedConfig.settings['osd_units']).toBe('IMPERIAL')
+    expect(fc.savedConfig.osd).toEqual(defaultMockConfig().osd)
+    expect((await readOsdSnapshot(client)).config.units).toBe(OSD_UNITS.IMPERIAL)
   })
 
   it('mock rejects unknown elements and the general settings', async () => {

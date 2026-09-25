@@ -1,4 +1,4 @@
-import { readFeatures, readSerialConfig, saveToEeprom } from '@/lib/msp/api'
+import { readFeatures, readSerialConfig, saveToEeprom, writeSetting } from '@/lib/msp/api'
 import type { MspClient } from '@/lib/msp/client'
 import { MSP } from '@/lib/msp/codes'
 import { configuredGpsPort } from '@/lib/ports/model'
@@ -9,6 +9,7 @@ import {
   encodeSetOsdElement,
   encodeSetOsdTimer,
   planOsdWrites,
+  unitsSetting,
   type OsdDraft,
   type OsdSnapshot,
 } from './model'
@@ -23,7 +24,7 @@ export async function readOsdSnapshot(client: MspClient): Promise<OsdSnapshot> {
   return { config, canvas: canvasFor(config.videoSystem, reported), gpsConfigured }
 }
 
-/** Writes only what changed, one message per element. Takes effect immediately, no reboot. */
+/** Writes only what changed, one message per element, and the units. Takes effect immediately, no reboot. */
 export async function saveOsd(
   client: MspClient,
   snapshot: OsdSnapshot,
@@ -36,5 +37,7 @@ export async function saveOsd(
         : encodeSetOsdElement(write.element, write.position)
     await client.request(MSP.SET_OSD_CONFIG, payload)
   }
+  const units = unitsSetting(snapshot, draft)
+  if (units) await writeSetting(client, units.name, units.value)
   await saveToEeprom(client)
 }

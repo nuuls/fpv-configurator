@@ -241,13 +241,13 @@ describe('externalOnly', () => {
       'osd_warnings_pos',
       'osd_crosshairs_pos',
       'osd_tim2',
+      'osd_units',
       'vtx_band',
       'blackbox_sample_rate',
     ]
     const others = [
       'name',
       'crashflip_motor_percent',
-      'osd_units',
       'osd_tim1',
       'osd_warn_batt_warning',
       'gyro_lpf1_type',
@@ -329,9 +329,9 @@ describe('externalOnly', () => {
     const output = [
       '# master',
       ...calibrations.map((name) => `set ${name} = 1`),
-      'set osd_units = IMPERIAL',
+      'set crashflip_motor_percent = 50',
     ].join('\r\n')
-    expect(names(externalOnly(parseDiff(output)), 'master')).toEqual(['osd_units'])
+    expect(names(externalOnly(parseDiff(output)), 'master')).toEqual(['crashflip_motor_percent'])
   })
 })
 

@@ -15,11 +15,14 @@ import {
   encodeSetOsdElement,
   encodeSetOsdTimer,
   OSD_ELEMENTS,
+  OSD_UNITS,
   otherVisibleElements,
   planOsdWrites,
+  sampleFor,
   setElementCell,
   setElementShown,
   toDraft,
+  unitsSetting,
   validateOsd,
   VIDEO_SYSTEM,
   type OsdConfig,
@@ -41,6 +44,7 @@ function snapshotWith(
     supported: true,
     deviceDetected: true,
     videoSystem: VIDEO_SYSTEM.AUTO,
+    units: OSD_UNITS.METRIC,
     positions,
     timers: [0x0a00, 0x0a01],
     profileCount: 3,
@@ -68,18 +72,34 @@ describe('OSD elements', () => {
   })
 
   it('suggests spots that keep every sample on both canvases without overlapping', () => {
-    for (const canvas of [SD, HD, { cols: 30, rows: 13 }]) {
-      const taken = new Set<string>()
-      for (const def of OSD_ELEMENTS) {
-        const cell = def.suggest(canvas)
-        expect(clampToCanvas(cell, def.sample.length, canvas)).toEqual(cell)
-        for (let i = 0; i < def.sample.length; i++) {
-          const key = `${cell.x + i},${cell.y}`
-          expect(taken.has(key), `${def.label} overlaps at ${key}`).toBe(false)
-          taken.add(key)
+    for (const canvas of [SD, HD, { cols: 30, rows: 13 }])
+      for (const units of Object.values(OSD_UNITS)) {
+        const taken = new Set<string>()
+        for (const def of OSD_ELEMENTS) {
+          const cell = def.suggest(canvas)
+          const sample = sampleFor(def, units)
+          expect(clampToCanvas(cell, sample.length, canvas)).toEqual(cell)
+          for (let i = 0; i < sample.length; i++) {
+            const key = `${cell.x + i},${cell.y}`
+            expect(taken.has(key), `${def.label} overlaps at ${key}`).toBe(false)
+            taken.add(key)
+          }
         }
       }
-    }
+  })
+
+  it('shows distances and speeds in the chosen units', () => {
+    const def = (name: string) => OSD_ELEMENTS.find((d) => d.index === elementIndex(name))
+    const samples = (name: string) =>
+      Object.values(OSD_UNITS).map((units) => {
+        const d = def(name)
+        return d && sampleFor(d, units)
+      })
+    // imperial, metric, British (metric with mph)
+    expect(samples('ALTITUDE')).toEqual(['40.4ft', '12.3m', '12.3m'])
+    expect(samples('GPS_SPEED')).toEqual(['42MPH', '67KPH', '42MPH'])
+    expect(samples('EFFICIENCY')).toEqual(['68mAh/mi', '42mAh/km', '42mAh/km'])
+    expect(samples('WARNINGS')).toEqual(['LOW BATTERY', 'LOW BATTERY', 'LOW BATTERY'])
   })
 })
 
@@ -141,6 +161,7 @@ describe('MSP_OSD_CONFIG', () => {
       supported: true,
       deviceDetected: true,
       videoSystem: VIDEO_SYSTEM.HD,
+      units: OSD_UNITS.IMPERIAL,
       positions: [0x0865, 0, 0x3c08],
       timers: [0x0a00, 0x0a01],
       profileCount: 3,
@@ -165,7 +186,7 @@ describe('MSP_OSD_CONFIG', () => {
   it('round-trips through the mock encoder', () => {
     const { config } = snapshotWith(
       { WARNINGS: shownAt(9, 10) },
-      { selectedProfile: 3, videoSystem: VIDEO_SYSTEM.NTSC },
+      { selectedProfile: 3, videoSystem: VIDEO_SYSTEM.NTSC, units: OSD_UNITS.BRITISH },
     )
     expect(decodeOsdConfig(encodeOsdConfig(config))).toEqual(config)
   })
@@ -317,5 +338,15 @@ describe('planOsdWrites', () => {
     )
     const hidden = snapshotWith({}, { timers: [0x0a00, onTime] })
     expect(planOsdWrites(hidden, toDraft(hidden))).toEqual([])
+  })
+
+  it('sets osd_units only when the units change', () => {
+    const snapshot = snapshotWith({}, { units: OSD_UNITS.IMPERIAL })
+    expect(unitsSetting(snapshot, toDraft(snapshot))).toBeNull()
+    expect(unitsSetting(snapshot, { ...toDraft(snapshot), units: OSD_UNITS.METRIC })).toEqual({
+      name: 'osd_units',
+      value: 'METRIC',
+    })
+    expect(planOsdWrites(snapshot, { ...toDraft(snapshot), units: OSD_UNITS.BRITISH })).toEqual([])
   })
 })

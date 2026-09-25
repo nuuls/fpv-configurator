@@ -5,6 +5,7 @@ import { SaveBar } from '@/components/SaveBar'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Switch } from '@/components/ui/switch'
 import { useDraft } from '@/hooks/useDraft'
 import { useFcSnapshot } from '@/hooks/useFcSnapshot'
@@ -16,7 +17,9 @@ import {
   availableElements,
   clampToCanvas,
   elementName,
+  OSD_UNITS,
   otherVisibleElements,
+  sampleFor,
   setElementCell,
   setElementShown,
   toDraft,
@@ -27,6 +30,11 @@ import {
 
 const PATH = '/osd'
 const CELL_INPUT = 'h-8 w-14 rounded-md border bg-transparent px-2 tabular-nums dark:bg-input/30'
+const UNIT_OPTIONS = [
+  { value: OSD_UNITS.METRIC, label: 'Metric (m, km/h)' },
+  { value: OSD_UNITS.IMPERIAL, label: 'Imperial (ft, mph)' },
+  { value: OSD_UNITS.BRITISH, label: 'British (m, mph)' },
+]
 
 /** Spec: docs/tabs/osd.md */
 export function OsdPage() {
@@ -65,7 +73,8 @@ function Editor({
   const others = otherVisibleElements(snapshot)
   const shown = defs.flatMap((def) => {
     const el = draft.elements.find((e) => e.index === def.index && e.shown)
-    return el ? [{ index: def.index, label: def.label, sample: def.sample, x: el.x, y: el.y }] : []
+    const sample = sampleFor(def, draft.units)
+    return el ? [{ index: def.index, label: def.label, sample, x: el.x, y: el.y }] : []
   })
 
   return (
@@ -86,6 +95,22 @@ function Editor({
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-4 flex items-center gap-3 border-b pb-4 text-sm">
+              <label htmlFor="osd-units" className="mr-auto font-medium">
+                Units
+              </label>
+              <NativeSelect
+                id="osd-units"
+                value={draft.units}
+                onChange={(e) => setDraft({ ...draft, units: Number(e.target.value) })}
+              >
+                {UNIT_OPTIONS.map(({ value, label }) => (
+                  <NativeSelectOption key={value} value={value}>
+                    {label}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </div>
             <ul className="flex flex-col gap-3 text-sm">
               {defs.map((def) => {
                 const el = draft.elements.find((e) => e.index === def.index)
@@ -150,7 +175,8 @@ function Editor({
               canvas={canvas}
               elements={shown}
               onMove={(index, cell) => {
-                const sample = defs.find((def) => def.index === index)?.sample ?? ''
+                const def = defs.find((d) => d.index === index)
+                const sample = def ? sampleFor(def, draft.units) : ''
                 setDraft(setElementCell(draft, index, clampToCanvas(cell, sample.length, canvas)))
               }}
             />

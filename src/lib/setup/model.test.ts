@@ -463,7 +463,7 @@ describe('changed outside this app', () => {
       ]),
     ).toEqual([
       ['crashflip_motor_percent', '0', '50'],
-      ['osd_units', 'METRIC', 'IMPERIAL'],
+      ['yaw_control_reversed', 'OFF', 'ON'],
     ])
   })
 
@@ -471,7 +471,11 @@ describe('changed outside this app', () => {
     const fc = new MockFlightController()
     const { transport, client } = await connect(fc)
     const snapshot = await readSetupSnapshot(client)
-    await saveSetup(client, snapshot, withReset(readSetup(snapshot), 'master: osd_units', true))
+    await saveSetup(
+      client,
+      snapshot,
+      withReset(readSetup(snapshot), 'master: yaw_control_reversed', true),
+    )
     const dropped = new Promise<void>((resolve) => transport.onClose(resolve))
     await sendReboot(client)
     await dropped
@@ -483,7 +487,7 @@ describe('changed outside this app', () => {
     const before = defaultMockConfig()
     expect(fc.savedConfig).toEqual({
       ...before,
-      settings: { ...before.settings, osd_units: 'METRIC' },
+      settings: { ...before.settings, yaw_control_reversed: 'OFF' },
     })
   })
 
@@ -496,7 +500,7 @@ describe('changed outside this app', () => {
     const draft = withAllResets(snapshot, readSetup(snapshot))
     expect(resetScript(snapshot, draft)).toEqual([
       'set crashflip_motor_percent = 0',
-      'set osd_units = METRIC',
+      'set yaw_control_reversed = OFF',
       'profile 0',
       'set anti_gravity_gain = 80',
       'profile 0',
@@ -505,7 +509,7 @@ describe('changed outside this app', () => {
     expect(fc.savedConfig.settings).toEqual({
       ...config.settings,
       crashflip_motor_percent: '0',
-      osd_units: 'METRIC',
+      yaw_control_reversed: 'OFF',
       anti_gravity_gain: '80',
     })
     expect(fc.savedConfig.features).toBe(config.features)

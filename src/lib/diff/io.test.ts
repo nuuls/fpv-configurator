@@ -85,7 +85,7 @@ describe('readDiff against the mock FC', () => {
     expect(report.sections.find((s) => s.title === 'master')?.entries).toEqual([
       { kind: 'setting', name: 'align_board_yaw', value: '90', defaultValue: '0' },
       { kind: 'setting', name: 'crashflip_motor_percent', value: '50', defaultValue: '0' },
-      { kind: 'setting', name: 'osd_units', value: 'IMPERIAL', defaultValue: 'METRIC' },
+      { kind: 'setting', name: 'yaw_control_reversed', value: 'ON', defaultValue: 'OFF' },
     ])
     expect(report.sections.find((s) => s.title === 'profile 0')?.entries).toEqual([
       { kind: 'setting', name: 'dyn_idle_min_rpm', value: '35', defaultValue: '0' },
@@ -104,12 +104,12 @@ describe('runCliCommands against the mock FC', () => {
   it('changes the running config, not the saved one', async () => {
     const fc = new MockFlightController()
     const client = await openMock(fc)
-    await runCliCommands(client, ['profile 0', 'set osd_units = METRIC', 'profile 0'])
+    await runCliCommands(client, ['profile 0', 'set yaw_control_reversed = OFF', 'profile 0'])
     const master = (await readDiff(client)).sections.find((s) => s.title === 'master')
     expect(master?.entries.map((e) => (e.kind === 'setting' ? e.name : e.line))).toEqual([
       'crashflip_motor_percent',
     ])
-    expect(fc.savedConfig.settings.osd_units).toBe('IMPERIAL')
+    expect(fc.savedConfig.settings.yaw_control_reversed).toBe('ON')
     expect((await readFcInfo(client)).variant).toBe('BTFL')
   })
 

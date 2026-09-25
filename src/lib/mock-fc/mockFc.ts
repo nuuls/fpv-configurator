@@ -63,6 +63,7 @@ import {
   encodeOsdConfig,
   encodePosition,
   FIRMWARE_ELEMENT_COUNT,
+  OSD_UNIT_NAMES,
   VIDEO_SYSTEM,
   VIDEO_SYSTEM_NAMES,
   type Canvas,
@@ -191,9 +192,10 @@ export function defaultMockConfig(): MockFcConfig {
       tpa_mode: 'D',
       tpa_rate: '65',
       tpa_breakpoint: '1350',
-      // Changed in Betaflight Configurator — no tab of this app manages them (Betaflight defaults: 0, METRIC)
+      // Changed in Betaflight Configurator — no tab of this app manages them (Betaflight defaults: 0, OFF)
       crashflip_motor_percent: '50',
-      osd_units: 'IMPERIAL',
+      yaw_control_reversed: 'ON',
+      osd_units: 'METRIC', // Betaflight default; the OSD tab manages it
       anti_gravity_gain: '80', // a profile setting at its default, for tests that change it
     },
     boardAlignment: { roll: 0, pitch: 0, yaw: 0 },
@@ -285,7 +287,7 @@ export function firmwareDefaultConfig(): MockFcConfig {
       port(identifier, identifier === 20 ? PORT_FUNCTION.MSP : 0),
     ),
     features: FEATURE.RX_SERIAL | FEATURE.OSD | FEATURE.AIRMODE,
-    settings: { ...config.settings, crashflip_motor_percent: '0', osd_units: 'METRIC' },
+    settings: { ...config.settings, crashflip_motor_percent: '0', yaw_control_reversed: 'OFF' },
     modeSlots: config.modeSlots.map(() => ({ boxId: 0, auxChannel: 0, start: 900, end: 900 })),
   }
 }
@@ -524,6 +526,7 @@ export class MockFlightController {
           supported: true,
           deviceDetected: true,
           videoSystem: this.videoSystem(),
+          units: Math.max(0, OSD_UNIT_NAMES.indexOf(this.running.settings['osd_units'] ?? '')),
           ...this.running.osd,
           profileCount: 3,
           selectedProfile: 1,
