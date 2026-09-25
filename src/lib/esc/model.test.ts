@@ -605,6 +605,15 @@ describe('editing', () => {
     ]).toEqual([false, true])
   })
 
+  it('knows that variable AM32 PWM goes up to twice the frequency', () => {
+    const [group] = editableGroups(read([mockAm32Esc()]))
+    const reach = (value: number, variablePwm: number) =>
+      group?.settings
+        .find((def) => def.key === 'pwmFrequency')
+        ?.reach?.(value, (key) => (key === 'variablePwm' ? variablePwm : 0))
+    expect([reach(24, 1), reach(100, 1), reach(24, 0), reach(24, 2)]).toEqual([48, 200, null, null])
+  })
+
   it('finds shared settings that are not the same on all ESCs of a group and can level them', () => {
     const reports = [
       describeEsc(rawRead(mockBluejayEsc())),

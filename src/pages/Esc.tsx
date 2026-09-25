@@ -528,6 +528,7 @@ function GroupEditor({
                 id={id}
                 def={def}
                 raw={draftRaw(draft, first, def)}
+                reach={(value) => def.reach?.(value, raw) ?? null}
                 disabled={disabled}
                 onChange={(next) => onChange(setDraftRaw(draft, group.escs, def, next))}
               />
@@ -543,11 +544,13 @@ interface SettingControlProps {
   id: string
   def: EscSettingDef
   raw: number
+  /** How far the ESC takes a number by itself (see `EscSettingDef.reach`). */
+  reach: (value: number) => number | null
   disabled: boolean
   onChange: (raw: number) => void
 }
 
-function SettingControl({ id, def, raw, disabled, onChange }: SettingControlProps) {
+function SettingControl({ id, def, raw, reach, disabled, onChange }: SettingControlProps) {
   const { control } = def
   if (!control) return null
   if (control.kind === 'switch')
@@ -585,6 +588,7 @@ function SettingControl({ id, def, raw, disabled, onChange }: SettingControlProp
         labelledBy={`${id}-label`}
         control={control}
         raw={raw}
+        reach={reach(rawToNumber(control, raw))}
         disabled={disabled}
         onChange={onChange}
       />
@@ -615,38 +619,58 @@ const ZONE_STYLE: Record<RecommendedZone, { bar: string; text: string; icon: typ
     high: { bar: 'bg-warning', text: 'text-warning', icon: TriangleAlert },
   }
 
-/** A number setting as a slider; a recommended range is painted green under the track (like Motors' dynamic idle). */
+/**
+ * A number setting as a slider. A recommended range is painted green under the track (like Motors' dynamic idle); how
+ * far the ESC takes the value by itself (`reach`) is a paler bar growing on from the thumb.
+ */
 function NumberSlider({
   labelledBy,
   control,
   raw,
+  reach,
   disabled,
   onChange,
 }: {
   labelledBy: string
   control: NumberControl
   raw: number
+  reach: number | null
   disabled: boolean
   onChange: (raw: number) => void
 }) {
   const value = rawToNumber(control, raw)
   const clamp = (v: number) => Math.min(control.max, Math.max(control.min, v))
+  const percent = (v: number) => ((clamp(v) - control.min) / (control.max - control.min)) * 100
+  const reaches = reach !== null && reach > value && !disabled
 
   return (
     <div role="group" aria-labelledby={labelledBy} className="flex flex-col gap-2">
       <div className="font-mono tabular-nums">
         {value}
+        {reaches && `–${reach}`}
         {control.unit && ` ${control.unit}`}
       </div>
-      <Slider
-        aria-labelledby={labelledBy}
-        min={control.min}
-        max={control.max}
-        step={control.step}
-        disabled={disabled}
-        value={[clamp(value)]}
-        onValueChange={([v]) => v !== undefined && onChange(numberToRaw(control, v))}
-      />
+      <div className="relative">
+        <Slider
+          aria-labelledby={labelledBy}
+          min={control.min}
+          max={control.max}
+          step={control.step}
+          disabled={disabled}
+          value={[clamp(value)]}
+          onValueChange={([v]) => v !== undefined && onChange(numberToRaw(control, v))}
+          // above the reach bar, which is painted over the track
+          className="[&_[data-slot=slider-thumb]]:relative [&_[data-slot=slider-thumb]]:z-10"
+        />
+        {reaches && (
+          <div
+            data-testid="slider-reach"
+            aria-hidden="true"
+            className="bg-primary/55 pointer-events-none absolute top-1/2 h-1.5 -translate-y-1/2 rounded-r-full saturate-50"
+            style={{ left: `${percent(value)}%`, right: `${100 - percent(reach)}%` }}
+          />
+        )}
+      </div>
       {control.recommended && (
         <RecommendedRange control={control} recommended={control.recommended} value={value} />
       )}

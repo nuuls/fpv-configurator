@@ -290,9 +290,22 @@ describe('ESCs that are not alike', () => {
     render(<Editable reports={await readReports([mockAm32Esc(), mockAm32Esc()])} />)
     const all = screen.getByRole('group', { name: 'All ESCs' })
     const pwm = slider(all, 'PWM frequency')
+    const pwmGroup = within(all).getByRole('group', { name: 'PWM frequency' })
     expect(pwm).not.toHaveAttribute('data-disabled')
+    // Variable: the ESC goes up to twice the frequency, shown as a range and a bar on from the thumb
+    expect(pwmGroup).toHaveTextContent('24–48 kHz')
+    // 8–144 kHz track: from 24 kHz (11.8 %) to 48 kHz (29.4 %)
+    const bar = within(pwmGroup).getByTestId('slider-reach')
+    expect(parseFloat(bar.style.left)).toBeCloseTo(11.76, 1)
+    expect(100 - parseFloat(bar.style.right)).toBeCloseTo(29.41, 1)
+
+    await user.selectOptions(within(all).getByLabelText('PWM type'), 'Fixed')
+    expect(pwmGroup).toHaveTextContent(/^24 kHz$/)
+    expect(within(pwmGroup).queryByTestId('slider-reach')).toBeNull()
+
     await user.selectOptions(within(all).getByLabelText('PWM type'), 'By RPM')
     expect(pwm).toHaveAttribute('data-disabled')
+    expect(within(pwmGroup).queryByTestId('slider-reach')).toBeNull()
 
     // A number is kept inside what the ESC takes
     const poles = within(all).getByLabelText('Motor poles')
