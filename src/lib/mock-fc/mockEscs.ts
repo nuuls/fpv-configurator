@@ -170,6 +170,11 @@ export function mixedMockEscs(): MockEsc[] {
   ]
 }
 
+/** What "Connect Mock FC" (demo mode) finds: a Bluejay and an AM32 ESC, so both editors can be seen. */
+export function demoMockEscs(): MockEsc[] {
+  return [mockBluejayEsc(), mockAm32Esc()]
+}
+
 /** cmd_DevicePageErase takes a page number: × 512 on SiLabs, × 1024 on ARM (`serial_4way.c`). */
 const ERASE_UNIT: Record<number, number> = {
   [INTERFACE_MODE.SILABS_BLB]: 512,

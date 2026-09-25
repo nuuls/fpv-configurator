@@ -158,13 +158,15 @@ AM32 settings (2.21, `eeprom_version` 4; offset · range as shown · what disabl
 
 ## Acceptance
 
-Mock FC (4 Bluejay 0.21.0 ESCs, 48 kHz build, set up alike, motors 2 and 3 reversed; like real ones they only answer
-once the signal wire was high for 0.7 s, and their SiLabs flash only takes a write after an erase). The checks on ESCs
-that are not alike run against `mixedMockEscs()` (two Bluejay 0.21.0 — the second one reversed and with another PWM
+Mock FC ("Connect Mock FC" / demo mode: a Bluejay 0.21.0 ESC, 48 kHz build, and an AM32 2.21 ESC; like real ones they
+only answer once the signal wire was high for 0.7 s, and their SiLabs flash only takes a write after an erase). The
+combined view runs against `defaultMockEscs()` (4 Bluejay set up alike, motors 2 and 3 reversed), the other checks on
+ESCs that are not alike against `mixedMockEscs()` (two Bluejay 0.21.0 — the second one reversed and with another PWM
 frequency —, a BLHeli_S 16.7 and an AM32 2.21) in the tests:
 
 - [x] Nothing is read before "Read ESCs" is pressed
-- [x] Read ESCs → all four are read, then one combined view with firmware, version, hardware and settings; motor
+- [x] Read ESCs in demo mode → a card each for the Bluejay and the AM32 ESC, and an editor for each firmware
+- [x] Four ESCs that are alike → one combined view with firmware, version, hardware and settings; motor
       direction listed per ESC (ESC 2 and 3 "Reversed"); no cards per ESC
 - [x] ESCs with different firmware → four cards with firmware, version, hardware and settings, and a notice
 - [x] A setting that differs → cards per ESC, the notice names it and the ESC's value carries "differs"; its motor
@@ -207,9 +209,10 @@ On real hardware:
 - One combined view for ESCs that are alike (user request): four identical lists say nothing, and whether they are
   identical is the actual question. Hardware has to match too — the view has one header — and a differing motor
   direction doesn't keep them apart, it is per motor on purpose.
-- The mock's default ESCs are a realistic quad (four Bluejay set up alike) so that "Connect Mock FC" shows the combined
-  view. The earlier set with three firmwares lives on as `mixedMockEscs()` for the tests, which keeps the BLHeli_S and
-  AM32 decoders and the cards per ESC covered — they are no longer visible through "Connect Mock FC".
+- The mock's default ESCs are a realistic quad (four Bluejay set up alike), used by the tests of the combined view.
+  "Connect Mock FC" (demo mode) reads `demoMockEscs()` instead — one Bluejay and one AM32 ESC — so both editors can be
+  seen (user request, 2026-09-25); the combined view is then only covered by the tests. `mixedMockEscs()` (three
+  firmwares) keeps BLHeli_S covered.
 
 - Editing (SPEC §2, 2026-09): the draft is the raw settings block per ESC and saving is read-modify-write of that
   block, the way ESC Configurator and the AM32 configurator write settings (SiLabs: erase the page, write 0xFF bytes;
@@ -231,7 +234,7 @@ On real hardware:
   and a motor KV is something you know. Timing advance is a dropdown of its 33 values.
 - Save asks for confirmation although SPEC §5 doesn't: a failed write leaves an ESC on default settings, and the ESCs
   restart.
-- The 48 kHz warning shows on "Connect Mock FC" on purpose (the mock is the 48 kHz build), so the warning is exercised.
+- The 48 kHz warning shows on "Connect Mock FC" on purpose (the mock Bluejay is the 48 kHz build), so the warning is exercised.
 
 ## Open questions
 

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { demoMockEscs } from '@/lib/mock-fc/mockEscs'
 import { MockFlightController } from '@/lib/mock-fc/mockFc'
 import { readFcInfo, sendReboot, sendRebootToMassStorage, type FcInfo } from '@/lib/msp/api'
 import { MspClient } from '@/lib/msp/client'
@@ -56,7 +57,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 async function openTransport(kind: ConnectionKind): Promise<OpenedTransport> {
   if (kind === 'mock') {
-    const fc = new MockFlightController()
+    const fc = new MockFlightController({ escs: demoMockEscs() })
     return { transport: new MockTransport(fc), reopen: async () => new MockTransport(fc) }
   }
   // SPEC §5 "Connect": straight to the last used FC when it's there, the browser's picker otherwise.
