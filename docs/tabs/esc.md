@@ -7,8 +7,10 @@ Route: `/esc` · Sidebar: "ESC" · Page: `src/pages/Esc.tsx` · Logic: `src/lib/
 ## Purpose
 
 See which firmware every ESC runs and how it is set up, and change the settings that matter — without opening a
-second configurator (SPEC §2 "ESC"). Bluejay 0.21: motor timing and both startup powers. AM32 2.21: every setting of
-the AM32 configurator. BLHeli_S is only shown. Firmware is never flashed (SPEC "Never").
+second configurator (SPEC §2 "ESC"). Bluejay 0.21: motor timing, both startup powers and the power rating. AM32 2.21:
+3D mode, PWM type, PWM frequency, motor KV and poles. Every other Bluejay / AM32 setting only shows up when it is not
+on the firmware's default, with a way back to it. BLHeli_S is only shown. The motor direction is ignored. Firmware is
+never flashed (SPEC "Never").
 
 ## Layout
 
@@ -29,19 +31,26 @@ the AM32 configurator. BLHeli_S is only shown. Firmware is never flashed (SPEC "
 | 1020  (slider, green 1050–1200)           |
 | ! Below the recommended 1050–1200         |
 | Motor timing           [22.5° (medium h.)]|
-| Other settings                            |   <- only shown
-| Motor direction             ESC 1 Normal  |
-|                             ESC 2 Reversed|
-| PWM frequency                      48 kHz |
-| [! Flight performance is greatly reduced …]|   <- warning in the row
-| …                                         |
+| Power rating                      [2S+ ]  |
+| +---------------------------------------+ |
+| | ! Not on the Bluejay default          | |   <- only when a setting is off
+| | This app doesn't change these …       | |      its default
+| | Demag compensation: High              | |
+| |   (default Low)             [Reset]   | |
+| | Temperature protection: 140 °C        | |
+| |   (default Off)             [Reset]   | |
+| | [Reset all to defaults]               | |
+| +---------------------------------------+ |
+| PWM frequency                      48 kHz |   <- only with its warning
+| [! Flight performance is greatly reduced …]|
 +-------------------------------------------+
                                             [Revert] [Save]
 ```
 
 When the ESCs are not alike (or one couldn't be read), a card per ESC instead, two side by side (one column on
-narrow screens). Each card is built like the combined one: what can be changed on that ESC at the top, the rest below
-under "Other settings" (left out when nothing is left, as on AM32):
+narrow screens). Each card is built like the combined one: what can be changed on that ESC, then what is not on the
+default, then the PWM frequency warning. Firmware this app doesn't change (BLHeli_S, unsupported layouts, AM32 on 128 k
+flash) lists every setting instead:
 
 ```
 | The ESCs are not set up alike (PWM frequency), so they are listed …     |
@@ -53,17 +62,18 @@ under "Other settings" (left out when nothing is left, as on AM32):
 | Minimum startup power [--o--] 1025| Minimum startup power [--o--] 1025  |
 | …                                 | …                                   |
 | Motor timing     [22.5° (m. high)]| Motor timing [differs] [7.5° (m. l.)]|
-| Other settings                    | Other settings                      |
-| Motor direction           Normal  | Motor direction           Reversed  |
-| PWM frequency             48 kHz  | PWM frequency     24 kHz [differs]  |
-| …                                 | …                                   |
+| Power rating              [2S+ ]  | Power rating              [2S+ ]    |
+| PWM frequency             48 kHz  |                                     |
+| [! Flight performance is …]       |                                     |
 +-----------------------------------+-------------------------------------+
 | ESC 3                             | ESC 4                               |
 | BLHeli_S 16.7                     | AM32 2.21                           |
 | A-H-30 · EFM8BB10                 | MOCK_ESC_F051                       |
-| Startup power               0.50  | Essentials                          |
-| …   (only shown)                  | Signal protocol           [DShot]   |
-|                                   | …                                   |
+| Startup power               0.50  | Bidirectional (3D) mode       [ o]  |
+| …   (only shown)                  | PWM type                [Variable]  |
+|                                   | PWM frequency  24 kHz [--o-------]  |
+|                                   | Motor KV                  [ 2220 ]  |
+|                                   | Motor poles               [   14 ]  |
 +-----------------------------------+-------------------------------------+
                                             [Revert] [Save]
 ```
@@ -80,39 +90,41 @@ under "Other settings" (left out when nothing is left, as on AM32):
 | Bluejay: minimum startup power | slider with recommended range                                   | byte 0x04; shown as 1000 + raw × 1000 / 2047                                                                                                                                                                                                 | 1000–1125, step 5 · 1010                        | Same for all Bluejay ESCs (per ESC on its card when they are listed one by one). 1025–1050 painted green under the track (the rest amber) with a line "Recommended (…)" / "Below / Above the recommended …", like dynamic idle on Motors             |
 | Bluejay: maximum startup power | slider with recommended range                                   | byte 0x07; shown as 1000 + raw × 4                                                                                                                                                                                                           | 1004–1300, step 4 · 1020                        | Same for all Bluejay ESCs (per ESC on its card when they are listed one by one). Recommended range 1050–1200, shown like the minimum                                                                                                                 |
 | Bluejay: motor timing          | dropdown                                                        | byte 0x15                                                                                                                                                                                                                                    | 0° / 7.5° / 15° / 22.5° / 30° (raw 1–5) · 22.5° | Same for all Bluejay ESCs (per ESC on its card when they are listed one by one)                                                                                                                                                                      |
-| Bluejay: PWM frequency         | readout + warning                                               | byte 0x0A (`24 SHL PWM_FREQ`: what the firmware was built for)                                                                                                                                                                               | 24 / 48 / 96 kHz                                | Read-only, changing it means flashing. Anything but 24 kHz: warning in the row (every card that shows it) that flight performance is greatly reduced, flash the 24 kHz build                                                                         |
-| AM32: all settings             | switch / dropdown / number, grouped as in the AM32 configurator | offsets of `Inc/eeprom.h`, see "AM32 settings" below                                                                                                                                                                                         | see below                                       | Same for all AM32 ESCs, except the motor direction: one dropdown per ESC. Per ESC on its card when they are listed one by one                                                                                                                        |
+| Bluejay: power rating          | dropdown                                                        | byte 0x29                                                                                                                                                                                                                                    | 1S / 2S+ (raw 1, 2) · 2S+                       | Same for all Bluejay ESCs (per ESC on its card when they are listed one by one). Hint: sets the temperature limits, 1S only on a 1S quad                                                                                                             |
+| Bluejay: PWM frequency         | readout + warning                                               | byte 0x0A (`24 SHL PWM_FREQ`: what the firmware was built for)                                                                                                                                                                               | 24 / 48 / 96 kHz                                | Read-only, changing it means flashing. Only shown when it isn't 24 kHz, with the warning that flight performance is greatly reduced, flash the 24 kHz build                                                                                          |
+| AM32: motor settings           | switch / dropdown / slider / number                             | 3D mode (18), PWM type (21), PWM frequency (24, slider), motor KV (26), motor poles (27) — offsets of `Inc/eeprom.h`                                                                                                                         | see "AM32 settings" below                       | Same for all AM32 ESCs (per ESC on its card when they are listed one by one). PWM frequency greyed out with PWM type "By RPM"                                                                                                                        |
+| "Not on the … default"         | warning box with a "Reset" per setting, "Reset all to defaults" | the settings this app doesn't change, see "Defaults" below                                                                                                                                                                                   | —                                               | Only when one of them isn't on the firmware's default (compared as shown, so bytes that mean the same don't count); lists value and default. Reset puts the default into the draft of every ESC the card stands for; Save writes it                  |
 | "Use ESC 1's for all"          | button in a notice                                              | —                                                                                                                                                                                                                                            | —                                               | Only when ESCs of one firmware differ in a setting that can be changed: the notice (above the cards) names the settings, the setting carries "differs" on the other ESCs' cards; the button puts the first ESC's values into the draft of the others |
 | Revert / Save                  | SaveBar (SPEC §5)                                               | 4-way `cmd_DevicePageErase` (SiLabs only), `cmd_DeviceWrite`, `cmd_DeviceRead`                                                                                                                                                               | —                                               | Save asks first ("Write the settings to the ESCs?", names the ESCs). No reboot of the FC, nothing is written to the FC                                                                                                                               |
-| Combined view                  | readout                                                         | —                                                                                                                                                                                                                                            | —                                               | Shown instead of the cards per ESC once all ESCs are read and they are alike: every one readable, same firmware, version, settings layout and hardware, and the same value for every setting. Motor direction may vary — it is then listed per ESC   |
-| "differs" badge                | readout                                                         | —                                                                                                                                                                                                                                            | —                                               | Cards per ESC only. On a setting whose value is not the one of the first ESC with the same firmware. Motor direction is left out — it is per motor on purpose                                                                                        |
+| Combined view                  | readout                                                         | —                                                                                                                                                                                                                                            | —                                               | Shown instead of the cards per ESC once all ESCs are read and they are alike: every one readable, same firmware, version, settings layout and hardware, and the same value for every setting. The motor direction isn't read into it                 |
+| "differs" badge                | readout                                                         | —                                                                                                                                                                                                                                            | —                                               | Cards per ESC only. On a setting whose value is not the one of the first ESC with the same firmware                                                                                                                                                  |
 
-Settings shown — BLHeli_S (layout 32, 33): motor direction, startup power, motor timing, demag compensation,
-temperature protection, low RPM power protection, brake on stop, beep strength, beacon strength, beacon delay.
-Bluejay 0.21 (layout 208): motor direction, PWM frequency, minimum / maximum startup power, motor timing, demag
-compensation, rampup power, temperature protection, brake on stop, braking strength, power rating, force EDT arm, beep
-strength, beacon strength, beacon delay.
+Settings — the motor direction is never shown or compared: it is set per motor on purpose (Motors tab).
 
-AM32 settings (2.21, `eeprom_version` 4; offset · range as shown · what disables it):
+- BLHeli_S (layout 32, 33), all shown: startup power, motor timing, demag compensation, temperature protection, low RPM
+  power protection, brake on stop, beep strength, beacon strength, beacon delay.
+- Bluejay 0.21 (layout 208): changed here — minimum / maximum startup power, motor timing, power rating. PWM frequency
+  only with its warning. The rest only when not on the default (below).
+- AM32 2.21 (`eeprom_version` 4): changed here — bidirectional (3D) mode (18), PWM type (21 · Fixed / Variable / By
+  RPM), PWM frequency (24 · slider 8–144 kHz · off with "By RPM"), motor KV (26 · 20–10220, step 40), motor poles (27 ·
+  2–36). The rest only when not on the default (below).
 
-- Essentials: signal protocol (46 · Auto / DShot / Servo / Serial / EDT ARM), disable stick calibration (7).
-- Motor: motor direction (17, per ESC), bidirectional (3D) mode (18), PWM type (21 · Fixed / Variable / By RPM), PWM
-  frequency (24 · 8–144 kHz · off with "By RPM"), auto timing advance (47), timing advance (23 · 0–30° in steps of
-  0.9375°, raw 10–42 · off with auto timing), startup power (25 · 50–150 %), motor KV (26 · 20–10220, step 40), motor
-  poles (27 · 2–36), complementary PWM (20), stuck rotor protection (22), stall protection (29), use hall sensors
-  (39), 30 ms telemetry (31), beep volume (30 · 0–11).
-- Extended settings: ramp rate (5 · 0.1–20 % duty cycle per ms), minimum duty cycle (6 · 0–25 %, step 0.5).
-- Limits: low voltage cutoff (36 · Off / Per cell / Absolute), cutoff voltage per cell (37 · 2.50–3.50 V · only with
-  "Per cell"), absolute cutoff voltage (8 · 0.5–50 V · only with "Absolute"), temperature limit (43 · 70–141 °C, 141 =
-  off), current limit (44 · 0–202 A, step 2, 0 and 202 = off).
-- Current control: current P / I / D (9, 10, 11 · 0–255).
-- Sinusoidal startup: sinusoidal startup (19), sine mode range (40 · 5–25 % throttle), sine mode power (45 · 1–10) —
-  both off without sinusoidal startup or with car type reverse braking.
-- Brake: brake on stop (28 · Off / On / Active brake), car type reverse braking (38), brake strength (41 · 1–10 · off
-  without brake on stop or with car braking), running brake level (42 · 1–10 · off with car braking), active brake
-  power (12 · 0–5 % duty cycle, 0 = off · only with "Active brake").
-- Servo input: low threshold (32 · 750–1250 µs), high threshold (33 · 1750–2250 µs), neutral (34 · 1374–1629 µs), dead
-  band (35 · 0–100).
+Defaults (raw byte · shown as):
+
+- Bluejay — the firmware's `DEFAULT_PGM_*` (`Bluejay.asm` v0.21.0, what a fresh flash starts with): demag
+  compensation (0x1F · 2 = Low), rampup power (0x09 · 9x), temperature protection (0x23 · 0 = Off), brake on stop
+  (0x27 · Off), braking strength (0x10 · 255), force EDT arm (0x2A · Off), beep strength (0x1B · 40), beacon strength
+  (0x1C · 80), beacon delay (0x1D · 4 = 10 minutes).
+- AM32 — the firmware has no default table; these are what the AM32 configurator's "Send Default Settings" writes
+  (`public/eeprom-defaults/DEFAULT/v4.bin`): signal protocol (46 · DShot), disable stick calibration (7 · Off), auto
+  timing advance (47 · Off), timing advance (23 · 26 = 15°), startup power (25 · 100 %), complementary PWM (20 · On),
+  stuck rotor protection (22 · On), stall protection (29 · Off), hall sensors (39 · Off), 30 ms telemetry (31 · Off),
+  beep volume (30 · 5), ramp rate (5 · 16 % duty cycle per ms), minimum duty cycle (6 · 2 %), low voltage cutoff
+  (36 · Off), cutoff voltage per cell (37 · 3.00 V), absolute cutoff voltage (8 · 5 V), temperature limit (43 · 141 =
+  Off), current limit (44 · 102 = Off), current P / I / D (9, 10, 11 · 100 / 0 / 50), sinusoidal startup (19 · Off),
+  sine mode range (40 · 15 % throttle), sine mode power (45 · 6), brake on stop (28 · Off), car type reverse braking
+  (38 · Off), brake strength (41 · 10), running brake level (42 · 10), active brake power (12 · 2 % duty cycle), servo
+  low / high / neutral (32, 33, 34 · 1006 / 2006 / 1502 µs), servo dead band (35 · 50).
 
 ## Behaviour
 
@@ -139,9 +151,9 @@ AM32 settings (2.21, `eeprom_version` 4; offset · range as shown · what disabl
 - Version check: Bluejay other than 0.21 and AM32 other than 2.21 get an error notice (once per message) saying what
   to flash, and "Version not supported" on their card — no settings, nothing to change. Such ESCs are never combined.
 - Editing (SPEC §5): edits stay local until Save. The draft is the settings block of each ESC as it was read, with
-  single bytes patched — a change to a shared setting goes into the block of every ESC with that firmware, a per-motor
-  one (AM32 motor direction) into one. Numbers are kept inside their range and on the values the ESC can store.
-  Settings that another one makes meaningless are greyed out (see "AM32 settings").
+  single bytes patched — a change goes into the block of every ESC the card stands for (all of them in the combined
+  view, one on a card per ESC). Numbers are kept inside their range and on the values the ESC can store. The AM32 PWM
+  frequency is greyed out with PWM type "By RPM". "Reset" / "Reset all to defaults" patch the defaults in the same way.
 - Save asks for confirmation, then takes over the MSP link like reading does (same waiting and retries). Per ESC whose
   block changed: `cmd_DeviceInitFlash`, check it is the same MCU, read the block again — if it already holds the new
   settings it is skipped, if it is no longer what was read the save stops ("read the ESCs again") — then SiLabs:
@@ -151,40 +163,46 @@ AM32 settings (2.21, `eeprom_version` 4; offset · range as shown · what disabl
 - Only the settings block is ever erased or written; ESCs that were not changed, BLHeli_S, unsupported versions and
   AM32 on 128 k flash are never written to. Nothing on this tab changes the FC or needs a reboot.
 - Bluejay built for anything but 24 kHz PWM: a warning in the PWM frequency row of the card(s) — it can only be fixed
-  by flashing.
+  by flashing, so there is no reset for it.
 
 ## Hidden on purpose
 
-- Flashing (SPEC "Never"), startup melodies / the AM32 "Tune" tab, changing BLHeli_S settings, Bluejay settings
-  other than the three SPEC §2 lists (they are shown).
-- BLHeli_S programming by TX, PPM throttle range and LED control; Bluejay LED control — none of them matter on a
-  DShot multirotor. AM32 `brake_on_zero_throttle` (byte 13): not in the AM32 configurator.
+- Flashing (SPEC "Never"), startup melodies / the AM32 "Tune" tab, changing BLHeli_S settings, changing Bluejay / AM32
+  settings other than the ones SPEC §2 lists (they are only put back to their default).
+- The motor direction (SPEC §2): it is set per motor, on the Motors tab.
+- BLHeli_S programming by TX, PPM throttle range and LED control; Bluejay LED control and startup beep — none of them
+  matter on a DShot multirotor. AM32 `brake_on_zero_throttle` (byte 13): not in the AM32 configurator.
 - Bluejay / AM32 versions other than 0.21 / 2.21: not even their settings are shown (SPEC §2).
 - ESC Configurator's "mistagged firmware" dead-time check.
 
 ## Acceptance
 
-Mock FC ("Connect Mock FC" / demo mode: a Bluejay 0.21.0 ESC, 48 kHz build, and an AM32 2.21 ESC; like real ones they
+Mock FC ("Connect Mock FC" / demo mode: a Bluejay 0.21.0 ESC, 48 kHz build, with demag compensation and temperature
+protection off their defaults, and an AM32 2.21 ESC with stall protection and current D off theirs; like real ones they
 only answer once the signal wire was high for 0.7 s, and their SiLabs flash only takes a write after an erase). The
-combined view runs against `defaultMockEscs()` (4 Bluejay set up alike, motors 2 and 3 reversed), the other checks on
+mock ESCs are otherwise on the firmware's defaults. The combined view runs against `defaultMockEscs()` (4 Bluejay set
+up alike, motors 2 and 3 reversed), the other checks on
 ESCs that are not alike against `mixedMockEscs()` (two Bluejay 0.21.0 — the second one reversed and with another PWM
 frequency —, a BLHeli_S 16.7 and an AM32 2.21) in the tests:
 
 - [x] Nothing is read before "Read ESCs" is pressed
-- [x] Read ESCs in demo mode → a card each for the Bluejay and the AM32 ESC, each with its settings to change on it
-- [x] Four ESCs that are alike → one combined view with firmware, version, hardware and settings; motor
-      direction listed per ESC (ESC 2 and 3 "Reversed"); no cards per ESC
+- [x] Read ESCs in demo mode → a card each for the Bluejay and the AM32 ESC, each with its settings to change and the
+      two that are not on the default
+- [x] Four ESCs that are alike (motor directions differ) → one combined view; no cards per ESC, no motor direction
 - [x] ESCs with different firmware → four cards with firmware, version, hardware and settings, and a notice
-- [x] A setting that differs → cards per ESC, the notice names it and the ESC's value carries "differs"; its motor
-      direction doesn't
+- [x] A setting that differs → cards per ESC, the notice names it; the motor direction is never named
 - [x] The FC answers MSP again afterwards (another tab opens and reads)
 - [x] An ESC that doesn't answer is shown as such next to the ones that do; none answering → battery hint
 - [x] Reading sends no write / erase command (the mock logs every one)
-- [x] Bluejay: timing and both startup powers can be changed, PWM frequency can't; the 48 kHz build shows the warning
+- [x] Bluejay: timing, both startup powers and the power rating can be changed, PWM frequency can't; the 48 kHz build
+      shows the warning, the 24 kHz build no PWM frequency at all
 - [x] Save asks first; then every ESC gets one page erase + one write of its settings block, the other bytes of the
       block (direction, name tags, melody) are unchanged, and "Read again" shows the new values
-- [x] AM32: all settings of the AM32 configurator in its groups, motor direction per ESC, written without a page
-      erase; dependent settings are greyed out; numbers stay in range
+- [x] AM32: 3D mode, PWM type, PWM frequency (slider, greyed out with "By RPM"), motor KV and poles; written without
+      a page erase; numbers stay in range
+- [x] A setting that isn't changed here and isn't on its default is listed with value and default; "Reset" / "Reset
+      all to defaults" put the default into the draft (of all ESCs in the combined view); on the default it isn't
+      shown. Bytes that mean the same (AM32 current limit 101 / 102) count as the default
 - [x] Bluejay ≠ 0.21 / AM32 ≠ 2.21: error telling what to flash, "Version not supported", nothing to change
 - [x] ESCs listed one by one are edited on their own card; one that differs in an editable setting is marked "differs"
       and "Use ESC 1's for all" levels them
@@ -214,8 +232,7 @@ On real hardware:
   does: only PA2, PB4 and PA6 are AM32.
 - AM32 timing advance: raw 0–3 is ×7.5°, raw 10–42 is (raw − 10) × 0.9375° (`Src/main.c`).
 - One combined view for ESCs that are alike (user request): four identical lists say nothing, and whether they are
-  identical is the actual question. Hardware has to match too — the view has one header — and a differing motor
-  direction doesn't keep them apart, it is per motor on purpose.
+  identical is the actual question. Hardware has to match too — the view has one header.
 - The mock's default ESCs are a realistic quad (four Bluejay set up alike), used by the tests of the combined view.
   "Connect Mock FC" (demo mode) reads `demoMockEscs()` instead — one Bluejay and one AM32 ESC — so both editors can be
   seen (user request, 2026-09-25); the combined view is then only covered by the tests. `mixedMockEscs()` (three
@@ -223,6 +240,15 @@ On real hardware:
 - ESCs listed one by one are edited on their own cards (user request, 2026-09-25): a separate editor per firmware below
   the cards repeated every setting, far from the card that shows it. An edit there goes to that ESC only; the notice
   with "Use ESC 1's for all" keeps a way to level ESCs of one firmware.
+- Only a few settings are changed; the others are hidden and only come up when they are off the firmware's default,
+  with a reset (user request, 2026-09-25). The motor direction is ignored completely — not shown, not compared.
+  Defaults are compared as shown, not as bytes: several bytes mean the same (AM32 current limit 101 from ESC
+  Configurator and 102 from the AM32 configurator are both off; timing 2 is the old format of 15°).
+- AM32 defaults: the firmware has none (a blank eeprom is only range-corrected), so the AM32 configurator's generic
+  `DEFAULT/v4.bin` is used. It can serve a different file per ESC model, which isn't public — an ESC shipped with other
+  defaults shows those settings as not on the default.
+- Bluejay minimum startup power has no reset: it is changed here (the firmware's default is 1010, ESC Configurator's
+  1025).
 
 - Editing (SPEC §2, 2026-09): the draft is the raw settings block per ESC and saving is read-modify-write of that
   block, the way ESC Configurator and the AM32 configurator write settings (SiLabs: erase the page, write 0xFF bytes;
@@ -231,17 +257,15 @@ On real hardware:
 - Before writing, the block is read again and must still be what the page shows — otherwise another tool changed the
   ESC in between and the bytes we'd write back would be stale.
 - "Editable timings" = Bluejay motor (commutation) timing; "startup speeds (both types)" = minimum and maximum startup
-  power. Ranges and steps as in ESC Configurator. Other Bluejay settings stay read-only because SPEC §2 doesn't list
-  them.
-- "All settings from AM32 configurator" = its "Base" tab, with its groups, ranges, units and enable rules. Not the
-  "Tune" tab (startup melody editor) — ask if wanted. 3D mode is one switch for all ESCs (the AM32 configurator has it
-  per ESC); only the motor direction is per ESC.
+  power. Ranges and steps as in ESC Configurator.
+- AM32 3D mode is one switch for all ESCs (the AM32 configurator has it per ESC). The PWM frequency is a slider (user
+  request); the other AM32 numbers stay number fields.
 - Versions are matched exactly (Bluejay `0.21`, any patch level; AM32 `2.21`). AM32 2.21 raises `eeprom_version` to 4
   when it first starts, so only that layout is known.
 - AM32 on 128 k flash (signature 0x2B06, CAN ESCs) is read but not written: newer bootloaders report their own flash
   map ("v3 devinfo" in the AM32 configurator), which this app doesn't read.
 - Numbers are typed (number fields) instead of the configurators' sliders: 255 steps on a short slider can't be hit,
-  and a motor KV is something you know. Timing advance is a dropdown of its 33 values.
+  and a motor KV is something you know.
 - Save asks for confirmation although SPEC §5 doesn't: a failed write leaves an ESC on default settings, and the ESCs
   restart.
 - The 48 kHz warning shows on "Connect Mock FC" on purpose (the mock Bluejay is the 48 kHz build), so the warning is exercised.

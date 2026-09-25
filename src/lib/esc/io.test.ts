@@ -231,15 +231,15 @@ describe('writeEscs against the mock FC', () => {
     const written = await writeEscs(
       client,
       reports,
-      edit(reports, 'AM32', 'direction', 1, [1]),
+      edit(reports, 'AM32', 'motorPoles', 12, [1]),
       options,
     )
 
     expect(fc.escPassthrough?.flashChanges).toEqual([
       { esc: 1, command: FOURWAY_CMD.DEVICE_WRITE, address: 0x7c00, length: 0xb8 },
     ])
-    expect(escs[1]?.flash[0x7c00]).toEqual(before.with(17, 1))
-    expect(written.map((report) => settingOf(report, 'direction'))).toEqual(['Normal', 'Reversed'])
+    expect(escs[1]?.flash[0x7c00]).toEqual(before.with(27, 12))
+    expect(written.map((report) => settingOf(report, 'motorPoles'))).toEqual(['14', '12'])
     expect(written[0]).toBe(reports[0])
   })
 

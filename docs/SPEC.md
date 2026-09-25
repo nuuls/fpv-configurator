@@ -125,11 +125,15 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
     - Only support version 21, show error and tell user to update if its older
     - Editable Timings
     - Editable Startup speeds (both types)
+    - Editable Power rating
     - PWM frequency (read only since it requires flashing)
       - Show a warning for anything but 24khz that flight performance is greatly reduced
+    - All other settings hidden; a warning with a reset to default when one is not on its default
   - AM32
     - Only support 2.21, show error otherwise
-    - Include all settings from AM32 configurator
+    - Editable: 3D mode, PWM type, PWM frequency (slider), Motor KV, Motor poles
+    - All other settings hidden; a warning with a reset to default when one is not on its default
+  - Motor direction is ignored completely: not shown, not compared between ESCs
 
 - OSD
   - Copy the existing betaflight UI but only keep the following elements

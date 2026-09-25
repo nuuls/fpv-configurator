@@ -23,8 +23,10 @@ import {
   draftRaw,
   editableGroups,
   numberToRaw,
+  offDefault,
   rawToNumber,
   recommendedZone,
+  resetToDefaults,
   setDraftRaw,
   toEscDraft,
   unevenSettings,
@@ -33,6 +35,7 @@ import {
   type EscGroup,
   type EscOverview,
   type EscReport,
+  type EscSetting,
   type EscSettingDef,
   type RecommendedZone,
 } from '@/lib/esc/model'
@@ -239,18 +242,16 @@ function UnevenNotice({ group, draft, onChange }: GroupEditorProps) {
   )
 }
 
-/** All ESCs are alike: their settings once, and what is set per motor listed by ESC. */
+/** All ESCs are alike: their settings once. */
 interface CombinedEscCardProps {
   overview: Extract<EscOverview, { view: 'combined' }>
-  /** The ESCs' editable settings, if this firmware has any: they are edited below the ones that are only shown. */
+  /** The ESCs' editable settings, if this firmware has any. */
   group: EscGroup | undefined
   draft: EscDraft
   onChange: (draft: EscDraft) => void
 }
 
 function CombinedEscCard({ overview, group, draft, onChange }: CombinedEscCardProps) {
-  const edited = new Set(group?.settings.map((def) => def.key))
-  const readOnly = overview.settings.filter((setting) => !edited.has(setting.key))
   return (
     <Card role="group" aria-label="All ESCs" className="mt-4 max-w-xl">
       <CardHeader>
@@ -262,39 +263,13 @@ function CombinedEscCard({ overview, group, draft, onChange }: CombinedEscCardPr
       </CardHeader>
       <CardContent className="text-sm">
         {overview.note && <p className="text-muted-foreground">{overview.note}</p>}
-        {group && (
-          <>
-            <div className="mt-3">
-              <GroupEditor group={group} draft={draft} onChange={onChange} />
-            </div>
-            {readOnly.length > 0 && <h3 className="mt-6 mb-1 font-medium">Other settings</h3>}
-          </>
-        )}
-        <dl className="divide-y">
-          {readOnly.map((setting) => (
-            <div
-              key={setting.key}
-              className="flex flex-wrap items-baseline justify-between gap-x-3 py-1.5"
-            >
-              <dt className="text-muted-foreground">{setting.label}</dt>
-              <dd className="text-right font-medium">
-                {setting.values.length === 1 ? (
-                  setting.values[0]
-                ) : (
-                  <ul>
-                    {setting.values.map((value, index) => (
-                      <li key={index}>
-                        <span className="text-muted-foreground font-normal">ESC {index + 1}</span>{' '}
-                        {value}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </dd>
-              <SettingWarning warning={setting.warning} />
-            </div>
-          ))}
-        </dl>
+        <EscSettings
+          settings={overview.settings}
+          group={group}
+          differing={new Set()}
+          draft={draft}
+          onChange={onChange}
+        />
       </CardContent>
     </Card>
   )
@@ -314,9 +289,6 @@ interface EscCardProps {
 }
 
 function EscCard({ number, report, differing, group, compareWith, draft, onChange }: EscCardProps) {
-  const edited = new Set(group?.settings.map((def) => def.key))
-  const readOnly =
-    report.status === 'ok' ? report.settings.filter((setting) => !edited.has(setting.key)) : []
   return (
     <Card role="group" aria-label={`ESC ${number}`}>
       <CardHeader>
@@ -340,44 +312,129 @@ function EscCard({ number, report, differing, group, compareWith, draft, onChang
       {report.status === 'ok' && (
         <CardContent className="text-sm">
           {report.note && <p className="text-muted-foreground">{report.note}</p>}
-          {group && (
-            <>
-              <div className="mt-3">
-                <GroupEditor
-                  group={group}
-                  draft={draft}
-                  onChange={onChange}
-                  compareWith={compareWith}
-                />
-              </div>
-              {readOnly.length > 0 && <h3 className="mt-6 mb-1 font-medium">Other settings</h3>}
-            </>
-          )}
-          <dl className="divide-y">
-            {readOnly.map((setting) => (
-              <div
-                key={setting.key}
-                className="flex flex-wrap items-baseline justify-between gap-x-3 py-1.5"
-              >
-                <dt className="text-muted-foreground">{setting.label}</dt>
-                <dd className="flex items-baseline gap-2 text-right font-medium">
-                  {setting.value}
-                  {differing.has(setting.key) && (
-                    <Badge
-                      className="py-0"
-                      title="Not the same as on the first ESC with this firmware"
-                    >
-                      differs
-                    </Badge>
-                  )}
-                </dd>
-                <SettingWarning warning={setting.warning} />
-              </div>
-            ))}
-          </dl>
+          <EscSettings
+            settings={report.settings}
+            group={group}
+            compareWith={compareWith}
+            differing={differing}
+            draft={draft}
+            onChange={onChange}
+          />
         </CardContent>
       )}
     </Card>
+  )
+}
+
+interface EscSettingsProps {
+  settings: EscSetting[]
+  group: EscGroup | undefined
+  compareWith?: number | undefined
+  differing: Set<string>
+  draft: EscDraft
+  onChange: (draft: EscDraft) => void
+}
+
+/**
+ * What a card lists. ESCs that can be changed: the settings to change, the ones that are not on the firmware's
+ * default, and what else needs fixing. Otherwise every setting, as read.
+ */
+function EscSettings({
+  settings,
+  group,
+  compareWith,
+  differing,
+  draft,
+  onChange,
+}: EscSettingsProps) {
+  const listed = group
+    ? settings.filter(
+        (setting) => setting.warning && !group.settings.some((def) => def.key === setting.key),
+      )
+    : settings
+  return (
+    <>
+      {group && (
+        <div className="mt-3">
+          <GroupEditor group={group} draft={draft} onChange={onChange} compareWith={compareWith} />
+        </div>
+      )}
+      {group && <OffDefaultNotice group={group} draft={draft} onChange={onChange} />}
+      {listed.length > 0 && (
+        <dl className={cn('divide-y', group && 'mt-4')}>
+          {listed.map((setting) => (
+            <div
+              key={setting.key}
+              className="flex flex-wrap items-baseline justify-between gap-x-3 py-1.5"
+            >
+              <dt className="text-muted-foreground">{setting.label}</dt>
+              <dd className="flex items-baseline gap-2 text-right font-medium">
+                {setting.value}
+                {differing.has(setting.key) && (
+                  <Badge
+                    className="py-0"
+                    title="Not the same as on the first ESC with this firmware"
+                  >
+                    differs
+                  </Badge>
+                )}
+              </dd>
+              <SettingWarning warning={setting.warning} />
+            </div>
+          ))}
+        </dl>
+      )}
+    </>
+  )
+}
+
+/** The settings this app doesn't change that are not on the firmware's default, each with a way back to it. */
+function OffDefaultNotice({ group, draft, onChange }: GroupEditorProps) {
+  const first = group.escs[0] ?? 0
+  const off = offDefault(draft, first, group)
+  if (off.length === 0) return null
+  const reset = (defs: EscSettingDef[]) => onChange(resetToDefaults(draft, group.escs, defs))
+  const shown = (def: EscSettingDef, raw: number) => def.format(raw) ?? String(raw)
+  return (
+    <div
+      role="group"
+      aria-label="Not on the default"
+      className="border-primary/40 bg-primary/10 mt-4 rounded-md border p-3"
+    >
+      <p className="flex items-center gap-2 font-medium">
+        <TriangleAlert className="text-warning size-4 shrink-0" />
+        Not on the {group.firmware} default
+      </p>
+      <p className="text-muted-foreground mt-1">
+        This app doesn&apos;t change these settings. Reset them unless they were set on purpose.
+      </p>
+      <ul className="mt-2 divide-y">
+        {off.map((def) => (
+          <li key={def.key} className="flex items-center justify-between gap-3 py-1.5">
+            <span>
+              {def.label}:{' '}
+              <span className="font-medium">{shown(def, draftRaw(draft, first, def))}</span>{' '}
+              <span className="text-muted-foreground">
+                (default {shown(def, def.defaultRaw ?? 0)})
+              </span>
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              aria-label={`Reset ${def.label} to default`}
+              onClick={() => reset([def])}
+            >
+              Reset
+            </Button>
+          </li>
+        ))}
+      </ul>
+      {off.length > 1 && (
+        <Button size="sm" variant="outline" className="mt-2" onClick={() => reset(off)}>
+          Reset all to defaults
+        </Button>
+      )}
+    </div>
   )
 }
 
@@ -422,7 +479,7 @@ interface GroupEditorProps {
   onChange: (draft: EscDraft) => void
 }
 
-/** The settings of ESCs that are edited as one. A change goes to all of them, except for what is set per motor. */
+/** The settings of ESCs that are edited as one. A change goes to all of them. */
 function GroupEditor({
   group,
   draft,
@@ -435,84 +492,50 @@ function GroupEditor({
     return def ? draftRaw(draft, first, def) : 0
   }
   const differs = (def: EscSettingDef) =>
-    !def.perMotor &&
-    compareWith !== undefined &&
-    draftRaw(draft, first, def) !== draftRaw(draft, compareWith, def)
-  const perMotorList = group.escs.length > 1
-  const sections = [...new Set(group.settings.map((def) => def.group))]
+    compareWith !== undefined && draftRaw(draft, first, def) !== draftRaw(draft, compareWith, def)
 
   return (
-    <>
-      {sections.map((section) => (
-        <Fragment key={section ?? ''}>
-          {section && <h3 className="mt-6 mb-1 font-medium">{section}</h3>}
-          <div className="divide-y">
-            {group.settings
-              .filter((def) => def.group === section)
-              .map((def) => {
-                const disabled = def.enabled ? !def.enabled(raw) : false
-                const id = `esc-${group.escs.join('-')}-${def.key}`
-                const slider = def.control?.kind === 'number' && def.control.recommended
-                return (
-                  <div
-                    key={def.key}
-                    className={
-                      slider
-                        ? 'flex flex-col gap-2 py-3'
-                        : 'flex items-center justify-between gap-3 py-1.5'
-                    }
-                  >
-                    <div>
-                      <label
-                        id={`${id}-label`}
-                        htmlFor={(def.perMotor && perMotorList) || slider ? undefined : id}
-                        className="font-medium"
-                      >
-                        {def.label}
-                      </label>
-                      {differs(def) && (
-                        <Badge
-                          className="ml-2 py-0"
-                          title="Not the same as on the first ESC with this firmware"
-                        >
-                          differs
-                        </Badge>
-                      )}
-                      {def.hint && <p className="text-muted-foreground text-xs">{def.hint}</p>}
-                    </div>
-                    {def.perMotor && perMotorList ? (
-                      <ul className="flex flex-col items-end gap-1.5">
-                        {group.escs.map((esc) => (
-                          <li key={esc} className="flex items-center gap-2">
-                            <label htmlFor={`${id}-${esc}`} className="text-muted-foreground">
-                              ESC {esc + 1}
-                            </label>
-                            <SettingControl
-                              id={`${id}-${esc}`}
-                              def={def}
-                              raw={draftRaw(draft, esc, def)}
-                              disabled={disabled}
-                              onChange={(next) => onChange(setDraftRaw(draft, [esc], def, next))}
-                            />
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <SettingControl
-                        id={id}
-                        def={def}
-                        raw={draftRaw(draft, first, def)}
-                        disabled={disabled}
-                        onChange={(next) => onChange(setDraftRaw(draft, group.escs, def, next))}
-                      />
-                    )}
-                  </div>
-                )
-              })}
+    <div className="divide-y">
+      {group.settings.map((def) => {
+        const disabled = def.enabled ? !def.enabled(raw) : false
+        const id = `esc-${group.escs.join('-')}-${def.key}`
+        const slider =
+          def.control?.kind === 'number' && (def.control.slider || def.control.recommended)
+        return (
+          <div
+            key={def.key}
+            className={
+              slider ? 'flex flex-col gap-2 py-3' : 'flex items-center justify-between gap-3 py-1.5'
+            }
+          >
+            <div>
+              <label id={`${id}-label`} htmlFor={slider ? undefined : id} className="font-medium">
+                {def.label}
+              </label>
+              {differs(def) && (
+                <Badge
+                  className="ml-2 py-0"
+                  title="Not the same as on the first ESC with this firmware"
+                >
+                  differs
+                </Badge>
+              )}
+              {def.hint && <p className="text-muted-foreground text-xs">{def.hint}</p>}
+            </div>
+            {/* a long hint next to it must not squeeze the control */}
+            <div className={slider ? undefined : 'shrink-0'}>
+              <SettingControl
+                id={id}
+                def={def}
+                raw={draftRaw(draft, first, def)}
+                disabled={disabled}
+                onChange={(next) => onChange(setDraftRaw(draft, group.escs, def, next))}
+              />
+            </div>
           </div>
-        </Fragment>
-      ))}
-    </>
+        )
+      })}
+    </div>
   )
 }
 
@@ -556,12 +579,11 @@ function SettingControl({ id, def, raw, disabled, onChange }: SettingControlProp
       </NativeSelect>
     )
   }
-  if (control.recommended)
+  if (control.slider || control.recommended)
     return (
-      <RecommendedSlider
+      <NumberSlider
         labelledBy={`${id}-label`}
         control={control}
-        recommended={control.recommended}
         raw={raw}
         disabled={disabled}
         onChange={onChange}
@@ -593,33 +615,22 @@ const ZONE_STYLE: Record<RecommendedZone, { bar: string; text: string; icon: typ
     high: { bar: 'bg-warning', text: 'text-warning', icon: TriangleAlert },
   }
 
-/** A number setting as a slider with its recommended range painted green under the track (like Motors' dynamic idle). */
-function RecommendedSlider({
+/** A number setting as a slider; a recommended range is painted green under the track (like Motors' dynamic idle). */
+function NumberSlider({
   labelledBy,
   control,
-  recommended,
   raw,
   disabled,
   onChange,
 }: {
   labelledBy: string
   control: NumberControl
-  recommended: { min: number; max: number }
   raw: number
   disabled: boolean
   onChange: (raw: number) => void
 }) {
   const value = rawToNumber(control, raw)
   const clamp = (v: number) => Math.min(control.max, Math.max(control.min, v))
-  const percent = (v: number) => ((clamp(v) - control.min) / (control.max - control.min)) * 100
-  const zone = recommendedZone(recommended, value)
-  const range = `${recommended.min}–${recommended.max}`
-  const segments = [
-    { from: control.min, to: recommended.min, zone: 'low' },
-    { from: recommended.min, to: recommended.max, zone: 'good' },
-    { from: recommended.max, to: control.max, zone: 'high' },
-  ] as const
-  const { text, icon: Icon } = ZONE_STYLE[zone]
 
   return (
     <div role="group" aria-labelledby={labelledBy} className="flex flex-col gap-2">
@@ -636,6 +647,37 @@ function RecommendedSlider({
         value={[clamp(value)]}
         onValueChange={([v]) => v !== undefined && onChange(numberToRaw(control, v))}
       />
+      {control.recommended && (
+        <RecommendedRange control={control} recommended={control.recommended} value={value} />
+      )}
+    </div>
+  )
+}
+
+function RecommendedRange({
+  control,
+  recommended,
+  value,
+}: {
+  control: NumberControl
+  recommended: { min: number; max: number }
+  value: number
+}) {
+  const percent = (v: number) =>
+    ((Math.min(control.max, Math.max(control.min, v)) - control.min) /
+      (control.max - control.min)) *
+    100
+  const zone = recommendedZone(recommended, value)
+  const range = `${recommended.min}–${recommended.max}`
+  const segments = [
+    { from: control.min, to: recommended.min, zone: 'low' },
+    { from: recommended.min, to: recommended.max, zone: 'good' },
+    { from: recommended.max, to: control.max, zone: 'high' },
+  ] as const
+  const { text, icon: Icon } = ZONE_STYLE[zone]
+
+  return (
+    <>
       <div className="relative mx-2 h-1.5" aria-hidden="true">
         {segments
           .filter(({ from, to }) => to > from)
@@ -655,6 +697,6 @@ function RecommendedSlider({
             : `${zone === 'low' ? 'Below' : 'Above'} the recommended ${range}`}
         </span>
       </p>
-    </div>
+    </>
   )
 }

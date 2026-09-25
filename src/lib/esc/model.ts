@@ -125,8 +125,6 @@ export interface EscSetting {
   key: string
   label: string
   value: string
-  /** Meant to be different from motor to motor, so never flagged as "differs". */
-  perMotor: boolean
   /** Something about this value the pilot should fix, e.g. a PWM frequency that flies badly. */
   warning: string | null
 }
@@ -176,6 +174,8 @@ export type EscControl =
       unit: string
       scale: number
       offset: number
+      /** Shown as a slider (instead of a number field). */
+      slider?: boolean
       /** Shown as a slider with this range marked as recommended (inclusive, in shown numbers). */
       recommended?: { min: number; max: number }
     }
@@ -187,13 +187,15 @@ export interface EscSettingDef {
   /** First / last layout revision that has the setting. */
   from?: number
   to?: number
-  perMotor?: boolean
   /** null hides the row (value not meaningful in this firmware version). */
   format: Format
   /** Only on settings this app can change. */
   control?: EscControl
-  /** Heading the setting is listed under in the editor. */
-  group?: string
+  /**
+   * The firmware's default, on the settings this app doesn't change: they are only shown when they are not on it,
+   * with a way back to it.
+   */
+  defaultRaw?: number
   hint?: string
   /** false greys the control out: another setting (looked up by key, raw value) makes it meaningless. */
   enabled?: (raw: (key: string) => number) => boolean
@@ -243,6 +245,7 @@ function number(range: {
   unit?: string
   scale?: number
   offset?: number
+  slider?: boolean
   recommended?: { min: number; max: number }
 }): Editable {
   const control = { kind: 'number', step: 1, unit: '', scale: 1, offset: 0, ...range } as const
@@ -259,12 +262,9 @@ function select(names: Record<number, string>): Editable {
 
 const toggle: Editable = { control: { kind: 'switch' }, format: onOff }
 
-const DIRECTION = oneOf({
-  1: 'Normal',
-  2: 'Reversed',
-  3: 'Bidirectional (3D)',
-  4: 'Bidirectional (3D), reversed',
-})
+/** A setting this app doesn't change, shown the way its editor would show it. */
+const shown = ({ format }: Editable): Editable => ({ format })
+
 const DEMAG = oneOf({ 1: 'Off', 2: 'Low', 3: 'High' })
 const BEACON_DELAY = oneOf({
   1: '1 minute',
@@ -293,7 +293,6 @@ const BLHELI_S_STARTUP_POWER = [
 ]
 
 const BLHELI_S_SETTINGS: EscSettingDef[] = [
-  { key: 'direction', label: 'Motor direction', offset: 0x0b, perMotor: true, format: DIRECTION },
   {
     key: 'startupPower',
     label: 'Startup power',
@@ -325,9 +324,11 @@ const BLHELI_S_SETTINGS: EscSettingDef[] = [
 /** PWM frequency Bluejay should be built for; SPEC §2: anything else flies a lot worse. */
 export const BLUEJAY_GOOD_PWM_KHZ = 24
 
-/** Bluejay 0.21, settings layout 208 (`Bluejay.asm`). Ranges and steps of the editable ones as in ESC Configurator. */
+/**
+ * Bluejay 0.21, settings layout 208 (`Bluejay.asm`). Ranges and steps of the editable ones as in ESC Configurator;
+ * the defaults of the others are the firmware's `DEFAULT_PGM_*` (what a fresh flash starts with).
+ */
 const BLUEJAY_SETTINGS: EscSettingDef[] = [
-  { key: 'direction', label: 'Motor direction', offset: 0x0b, perMotor: true, format: DIRECTION },
   {
     key: 'pwmFrequency',
     label: 'PWM frequency',
@@ -381,26 +382,40 @@ const BLUEJAY_SETTINGS: EscSettingDef[] = [
       5: '30° (high)',
     }),
   },
-  { key: 'demag', label: 'Demag compensation', offset: 0x1f, format: DEMAG },
+  {
+    key: 'powerRating',
+    label: 'Power rating',
+    offset: 0x29,
+    hint: 'Sets the temperature limits: 1S only on a quad that flies on one cell.',
+    ...select({ 1: '1S', 2: '2S+' }),
+  },
+  { key: 'demag', label: 'Demag compensation', offset: 0x1f, defaultRaw: 2, format: DEMAG },
   {
     key: 'rampupPower',
     label: 'Rampup power',
     offset: 0x09,
+    defaultRaw: 9,
     format: (raw) => (raw === 0 ? 'Off' : raw <= 13 ? `${raw}x` : `Unknown (${raw})`),
   },
   {
     key: 'temperature',
     label: 'Temperature protection',
     offset: 0x23,
+    defaultRaw: 0,
     format: TEMPERATURE_PROTECTION,
   },
-  { key: 'brakeOnStop', label: 'Brake on stop', offset: 0x27, format: onOff },
-  { key: 'brakingStrength', label: 'Braking strength', offset: 0x10, format: plain },
-  { key: 'powerRating', label: 'Power rating', offset: 0x29, format: oneOf({ 1: '1S', 2: '2S+' }) },
-  { key: 'forceEdtArm', label: 'Force EDT arm', offset: 0x2a, format: onOff },
-  { key: 'beepStrength', label: 'Beep strength', offset: 0x1b, format: plain },
-  { key: 'beaconStrength', label: 'Beacon strength', offset: 0x1c, format: plain },
-  { key: 'beaconDelay', label: 'Beacon delay', offset: 0x1d, format: BEACON_DELAY },
+  { key: 'brakeOnStop', label: 'Brake on stop', offset: 0x27, defaultRaw: 0, format: onOff },
+  {
+    key: 'brakingStrength',
+    label: 'Braking strength',
+    offset: 0x10,
+    defaultRaw: 255,
+    format: plain,
+  },
+  { key: 'forceEdtArm', label: 'Force EDT arm', offset: 0x2a, defaultRaw: 0, format: onOff },
+  { key: 'beepStrength', label: 'Beep strength', offset: 0x1b, defaultRaw: 40, format: plain },
+  { key: 'beaconStrength', label: 'Beacon strength', offset: 0x1c, defaultRaw: 80, format: plain },
+  { key: 'beaconDelay', label: 'Beacon delay', offset: 0x1d, defaultRaw: 4, format: BEACON_DELAY },
 ]
 
 /** Raw 10–42 is (raw − 10) × 0.9375°; 0–3 is the format of old configurators, ×7.5° (`loadEEpromSettings`). */
@@ -409,276 +424,207 @@ const AM32_TIMING = Object.fromEntries(
 )
 const am32Timing = select(AM32_TIMING)
 
-const noCarBraking = (raw: (key: string) => number) => raw('rcCarReversing') === 0
-
 /**
- * AM32 2.21, `eeprom_version` 4. Offsets from AM32 `Inc/eeprom.h`; groups, ranges, units and what disables what
- * from the AM32 configurator (`pages/configurator.vue`) — all of its settings except the startup tune.
+ * AM32 2.21, `eeprom_version` 4. Offsets from AM32 `Inc/eeprom.h`; ranges and units from the AM32 configurator
+ * (`pages/configurator.vue`) — all of its settings except the startup tune. Only the motor ones are changed here; the
+ * defaults of the others are what the AM32 configurator's "Send Default Settings" writes
+ * (`public/eeprom-defaults/DEFAULT/v4.bin`) — the firmware itself has none.
  */
 const AM32_SETTINGS: EscSettingDef[] = [
   {
     key: 'protocol',
     label: 'Signal protocol',
     offset: 46,
-    group: 'Essentials',
-    ...select({ 0: 'Auto', 1: 'DShot', 2: 'Servo', 3: 'Serial', 4: 'EDT ARM' }),
+    defaultRaw: 1,
+    ...shown(select({ 0: 'Auto', 1: 'DShot', 2: 'Servo', 3: 'Serial', 4: 'EDT ARM' })),
   },
   {
     key: 'disableStickCalibration',
     label: 'Disable stick calibration',
     offset: 7,
-    group: 'Essentials',
-    ...toggle,
+    defaultRaw: 0,
+    ...shown(toggle),
   },
-
-  {
-    key: 'direction',
-    label: 'Motor direction',
-    offset: 17,
-    perMotor: true,
-    group: 'Motor',
-    ...select({ 0: 'Normal', 1: 'Reversed' }),
-  },
-  { key: 'bidirectional', label: 'Bidirectional (3D) mode', offset: 18, group: 'Motor', ...toggle },
+  { key: 'bidirectional', label: 'Bidirectional (3D) mode', offset: 18, ...toggle },
   {
     key: 'variablePwm',
     label: 'PWM type',
     offset: 21,
-    group: 'Motor',
     ...select({ 0: 'Fixed', 1: 'Variable', 2: 'By RPM' }),
   },
   {
     key: 'pwmFrequency',
     label: 'PWM frequency',
     offset: 24,
-    group: 'Motor',
     hint: 'Variable PWM runs between this frequency and twice as much.',
     enabled: (raw) => raw('variablePwm') < 2,
-    ...number({ min: 8, max: 144, unit: 'kHz' }),
+    ...number({ min: 8, max: 144, unit: 'kHz', slider: true }),
   },
-  { key: 'autoAdvance', label: 'Auto timing advance', offset: 47, group: 'Motor', ...toggle },
+  { key: 'autoAdvance', label: 'Auto timing advance', offset: 47, defaultRaw: 0, ...shown(toggle) },
   {
     key: 'timing',
     label: 'Timing advance',
     offset: 23,
-    group: 'Motor',
-    enabled: (raw) => raw('autoAdvance') !== 1,
-    ...am32Timing,
+    defaultRaw: 26,
     format: (raw) => (raw <= 3 ? `${raw * 7.5}°` : am32Timing.format(raw)),
   },
   {
     key: 'startupPower',
     label: 'Startup power',
     offset: 25,
-    group: 'Motor',
-    ...number({ min: 50, max: 150, unit: '%' }),
+    defaultRaw: 100,
+    ...shown(number({ min: 50, max: 150, unit: '%' })),
   },
   {
     key: 'motorKv',
     label: 'Motor KV',
     offset: 26,
-    group: 'Motor',
     ...number({ min: 20, max: 10220, step: 40, scale: 40, offset: 20 }),
   },
+  { key: 'motorPoles', label: 'Motor poles', offset: 27, ...number({ min: 2, max: 36 }) },
   {
-    key: 'motorPoles',
-    label: 'Motor poles',
-    offset: 27,
-    group: 'Motor',
-    ...number({ min: 2, max: 36 }),
+    key: 'complementaryPwm',
+    label: 'Complementary PWM',
+    offset: 20,
+    defaultRaw: 1,
+    ...shown(toggle),
   },
-  { key: 'complementaryPwm', label: 'Complementary PWM', offset: 20, group: 'Motor', ...toggle },
   {
     key: 'stuckRotorProtection',
     label: 'Stuck rotor protection',
     offset: 22,
-    group: 'Motor',
-    ...toggle,
+    defaultRaw: 1,
+    ...shown(toggle),
   },
-  { key: 'stallProtection', label: 'Stall protection', offset: 29, group: 'Motor', ...toggle },
-  { key: 'hallSensors', label: 'Use hall sensors', offset: 39, group: 'Motor', ...toggle },
-  { key: 'telemetry', label: '30 ms telemetry', offset: 31, group: 'Motor', ...toggle },
+  {
+    key: 'stallProtection',
+    label: 'Stall protection',
+    offset: 29,
+    defaultRaw: 0,
+    ...shown(toggle),
+  },
+  { key: 'hallSensors', label: 'Use hall sensors', offset: 39, defaultRaw: 0, ...shown(toggle) },
+  { key: 'telemetry', label: '30 ms telemetry', offset: 31, defaultRaw: 0, ...shown(toggle) },
   {
     key: 'beepVolume',
     label: 'Beep volume',
     offset: 30,
-    group: 'Motor',
-    ...number({ min: 0, max: 11 }),
+    defaultRaw: 5,
+    ...shown(number({ min: 0, max: 11 })),
   },
-
   {
     key: 'maxRamp',
     label: 'Ramp rate',
     offset: 5,
-    group: 'Extended settings',
-    ...number({ min: 0.1, max: 20, step: 0.1, scale: 0.1, unit: '% duty cycle per ms' }),
+    defaultRaw: 160,
+    ...shown(number({ min: 0.1, max: 20, step: 0.1, scale: 0.1, unit: '% duty cycle per ms' })),
   },
   {
     key: 'minimumDutyCycle',
     label: 'Minimum duty cycle',
     offset: 6,
-    group: 'Extended settings',
-    ...number({ min: 0, max: 25, step: 0.5, scale: 0.5, unit: '%' }),
+    defaultRaw: 4,
+    ...shown(number({ min: 0, max: 25, step: 0.5, scale: 0.5, unit: '%' })),
   },
-
   {
     key: 'lowVoltageCutoff',
     label: 'Low voltage cutoff',
     offset: 36,
-    group: 'Limits',
-    ...select({ 0: 'Off', 1: 'Per cell', 2: 'Absolute' }),
+    defaultRaw: 0,
+    ...shown(select({ 0: 'Off', 1: 'Per cell', 2: 'Absolute' })),
   },
   {
     key: 'lowVoltageThreshold',
     label: 'Cutoff voltage per cell',
     offset: 37,
-    group: 'Limits',
-    enabled: (raw) => raw('lowVoltageCutoff') === 1,
-    ...number({ min: 2.5, max: 3.5, step: 0.01, scale: 0.01, offset: 2.5, unit: 'V' }),
+    defaultRaw: 50,
     format: (raw) => `${((raw + 250) / 100).toFixed(2)} V`,
   },
   {
     key: 'absoluteVoltageCutoff',
     label: 'Absolute cutoff voltage',
     offset: 8,
-    group: 'Limits',
-    enabled: (raw) => raw('lowVoltageCutoff') === 2,
-    ...number({ min: 0.5, max: 50, step: 0.5, scale: 0.5, unit: 'V' }),
+    defaultRaw: 10,
+    ...shown(number({ min: 0.5, max: 50, step: 0.5, scale: 0.5, unit: 'V' })),
   },
   {
     key: 'temperatureLimit',
     label: 'Temperature limit',
     offset: 43,
-    group: 'Limits',
-    hint: '141 switches the limit off.',
-    ...number({ min: 70, max: 141, unit: '°C' }),
+    defaultRaw: 141,
     format: (raw) => (raw >= 70 && raw <= 140 ? `${raw} °C` : 'Off'),
   },
   {
     key: 'currentLimit',
     label: 'Current limit',
     offset: 44,
-    group: 'Limits',
-    hint: '0 or 202 switches the limit off.',
-    ...number({ min: 0, max: 202, step: 2, scale: 2, unit: 'A' }),
+    defaultRaw: 102,
     format: (raw) => (raw > 0 && raw <= 100 ? `${raw * 2} A` : 'Off'),
   },
-
   // Only used while the current limit is on.
-  {
-    key: 'currentP',
-    label: 'Current P',
-    offset: 9,
-    group: 'Current control',
-    ...number({ min: 0, max: 255 }),
-  },
-  {
-    key: 'currentI',
-    label: 'Current I',
-    offset: 10,
-    group: 'Current control',
-    ...number({ min: 0, max: 255 }),
-  },
-  {
-    key: 'currentD',
-    label: 'Current D',
-    offset: 11,
-    group: 'Current control',
-    ...number({ min: 0, max: 255 }),
-  },
-
-  {
-    key: 'sineStartup',
-    label: 'Sinusoidal startup',
-    offset: 19,
-    group: 'Sinusoidal startup',
-    ...toggle,
-  },
+  { key: 'currentP', label: 'Current P', offset: 9, defaultRaw: 100, format: plain },
+  { key: 'currentI', label: 'Current I', offset: 10, defaultRaw: 0, format: plain },
+  { key: 'currentD', label: 'Current D', offset: 11, defaultRaw: 50, format: plain },
+  { key: 'sineStartup', label: 'Sinusoidal startup', offset: 19, defaultRaw: 0, ...shown(toggle) },
   {
     key: 'sineModeRange',
     label: 'Sine mode range',
     offset: 40,
-    group: 'Sinusoidal startup',
-    enabled: (raw) => raw('sineStartup') !== 0 && noCarBraking(raw),
-    ...number({ min: 5, max: 25, unit: '% throttle' }),
+    defaultRaw: 15,
+    ...shown(number({ min: 5, max: 25, unit: '% throttle' })),
   },
-  {
-    key: 'sineModePower',
-    label: 'Sine mode power',
-    offset: 45,
-    group: 'Sinusoidal startup',
-    enabled: (raw) => raw('sineStartup') !== 0 && noCarBraking(raw),
-    ...number({ min: 1, max: 10 }),
-  },
-
+  { key: 'sineModePower', label: 'Sine mode power', offset: 45, defaultRaw: 6, format: plain },
   {
     key: 'brakeOnStop',
     label: 'Brake on stop',
     offset: 28,
-    group: 'Brake',
-    ...select({ 0: 'Off', 1: 'On', 2: 'Active brake' }),
+    defaultRaw: 0,
+    ...shown(select({ 0: 'Off', 1: 'On', 2: 'Active brake' })),
   },
   {
     key: 'rcCarReversing',
     label: 'Car type reverse braking',
     offset: 38,
-    group: 'Brake',
-    ...toggle,
+    defaultRaw: 0,
+    ...shown(toggle),
   },
-  {
-    key: 'brakeStrength',
-    label: 'Brake strength',
-    offset: 41,
-    group: 'Brake',
-    enabled: (raw) => raw('brakeOnStop') !== 0 && noCarBraking(raw),
-    ...number({ min: 1, max: 10 }),
-  },
+  { key: 'brakeStrength', label: 'Brake strength', offset: 41, defaultRaw: 10, format: plain },
   {
     key: 'runningBrakeLevel',
     label: 'Running brake level',
     offset: 42,
-    group: 'Brake',
-    enabled: noCarBraking,
-    ...number({ min: 1, max: 10 }),
+    defaultRaw: 10,
+    format: plain,
   },
   {
     key: 'activeBrakePower',
     label: 'Active brake power',
     offset: 12,
-    group: 'Brake',
-    hint: '0 switches it off.',
-    enabled: (raw) => raw('brakeOnStop') === 2,
-    ...number({ min: 0, max: 5, unit: '% duty cycle' }),
+    defaultRaw: 2,
+    ...shown(number({ min: 0, max: 5, unit: '% duty cycle' })),
   },
-
   {
     key: 'servoLow',
     label: 'Servo low threshold',
     offset: 32,
-    group: 'Servo input',
-    ...number({ min: 750, max: 1250, step: 2, scale: 2, offset: 750, unit: 'µs' }),
+    defaultRaw: 128,
+    ...shown(number({ min: 750, max: 1250, step: 2, scale: 2, offset: 750, unit: 'µs' })),
   },
   {
     key: 'servoHigh',
     label: 'Servo high threshold',
     offset: 33,
-    group: 'Servo input',
-    ...number({ min: 1750, max: 2250, step: 2, scale: 2, offset: 1750, unit: 'µs' }),
+    defaultRaw: 128,
+    ...shown(number({ min: 1750, max: 2250, step: 2, scale: 2, offset: 1750, unit: 'µs' })),
   },
   {
     key: 'servoNeutral',
     label: 'Servo neutral',
     offset: 34,
-    group: 'Servo input',
-    ...number({ min: 1374, max: 1629, offset: 1374, unit: 'µs' }),
+    defaultRaw: 128,
+    ...shown(number({ min: 1374, max: 1629, offset: 1374, unit: 'µs' })),
   },
-  {
-    key: 'servoDeadBand',
-    label: 'Servo dead band',
-    offset: 35,
-    group: 'Servo input',
-    ...number({ min: 0, max: 100 }),
-  },
+  { key: 'servoDeadBand', label: 'Servo dead band', offset: 35, defaultRaw: 50, format: plain },
 ]
 
 const SETTINGS: Record<EscFirmware, EscSettingDef[]> = {
@@ -721,13 +667,7 @@ function listSettings(
     if (raw === undefined) continue // shorter block than expected
     const value = def.format(raw)
     if (value !== null)
-      settings.push({
-        key: def.key,
-        label: def.label,
-        value,
-        perMotor: def.perMotor ?? false,
-        warning: def.warning?.(raw) ?? null,
-      })
+      settings.push({ key: def.key, label: def.label, value, warning: def.warning?.(raw) ?? null })
   }
   return settings
 }
@@ -871,15 +811,6 @@ export function describeEsc(raw: EscRawRead): EscReport {
   return report('BLHeli_S', `${main}.${sub}`, hardware, layoutRevision, raw)
 }
 
-export interface CombinedEscSetting {
-  key: string
-  label: string
-  /** One value when every ESC has the same; one per ESC, in motor order, for a `perMotor` setting that varies. */
-  values: string[]
-  /** The first ESC's warning for the value. */
-  warning: string | null
-}
-
 /** How the page shows a finished read: one view for ESCs that are all alike, otherwise a card per ESC. */
 export type EscOverview =
   | {
@@ -888,7 +819,7 @@ export type EscOverview =
       firmware: EscFirmware
       version: string
       hardware: string
-      settings: CombinedEscSetting[]
+      settings: EscSetting[]
       note: string | null
     }
   /** `reason`: why the ESCs can't share a view, unless the cards say so themselves (an ESC that wasn't read). */
@@ -897,8 +828,8 @@ export type EscOverview =
 export type ReadableEsc = Extract<EscReport, { status: 'ok' }>
 
 /**
- * All ESCs of a quad should be the same hardware, run the same firmware and be set up alike — except for what is
- * `perMotor`. Only then they are shown as one.
+ * All ESCs of a quad should be the same hardware, run the same firmware and be set up alike. Only then they are shown
+ * as one. The motor direction isn't read at all: it is set per motor on purpose.
  */
 export function combineReports(reports: EscReport[]): EscOverview {
   const escs = reports.filter((report): report is ReadableEsc => report.status === 'ok')
@@ -929,15 +860,14 @@ export function combineReports(reports: EscReport[]): EscOverview {
   for (const esc of escs)
     for (const setting of esc.settings) if (!rows.has(setting.key)) rows.set(setting.key, setting)
 
-  const settings: CombinedEscSetting[] = []
+  const settings: EscSetting[] = []
   const differing: string[] = []
-  for (const { key, label, perMotor, warning } of rows.values()) {
-    const values = escs.map(
-      (esc) => esc.settings.find((setting) => setting.key === key)?.value ?? '—',
+  for (const { key, label, value, warning } of rows.values()) {
+    const same = escs.every(
+      (esc) => (esc.settings.find((setting) => setting.key === key)?.value ?? '—') === value,
     )
-    const same = values.every((value) => value === values[0])
-    if (!same && !perMotor) differing.push(label)
-    settings.push({ key, label, values: same ? values.slice(0, 1) : values, warning })
+    if (!same) differing.push(label)
+    settings.push({ key, label, value, warning })
   }
   if (differing.length > 0) {
     return {
@@ -956,10 +886,7 @@ export function combineReports(reports: EscReport[]): EscOverview {
   }
 }
 
-/**
- * Keys of the settings that differ from the first ESC running the same firmware and layout, per ESC.
- * All ESCs of a quad should be set up alike — except for what is `perMotor`.
- */
+/** Keys of the settings that differ from the first ESC running the same firmware and layout, per ESC. */
 export function differingSettings(reports: EscReport[]): Set<string>[] {
   return reports.map((current) => {
     const differing = new Set<string>()
@@ -972,7 +899,6 @@ export function differingSettings(reports: EscReport[]): Set<string>[] {
     )
     if (!reference || reference === current || reference.status !== 'ok') return differing
     for (const setting of current.settings) {
-      if (setting.perMotor) continue
       const expected = reference.settings.find((other) => other.key === setting.key)
       if (expected && expected.value !== setting.value) differing.add(setting.key)
     }
@@ -997,7 +923,12 @@ export interface EscGroup {
   escs: number[]
   /** The settings this app can change, in the order they are shown. */
   settings: EscSettingDef[]
+  /** The settings this app doesn't change, but puts back to the firmware's default when asked. */
+  defaults: EscSettingDef[]
 }
+
+const inLayout = (def: EscSettingDef, layoutRevision: number) =>
+  layoutRevision >= (def.from ?? 0) && layoutRevision <= (def.to ?? Infinity)
 
 export function editableGroups(reports: EscReport[]): EscGroup[] {
   const groups: EscGroup[] = []
@@ -1006,8 +937,14 @@ export function editableGroups(reports: EscReport[]): EscGroup[] {
     const group = groups.find((other) => other.firmware === report.firmware)
     if (group) group.escs.push(index)
     else {
-      const settings = SETTINGS[report.firmware].filter((def) => def.control)
-      groups.push({ firmware: report.firmware, version: report.version, escs: [index], settings })
+      const defs = SETTINGS[report.firmware].filter((def) => inLayout(def, report.layoutRevision))
+      groups.push({
+        firmware: report.firmware,
+        version: report.version,
+        escs: [index],
+        settings: defs.filter((def) => def.control),
+        defaults: defs.filter((def) => def.defaultRaw !== undefined),
+      })
     }
   })
   return groups
@@ -1034,10 +971,8 @@ export function unevenSettings(draft: EscDraft, group: EscGroup): string[] {
   const first = group.escs[0]
   if (first === undefined) return []
   return group.settings
-    .filter(
-      (def) =>
-        !def.perMotor &&
-        group.escs.some((esc) => draftRaw(draft, esc, def) !== draftRaw(draft, first, def)),
+    .filter((def) =>
+      group.escs.some((esc) => draftRaw(draft, esc, def) !== draftRaw(draft, first, def)),
     )
     .map((def) => def.label)
 }
@@ -1046,9 +981,28 @@ export function unevenSettings(draft: EscDraft, group: EscGroup): string[] {
 export function alignGroup(draft: EscDraft, group: EscGroup): EscDraft {
   const first = group.escs[0]
   if (first === undefined) return draft
-  return group.settings
-    .filter((def) => !def.perMotor)
-    .reduce((next, def) => setDraftRaw(next, group.escs, def, draftRaw(draft, first, def)), draft)
+  return group.settings.reduce(
+    (next, def) => setDraftRaw(next, group.escs, def, draftRaw(draft, first, def)),
+    draft,
+  )
+}
+
+/** The group's settings that are not on the firmware's default on this ESC (as edited). */
+export function offDefault(draft: EscDraft, esc: number, group: EscGroup): EscSettingDef[] {
+  if (!draft[esc]) return []
+  // Compared as shown: bytes that mean the same (current limit 101 and 102 are both off) are not flagged.
+  return group.defaults.filter(
+    (def) => def.format(draftRaw(draft, esc, def)) !== def.format(def.defaultRaw ?? 0),
+  )
+}
+
+/** Puts these settings back to the firmware's default on these ESCs. */
+export function resetToDefaults(draft: EscDraft, escs: number[], defs: EscSettingDef[]): EscDraft {
+  return defs.reduce(
+    (next, def) =>
+      def.defaultRaw === undefined ? next : setDraftRaw(next, escs, def, def.defaultRaw),
+    draft,
+  )
 }
 
 /** Indices of the ESCs whose block is no longer what was read from them. */

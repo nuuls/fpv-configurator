@@ -46,7 +46,10 @@ const BLUEJAY_MELODY = [
   25, 0,
 ]
 
-/** Bluejay 0.21.0 (settings layout 208) on a Z-H-30 EFM8BB21 board, built for 48 kHz unless told otherwise. */
+/**
+ * Bluejay 0.21.0 (settings layout 208) on a Z-H-30 EFM8BB21 board, built for 48 kHz unless told otherwise. Settings
+ * are the firmware's defaults, except the minimum startup power (ESC Configurator's 1025).
+ */
 export function mockBluejayEsc(options: { reversed?: boolean; pwmKhz?: number } = {}): MockEsc {
   return {
     signature: 0xe8b2,
@@ -66,7 +69,7 @@ export function mockBluejayEsc(options: { reversed?: boolean; pwmKhz?: number } 
         0x15: 4, // timing
         0x1b: [40, 80, 4], // beep strength, beacon strength, beacon delay
         0x1f: 2, // demag
-        0x23: 7, // temperature protection
+        0x23: 0, // temperature protection
         0x27: 0, // brake on stop
         0x29: [2, 0], // power rating, force EDT arm
         0x40: ascii('#Z_H_30#', 16),
@@ -104,7 +107,7 @@ export function mockBlheliSEsc(): MockEsc {
   }
 }
 
-/** AM32 2.21 (eeprom version 4) on an STM32F051 (32 k flash, signal on PB4). */
+/** AM32 2.21 (eeprom version 4) on an STM32F051 (32 k flash, signal on PB4), with the AM32 configurator's defaults. */
 export function mockAm32Esc(): MockEsc {
   return {
     signature: 0x1f06,
@@ -115,9 +118,9 @@ export function mockAm32Esc(): MockEsc {
       [0x7c00 - 32]: block(32, { 0: ascii('MOCK_ESC_F051', 16, 0) }),
       0x7c00: block(0xb8, {
         0: [1, 4, 13, 2, 21], // boot byte, eeprom version, bootloader version, firmware 2.21
-        5: [160, 1, 0, 10, 100, 0, 100, 0, 0], // ramp rate, minimum duty cycle … active brake power, brake on zero throttle
+        5: [160, 4, 0, 10, 100, 0, 50, 2, 0], // ramp rate, minimum duty cycle … active brake power, brake on zero throttle
         14: [0, 0, 0],
-        17: [0, 0, 0, 1, 1, 1, 26, 24, 100, 55, 14, 0, 1, 5, 0], // direction … telemetry (offset 31)
+        17: [0, 0, 0, 1, 1, 1, 26, 24, 100, 55, 14, 0, 0, 5, 0], // direction … telemetry (offset 31)
         32: [128, 128, 128, 50], // servo settings
         36: [0, 50, 0, 0, 15, 10, 10, 141, 102, 6, 1, 0], // low voltage cutoff … protocol, auto advance
         48: new Array<number>(128).fill(0), // no startup tune
@@ -170,9 +173,24 @@ export function mixedMockEscs(): MockEsc[] {
   ]
 }
 
-/** What "Connect Mock FC" (demo mode) finds: a Bluejay and an AM32 ESC, so both editors can be seen. */
+/** The ESC with these bytes of its settings block changed. */
+export function withMockSettings(esc: MockEsc, patch: Record<number, number>): MockEsc {
+  const address =
+    esc.interfaceMode === INTERFACE_MODE.ARM_BLB ? SETTINGS_ADDRESS.arm : SETTINGS_ADDRESS.silabs
+  const block = esc.flash[address]
+  for (const [offset, value] of Object.entries(patch)) if (block) block[Number(offset)] = value
+  return esc
+}
+
+/**
+ * What "Connect Mock FC" (demo mode) finds: a Bluejay and an AM32 ESC, so both editors can be seen — each with two
+ * settings off the firmware's default, so that the warnings can be seen too.
+ */
 export function demoMockEscs(): MockEsc[] {
-  return [mockBluejayEsc(), mockAm32Esc()]
+  return [
+    withMockSettings(mockBluejayEsc(), { 0x1f: 3, 0x23: 7 }), // demag high, temperature protection 140 °C
+    withMockSettings(mockAm32Esc(), { 11: 100, 29: 1 }), // current D 100, stall protection on
+  ]
 }
 
 /** cmd_DevicePageErase takes a page number: × 512 on SiLabs, × 1024 on ARM (`serial_4way.c`). */

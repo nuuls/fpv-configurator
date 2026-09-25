@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
 import { readEscs } from '@/lib/esc/io'
-import { toEscDraft, type EscReport } from '@/lib/esc/model'
+import { toEscDraft, type EscDraft, type EscReport } from '@/lib/esc/model'
 import {
   defaultMockEscs,
   mixedMockEscs,
@@ -27,6 +27,15 @@ const card = (number: number) => screen.getByRole('group', { name: `ESC ${number
 /** A setting shown as a slider with its recommended range. */
 const slider = (within_: HTMLElement, label: string) =>
   within(within(within_).getByRole('group', { name: label })).getByRole('slider')
+
+/** What a card's "Not on the default" notice lists, one line per setting. */
+function offDefault(within_: HTMLElement): string[] {
+  const notice = within(within_).queryByRole('group', { name: 'Not on the default' })
+  if (!notice) return []
+  return within(notice)
+    .getAllByRole('listitem')
+    .map((item) => item.textContent.replace(/Reset$/, '').trim())
+}
 
 /** The row of a setting (label and value) inside a card. */
 function setting(esc: HTMLElement, label: string): HTMLElement {
@@ -68,7 +77,7 @@ describe('ESC tab', () => {
     expect(screen.queryByRole('group')).toBeNull()
   })
 
-  it('reads the demo ESCs: a Bluejay and an AM32, each on its card and with its editor', async () => {
+  it('reads the demo ESCs: a Bluejay and an AM32, each with what can be changed and what is not on the default', async () => {
     const user = await openTab('ESC')
     await user.click(screen.getByRole('button', { name: 'Read ESCs' }))
 
@@ -87,26 +96,57 @@ describe('ESC tab', () => {
     expect(within(card(2)).getByText('AM32 2.21')).toBeInTheDocument()
     expect(within(card(2)).getByText('MOCK_ESC_F051')).toBeInTheDocument()
 
-    // What can be changed is changed on the ESC's card. Bluejay: the timing and both startup powers
-    const bluejayEditor = card(1)
-    expect(within(bluejayEditor).getByLabelText('Motor timing')).toHaveDisplayValue(
-      '22.5° (medium high)',
-    )
-    expect(slider(bluejayEditor, 'Minimum startup power')).toHaveAttribute('aria-valuenow', '1025')
-    expect(slider(bluejayEditor, 'Maximum startup power')).toHaveAttribute('aria-valuenow', '1020')
-    expect(within(bluejayEditor).queryByLabelText('PWM frequency')).toBeNull()
-    expect(within(bluejayEditor).getAllByText('Motor timing')).toHaveLength(1)
-    expect(screen.queryByRole('group', { name: /settings/ })).toBeNull()
-    // AM32: every setting of the AM32 configurator
-    const am32Editor = card(2)
-    expect(within(am32Editor).getByLabelText('Motor direction')).toHaveDisplayValue('Normal')
-    // Every AM32 setting can be changed: nothing is left to only show
-    expect(within(am32Editor).queryByText('Other settings')).toBeNull()
-    expect(within(am32Editor).getByLabelText('Motor KV')).toHaveValue(2220)
-    expect(within(am32Editor).getByLabelText('Signal protocol')).toHaveDisplayValue('DShot')
+    // Bluejay: timing, both startup powers and the power rating can be changed
+    expect(within(bluejay).getByLabelText('Motor timing')).toHaveDisplayValue('22.5° (medium high)')
+    expect(slider(bluejay, 'Minimum startup power')).toHaveAttribute('aria-valuenow', '1025')
+    expect(slider(bluejay, 'Maximum startup power')).toHaveAttribute('aria-valuenow', '1020')
+    expect(within(bluejay).getByLabelText('Power rating')).toHaveDisplayValue('2S+')
+    expect(within(bluejay).queryByLabelText('PWM frequency')).toBeNull()
+    // AM32: only the motor settings
+    const am32 = card(2)
+    expect(within(am32).getByLabelText('Bidirectional (3D) mode')).not.toBeChecked()
+    expect(within(am32).getByLabelText('PWM type')).toHaveDisplayValue('Variable')
+    expect(slider(am32, 'PWM frequency')).toHaveAttribute('aria-valuenow', '24')
+    expect(within(am32).getByLabelText('Motor KV')).toHaveValue(2220)
+    expect(within(am32).getByLabelText('Motor poles')).toHaveValue(14)
+    expect(within(am32).getAllByRole('combobox')).toHaveLength(1)
+    expect(within(am32).queryByText('Signal protocol')).toBeNull()
+
+    // The rest only when it is not on the firmware's default — the demo ESCs have two such settings each
+    expect(offDefault(bluejay)).toEqual([
+      'Demag compensation: High (default Low)',
+      'Temperature protection: 140 °C (default Off)',
+    ])
+    expect(offDefault(am32)).toEqual([
+      'Stall protection: On (default Off)',
+      'Current D: 100 (default 50)',
+    ])
+    expect(within(bluejay).queryByText('Beep strength')).toBeNull()
+    // The motor direction is not shown at all
+    expect(screen.queryByText(/Motor direction/)).toBeNull()
 
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Read again' })).toBeEnabled()
+  })
+
+  it('puts a setting back to its default, one at a time or all of them', async () => {
+    const user = await openTab('ESC')
+    await user.click(screen.getByRole('button', { name: 'Read ESCs' }))
+    const bluejay = await escCard(1)
+
+    await user.click(
+      within(bluejay).getByRole('button', { name: 'Reset Demag compensation to default' }),
+    )
+    expect(offDefault(bluejay)).toEqual(['Temperature protection: 140 °C (default Off)'])
+    expect(within(bluejay).queryByRole('button', { name: 'Reset all to defaults' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+
+    await user.click(within(card(2)).getByRole('button', { name: 'Reset all to defaults' }))
+    expect(within(card(2)).queryByRole('group', { name: 'Not on the default' })).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Revert' }))
+    expect(offDefault(bluejay)).toHaveLength(2)
+    expect(offDefault(card(2))).toHaveLength(2)
   })
 
   it(
@@ -124,6 +164,7 @@ describe('ESC tab', () => {
       await user.clear(kv)
       await user.type(kv, '1940')
       await user.tab()
+      await user.click(within(card(2)).getByRole('button', { name: 'Reset all to defaults' }))
       expect(screen.getByTitle('Unsaved changes')).toBeInTheDocument()
 
       // Not without a yes
@@ -148,9 +189,9 @@ describe('ESC tab', () => {
       expect(within(card(1)).getByLabelText('Motor timing')).toHaveDisplayValue('15° (medium)')
       expect(slider(card(1), 'Maximum startup power')).toHaveAttribute('aria-valuenow', '1100')
       expect(within(card(2)).getByLabelText('Motor KV')).toHaveValue(1940)
-      // Untouched: the direction of each motor
-      expect(setting(card(1), 'Motor direction')).toHaveTextContent(/^Motor directionNormal$/)
-      expect(within(card(2)).getByLabelText('Motor direction')).toHaveDisplayValue('Normal')
+      expect(within(card(2)).queryByRole('group', { name: 'Not on the default' })).toBeNull()
+      // Untouched: what wasn't reset
+      expect(offDefault(card(1))).toHaveLength(2)
     },
   )
 
@@ -176,7 +217,7 @@ describe('ESC tab', () => {
 })
 
 describe('ESCs that are alike', () => {
-  it('shows all four as one, with the motor direction listed per ESC', async () => {
+  it('shows all four as one, whatever their motor direction', async () => {
     render(<Editable reports={await readReports(defaultMockEscs())} />)
 
     const all = screen.getByRole('group', { name: 'All ESCs' })
@@ -192,13 +233,33 @@ describe('ESCs that are alike', () => {
     expect(within(all).getByText('Recommended (1025–1050)')).toBeInTheDocument()
     expect(within(all).getByText('Below the recommended 1050–1200')).toBeInTheDocument()
     expect(within(all).queryByLabelText('PWM frequency')).toBeNull()
-    // Set per motor on purpose: listed by ESC instead of keeping the ESCs apart.
-    expect(setting(all, 'Motor direction')).toHaveTextContent(
-      'ESC 1 NormalESC 2 ReversedESC 3 ReversedESC 4 Normal',
-    )
+    // On the firmware's defaults: nothing else to show
+    expect(within(all).queryByRole('group', { name: 'Not on the default' })).toBeNull()
+    expect(within(all).queryByText('Demag compensation')).toBeNull()
+    expect(within(all).queryByText(/Motor direction/)).toBeNull()
 
-    expect(screen.getAllByRole('group', { name: /ESC|settings/ })).toHaveLength(1)
+    expect(screen.getAllByRole('group', { name: /ESC/ })).toHaveLength(1)
     expect(screen.queryByText('differs')).toBeNull()
+  })
+
+  it('puts a setting back to its default on all of them', async () => {
+    const user = userEvent.setup()
+    const escs = defaultMockEscs().map((esc) => patched(esc, 0x1a00, { 0x1b: 100 }))
+    const reports = await readReports(escs)
+    let latest = toEscDraft(reports)
+    function Watched() {
+      const [draft, setDraft] = useState(latest)
+      const change = (next: EscDraft) => {
+        latest = next
+        setDraft(next)
+      }
+      return <EscReportList reports={reports} draft={draft} onChange={change} />
+    }
+    render(<Watched />)
+    const all = screen.getByRole('group', { name: 'All ESCs' })
+    expect(offDefault(all)).toEqual(['Beep strength: 100 (default 40)'])
+    await user.click(within(all).getByRole('button', { name: 'Reset Beep strength to default' }))
+    expect(latest.map((block) => block?.[0x1b])).toEqual([40, 40, 40, 40])
   })
 })
 
@@ -211,51 +272,27 @@ describe('ESCs that are not alike', () => {
     // What can be changed is changed on the card; BLHeli_S is only shown.
     expect(within(card(1)).getByText('Bluejay 0.21.0')).toBeInTheDocument()
     expect(within(card(1)).getByText('Z-H-30 · EFM8BB21')).toBeInTheDocument()
-    expect(setting(card(1), 'Motor direction')).toHaveTextContent('Normal')
     expect(within(card(1)).getByLabelText('Motor timing')).toHaveDisplayValue('22.5° (medium high)')
-    expect(setting(card(2), 'Motor direction')).toHaveTextContent('Reversed')
 
     expect(within(card(3)).getByText('BLHeli_S 16.7')).toBeInTheDocument()
     expect(setting(card(3), 'Startup power')).toHaveTextContent('0.50')
+    expect(setting(card(3), 'Demag compensation')).toHaveTextContent('Low')
     expect(within(card(3)).queryByRole('combobox')).toBeNull()
-    expect(within(card(3)).queryByText('Other settings')).toBeNull()
 
     expect(within(card(4)).getByText('AM32 2.21')).toBeInTheDocument()
     expect(within(card(4)).getByText('MOCK_ESC_F051')).toBeInTheDocument()
     expect(within(card(4)).getByLabelText('Motor KV')).toHaveValue(2220)
-    expect(within(card(4)).getByLabelText('Motor direction')).toHaveDisplayValue('Normal')
+    expect(screen.queryByText(/Motor direction/)).toBeNull()
   })
 
-  it('offers every setting of the AM32 configurator, the motor direction per ESC', async () => {
+  it('offers the motor settings of AM32, and keeps the PWM frequency out of it when the PWM follows the RPM', async () => {
     const user = userEvent.setup()
-    render(
-      <Editable
-        reports={await readReports([mockAm32Esc(), patched(mockAm32Esc(), 0x7c00, { 17: 1 })])}
-      />,
-    )
+    render(<Editable reports={await readReports([mockAm32Esc(), mockAm32Esc()])} />)
     const all = screen.getByRole('group', { name: 'All ESCs' })
-    for (const section of [
-      'Essentials',
-      'Motor',
-      'Extended settings',
-      'Limits',
-      'Current control',
-      'Sinusoidal startup',
-      'Brake',
-      'Servo input',
-    ]) {
-      expect(within(all).getByRole('heading', { name: section })).toBeInTheDocument()
-    }
-    expect(within(all).getByLabelText('Signal protocol')).toHaveDisplayValue('DShot')
-    expect(within(all).getByLabelText('ESC 1')).toHaveDisplayValue('Normal')
-    expect(within(all).getByLabelText('ESC 2')).toHaveDisplayValue('Reversed')
-    await user.selectOptions(within(all).getByLabelText('ESC 1'), 'Reversed')
-    expect(within(all).getByLabelText('ESC 2')).toHaveDisplayValue('Reversed')
-
-    // Auto timing takes the timing advance out of your hands
-    expect(within(all).getByLabelText('Timing advance')).toBeEnabled()
-    await user.click(within(all).getByLabelText('Auto timing advance'))
-    expect(within(all).getByLabelText('Timing advance')).toBeDisabled()
+    const pwm = slider(all, 'PWM frequency')
+    expect(pwm).not.toHaveAttribute('data-disabled')
+    await user.selectOptions(within(all).getByLabelText('PWM type'), 'By RPM')
+    expect(pwm).toHaveAttribute('data-disabled')
 
     // A number is kept inside what the ESC takes
     const poles = within(all).getByLabelText('Motor poles')
@@ -319,7 +356,7 @@ describe('ESCs that are not alike', () => {
     expect(screen.queryByRole('combobox')).toBeNull()
   })
 
-  it('names the setting that differs and marks it on the ESC, but not the motor direction', async () => {
+  it('names the setting that differs, but not the motor direction', async () => {
     const escs = [
       mockBluejayEsc(),
       mockBluejayEsc({ reversed: true, pwmKhz: 24 }),
@@ -328,10 +365,10 @@ describe('ESCs that are not alike', () => {
     ]
     render(<EscReportList reports={await readReports(escs)} />)
     expect(screen.getByText(/not set up alike \(PWM frequency\)/)).toBeInTheDocument()
-
-    expect(setting(card(2), 'Motor direction')).toHaveTextContent(/^Motor directionReversed$/)
-    expect(setting(card(2), 'PWM frequency')).toHaveTextContent(/24 kHz.*differs/)
-    expect(screen.getAllByText('differs')).toHaveLength(1)
+    // The 24 kHz build is what it should be: nothing to say about it
+    expect(within(card(2)).queryByText('PWM frequency')).toBeNull()
+    expect(setting(card(1), 'PWM frequency')).toHaveTextContent(/48 kHz/)
+    expect(screen.queryByText(/Motor direction/)).toBeNull()
   })
 
   it('shows an ESC that does not answer next to the ones that do', async () => {

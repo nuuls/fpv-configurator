@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { mockAm32Esc, mockBlheliSEsc, mockBluejayEsc, type MockEsc } from '@/lib/mock-fc/mockEscs'
+import {
+  mockAm32Esc,
+  mockBlheliSEsc,
+  mockBluejayEsc,
+  withMockSettings,
+  type MockEsc,
+} from '@/lib/mock-fc/mockEscs'
 import { INTERFACE_MODE } from './fourway'
 import {
   alignGroup,
@@ -13,14 +19,17 @@ import {
   editableGroups,
   needsCodeProbe,
   numberToRaw,
+  offDefault,
   rawToNumber,
   readPlan,
   recommendedZone,
+  resetToDefaults,
   setDraftRaw,
   toEscDraft,
   unevenSettings,
   withBlock,
   type EscControl,
+  type EscGroup,
   type EscRawRead,
   type EscReport,
   type ReadableEsc,
@@ -135,15 +144,15 @@ describe('describeEsc', () => {
       note: null,
       editable: true,
     })
+    // The motor direction isn't shown: it is set per motor on purpose.
     expect(settingsOf(report)).toEqual({
-      'Motor direction': 'Reversed',
       'PWM frequency': '48 kHz',
       'Minimum startup power': '1025',
       'Maximum startup power': '1020',
       'Motor timing': '22.5° (medium high)',
       'Demag compensation': 'Low',
       'Rampup power': '9x',
-      'Temperature protection': '140 °C',
+      'Temperature protection': 'Off',
       'Brake on stop': 'Off',
       'Braking strength': '255',
       'Power rating': '2S+',
@@ -197,7 +206,6 @@ describe('describeEsc', () => {
     })
     expect(warningsOf(report)).toEqual({})
     expect(settingsOf(report)).toEqual({
-      'Motor direction': 'Normal',
       'Startup power': '0.50',
       'Motor timing': 'Medium',
       'Demag compensation': 'Low',
@@ -246,7 +254,6 @@ describe('describeEsc', () => {
       editable: true,
     })
     expect(settingsOf(report)).toEqual({
-      'Motor direction': 'Normal',
       'Bidirectional (3D) mode': 'Off',
       'Signal protocol': 'DShot',
       'Disable stick calibration': 'Off',
@@ -259,12 +266,12 @@ describe('describeEsc', () => {
       'Motor poles': '14',
       'Complementary PWM': 'On',
       'Stuck rotor protection': 'On',
-      'Stall protection': 'On',
+      'Stall protection': 'Off',
       'Use hall sensors': 'Off',
       '30 ms telemetry': 'Off',
       'Beep volume': '5',
       'Ramp rate': '16 % duty cycle per ms',
-      'Minimum duty cycle': '0.5 %',
+      'Minimum duty cycle': '2 %',
       'Low voltage cutoff': 'Off',
       'Cutoff voltage per cell': '3.00 V',
       'Absolute cutoff voltage': '5 V',
@@ -272,7 +279,7 @@ describe('describeEsc', () => {
       'Current limit': 'Off',
       'Current P': '100',
       'Current I': '0',
-      'Current D': '100',
+      'Current D': '50',
       'Sinusoidal startup': 'Off',
       'Sine mode range': '15 % throttle',
       'Sine mode power': '6',
@@ -280,7 +287,7 @@ describe('describeEsc', () => {
       'Car type reverse braking': 'Off',
       'Brake strength': '10',
       'Running brake level': '10',
-      'Active brake power': '0 % duty cycle',
+      'Active brake power': '2 % duty cycle',
       'Servo low threshold': '1006 µs',
       'Servo high threshold': '2006 µs',
       'Servo neutral': '1502 µs',
@@ -346,7 +353,7 @@ describe('describeEsc', () => {
 })
 
 describe('differingSettings', () => {
-  it('flags settings that differ from the first ESC with the same firmware, except the per-motor ones', () => {
+  it('flags settings that differ from the first ESC with the same firmware, not the motor direction', () => {
     const reports = [
       describeEsc(rawRead(mockBluejayEsc())),
       describeEsc(rawRead(mockBluejayEsc({ reversed: true, pwmKhz: 24 }))),
@@ -370,7 +377,7 @@ describe('combineReports', () => {
     patch?: Record<number, number>,
   ) => describeEsc(rawRead(mockBluejayEsc(options), patch))
 
-  it('shows ESCs that are alike as one, with the motor direction per ESC', () => {
+  it('shows ESCs that are alike as one, whatever their motor direction', () => {
     const overview = combineReports([
       bluejay(),
       bluejay({ reversed: true }),
@@ -385,25 +392,11 @@ describe('combineReports', () => {
       hardware: 'Z-H-30 · EFM8BB21',
     })
     if (overview.view !== 'combined') return
-    const values = Object.fromEntries(
-      overview.settings.map((setting) => [setting.label, setting.values]),
-    )
-    expect(
-      overview.settings.find((setting) => setting.label === 'PWM frequency')?.warning,
-    ).toContain('24 kHz build')
-    expect(values['Motor direction']).toEqual(['Normal', 'Reversed', 'Reversed', 'Normal'])
-    expect(values['PWM frequency']).toEqual(['48 kHz'])
+    const pwm = overview.settings.find((setting) => setting.label === 'PWM frequency')
+    expect(pwm).toMatchObject({ value: '48 kHz', warning: expect.stringContaining('24 kHz build') })
     expect(overview.settings.map((setting) => setting.key)).toEqual(
       (bluejay() as Extract<EscReport, { status: 'ok' }>).settings.map((setting) => setting.key),
     )
-  })
-
-  it('gives a per-motor setting once when it is the same everywhere', () => {
-    const overview = combineReports([bluejay(), bluejay()])
-    expect(
-      overview.view === 'combined' &&
-        overview.settings.find((setting) => setting.key === 'direction')?.values,
-    ).toEqual(['Normal'])
   })
 
   it('keeps the ESCs apart when a setting differs, and names it', () => {
@@ -481,11 +474,66 @@ describe('editing', () => {
       'startupPowerMin',
       'startupPowerMax',
       'timing',
+      'powerRating',
     ])
-    expect(groups[1]?.settings).toHaveLength(39)
-    expect(groups[1]?.settings.filter((def) => def.perMotor).map((def) => def.key)).toEqual([
-      'direction',
+    expect(groups[1]?.settings.map((def) => def.key)).toEqual([
+      'bidirectional',
+      'variablePwm',
+      'pwmFrequency',
+      'motorKv',
+      'motorPoles',
     ])
+    // The others are only put back to their default
+    expect(groups[0]?.defaults.map((def) => def.key)).toEqual([
+      'demag',
+      'rampupPower',
+      'temperature',
+      'brakeOnStop',
+      'brakingStrength',
+      'forceEdtArm',
+      'beepStrength',
+      'beaconStrength',
+      'beaconDelay',
+    ])
+    expect(groups[1]?.defaults).toHaveLength(33)
+  })
+
+  it('finds the settings that are not on the default and puts them back', () => {
+    const reports = read([
+      mockBluejayEsc(),
+      withMockSettings(mockBluejayEsc(), { 0x1f: 3, 0x23: 7 }),
+      mockAm32Esc(),
+    ])
+    const [bluejay, am32] = editableGroups(reports)
+    if (!bluejay || !am32) throw new Error('no groups')
+    const draft = toEscDraft(reports)
+    const keys = (esc: number, group: EscGroup, from = draft) =>
+      offDefault(from, esc, group).map((def) => def.key)
+    // The mocks are on the firmware's defaults
+    expect([keys(0, bluejay), keys(1, bluejay), keys(2, am32)]).toEqual([
+      [],
+      ['demag', 'temperature'],
+      [],
+    ])
+
+    const reset = resetToDefaults(draft, [1], offDefault(draft, 1, bluejay))
+    expect(keys(1, bluejay, reset)).toEqual([])
+    expect(reset[1]).toEqual(draft[1]?.with(0x1f, 2).with(0x23, 0))
+    expect(reset[0]).toBe(draft[0])
+    expect(changedEscs(reports, reset)).toEqual([1])
+  })
+
+  it('compares with the default as shown, so bytes that mean the same are not flagged', () => {
+    // Current limit 101 (ESC Configurator's default) and 102 (the AM32 configurator's) are both off; timing 2 is
+    // the old format of 15°.
+    const reports = read([withMockSettings(mockAm32Esc(), { 44: 101, 23: 2, 43: 255 })])
+    const [am32] = editableGroups(reports)
+    if (!am32) throw new Error('no group')
+    expect(offDefault(toEscDraft(reports), 0, am32)).toEqual([])
+    const currentLimit = am32.defaults.find((def) => def.key === 'currentLimit')
+    if (!currentLimit) throw new Error('no current limit')
+    const on = setDraftRaw(toEscDraft(reports), [0], currentLimit, 50)
+    expect(offDefault(on, 0, am32).map((def) => def.key)).toEqual(['currentLimit'])
   })
 
   it('keeps a block per editable ESC and patches single bytes into it', () => {
@@ -531,14 +579,9 @@ describe('editing', () => {
     expect([rawToNumber(kv, 55), numberToRaw(kv, 1950), numberToRaw(kv, 1960)]).toEqual([
       2220, 48, 49,
     ])
-    const cell = numberControl(reports, 'AM32', 'lowVoltageThreshold')
-    expect([rawToNumber(cell, 50), numberToRaw(cell, 3.3), numberToRaw(cell, 9)]).toEqual([
-      3, 80, 100,
-    ])
-    const ramp = numberControl(reports, 'AM32', 'maxRamp')
-    expect([rawToNumber(ramp, 160), numberToRaw(ramp, 0.1), numberToRaw(ramp, 0)]).toEqual([
-      16, 1, 1,
-    ])
+    const pwm = numberControl(reports, 'AM32', 'pwmFrequency')
+    expect(pwm).toMatchObject({ min: 8, max: 144, slider: true })
+    expect([numberToRaw(pwm, 48), numberToRaw(pwm, 200)]).toEqual([48, 144])
   })
 
   it('rates a number against its recommended range, ends included', () => {
@@ -552,26 +595,14 @@ describe('editing', () => {
     ])
   })
 
-  it('greys out AM32 settings that another one makes meaningless', () => {
+  it('greys out the AM32 PWM frequency when the PWM follows the RPM', () => {
     const [group] = editableGroups(read([mockAm32Esc()]))
     const enabled = (key: string, values: Record<string, number>) =>
       group?.settings.find((def) => def.key === key)?.enabled?.((other) => values[other] ?? 0)
-    expect([enabled('timing', { autoAdvance: 1 }), enabled('timing', { autoAdvance: 0 })]).toEqual([
-      false,
-      true,
-    ])
     expect([
       enabled('pwmFrequency', { variablePwm: 2 }),
       enabled('pwmFrequency', { variablePwm: 1 }),
     ]).toEqual([false, true])
-    expect([
-      enabled('lowVoltageThreshold', { lowVoltageCutoff: 1 }),
-      enabled('absoluteVoltageCutoff', { lowVoltageCutoff: 1 }),
-    ]).toEqual([true, false])
-    expect([
-      enabled('activeBrakePower', { brakeOnStop: 2 }),
-      enabled('brakeStrength', { brakeOnStop: 1, rcCarReversing: 1 }),
-    ]).toEqual([true, false])
   })
 
   it('finds shared settings that are not the same on all ESCs of a group and can level them', () => {
