@@ -132,6 +132,7 @@ describe('motor output reordering', () => {
       poles: 14,
       propsOut: false,
       dynIdle: 20,
+      motorIdle: 550,
       outputOrder: IDENTITY,
     }
     expect(validateMotors(draft)).toEqual([])

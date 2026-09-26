@@ -22,6 +22,13 @@ import {
 import {
   dynIdleSegments,
   dynIdleZone,
+  formatMotorIdle,
+  idleSegments,
+  idleZone,
+  MOTOR_IDLE_MAX,
+  MOTOR_IDLE_MIN,
+  MOTOR_IDLE_STEP,
+  MOTOR_IDLE_ZONES,
   readMotors,
   spinsClockwise,
   validateMotors,
@@ -368,6 +375,7 @@ describe('motors', () => {
       poles: 14,
       propsOut: false,
       dynIdle: 20,
+      motorIdle: 550,
       outputOrder: [0, 1, 2, 3, 4, 5, 6, 7],
     }
     expect(validateMotors(draft)).toEqual([])
@@ -384,6 +392,7 @@ describe('motors', () => {
       poles: 14,
       propsOut: false,
       dynIdle: 0,
+      motorIdle: 550,
       outputOrder: [0, 1, 2, 3, 4, 5, 6, 7],
     })
     expect(snapshot.motorCount).toBe(4)
@@ -394,6 +403,7 @@ describe('motors', () => {
       poles: 12,
       propsOut: true,
       dynIdle: 0,
+      motorIdle: 550,
       outputOrder: snapshot.outputOrder,
     })
     const after = await readMotorsSnapshot(await rebootAndReconnect(fc, transport, client))
@@ -403,6 +413,7 @@ describe('motors', () => {
       poles: 12,
       propsOut: true,
       dynIdle: 0,
+      motorIdle: 550,
       outputOrder: [0, 1, 2, 3, 4, 5, 6, 7],
     })
     expect(after.advancedConfig.filter((_, i) => i !== 3)).toEqual(
@@ -419,6 +430,7 @@ describe('motors', () => {
       poles: 14,
       propsOut: false,
       dynIdle: 0,
+      motorIdle: 550,
       outputOrder: snapshot.outputOrder,
     })
     expect((await readMotorsSnapshot(client)).bidirDshot).toBe(false)
@@ -464,6 +476,57 @@ describe('motors', () => {
     expect(
       (await readMotorsSnapshot(await rebootAndReconnect(fc, transport, client))).dynIdle,
     ).toBe(22)
+  })
+
+  it('classifies motor idle for a 5": 4–8 % good, 3–4 % and 8–10 % warning', () => {
+    const zones = MOTOR_IDLE_ZONES['five-inch']
+    expect(
+      [200, 290, 300, 390, 400, 800, 810, 1000, 1010, 1200].map((v) => idleZone(v, zones)),
+    ).toEqual([
+      'danger',
+      'danger',
+      'warning',
+      'warning',
+      'good',
+      'good',
+      'warning',
+      'warning',
+      'danger',
+      'danger',
+    ])
+    expect(idleSegments(MOTOR_IDLE_MIN, MOTOR_IDLE_MAX, MOTOR_IDLE_STEP, zones)).toEqual([
+      { from: 200, to: 290, zone: 'danger' },
+      { from: 300, to: 390, zone: 'warning' },
+      { from: 400, to: 800, zone: 'good' },
+      { from: 810, to: 1000, zone: 'warning' },
+      { from: 1010, to: 1200, zone: 'danger' },
+    ])
+    expect(formatMotorIdle(550)).toBe('5.5 %')
+  })
+
+  it('accepts an untouched motor idle outside the slider but not an edited one', async () => {
+    const { client } = await connect()
+    const snapshot = await readMotorsSnapshot(client)
+    const draft = readMotors(snapshot)
+    expect(draft.motorIdle).toBe(550)
+    const outside = { ...snapshot, advancedConfig: [...snapshot.advancedConfig] }
+    outside.advancedConfig[6] = 100 // 1 %
+    outside.advancedConfig[7] = 0
+    expect(validateMotors(readMotors(outside), outside)).toEqual([])
+    expect(validateMotors({ ...draft, motorIdle: 150 }, snapshot)).toHaveLength(1)
+    expect(validateMotors({ ...draft, motorIdle: 700 }, snapshot)).toEqual([])
+  })
+
+  it('saves motor idle persistently, changing only its two bytes of the advanced config', async () => {
+    const { fc, transport, client } = await connect()
+    const snapshot = await readMotorsSnapshot(client)
+    await saveMotors(client, snapshot, { ...readMotors(snapshot), motorIdle: 700 })
+    const after = await readMotorsSnapshot(await rebootAndReconnect(fc, transport, client))
+    expect(readMotors(after).motorIdle).toBe(700)
+    expect(after.advancedConfig.slice(6, 8)).toEqual([0xbc, 0x02])
+    expect(after.advancedConfig.filter((_, i) => i !== 6 && i !== 7)).toEqual(
+      snapshot.advancedConfig.filter((_, i) => i !== 6 && i !== 7),
+    )
   })
 
   it('reports RPM only with bidirectional DShot', async () => {

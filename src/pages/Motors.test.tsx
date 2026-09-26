@@ -140,3 +140,28 @@ describe('Motors tab — direction and swap', () => {
     expect(await within(disc(3)).findByText('1650 rpm')).toBeInTheDocument()
   })
 })
+
+describe('Motors tab — motor idle', () => {
+  it('rates motor idle against the 5" zones and saves it', async () => {
+    const user = await openTab('Motors')
+    const group = () => within(screen.getByRole('group', { name: 'Motor idle' }))
+    const idle = () => group().getByRole('slider')
+    expect(await screen.findByText('5.5 %')).toBeInTheDocument() // mock FC: Betaflight default
+    expect(group().getByText('Good for a 5"')).toBeInTheDocument()
+
+    await nudge(user, idle(), '{Home}') // 2.0 %
+    expect(group().getByText('Too low: motors can desync or stall')).toBeInTheDocument()
+    await nudge(user, idle(), '{PageUp}') // 3.0 %
+    expect(group().getByText('A bit low for a 5" (4–8 % recommended)')).toBeInTheDocument()
+    await nudge(user, idle(), '{End}') // 12.0 %
+    expect(group().getByText(/Too high: the quad floats/)).toBeInTheDocument()
+    await nudge(user, idle(), '{PageDown}{PageDown}') // 10.0 %
+    expect(group().getByText('A bit high for a 5" (4–8 % recommended)')).toBeInTheDocument()
+    await nudge(user, idle(), '{PageDown}{PageDown}{PageDown}{ArrowRight}') // 7.1 %
+    expect(group().getByText('Good for a 5"')).toBeInTheDocument()
+    expect(screen.getByText('7.1 %')).toBeInTheDocument()
+
+    await saveAndReboot(user)
+    expect(await screen.findByText('7.1 %')).toBeInTheDocument()
+  })
+})

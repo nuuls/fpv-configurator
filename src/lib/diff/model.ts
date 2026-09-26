@@ -276,6 +276,7 @@ const MANAGED_SETTINGS = new Set([
   'dshot_bidir',
   'yaw_motors_reversed',
   'dyn_idle_min_rpm',
+  'motor_idle',
   // OSD
   'osd_tim2',
   'osd_units',

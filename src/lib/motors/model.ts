@@ -25,11 +25,13 @@ export const MOTOR_MAX = 2000
 export const MOTOR_TEST_MAX = 1300
 
 const ADVANCED_CONFIG_PROTOCOL_OFFSET = 3
+/** `motor_idle` (u16, 0.01 %) inside MSP_ADVANCED_CONFIG, after the protocol byte and the PWM rate. */
+const ADVANCED_CONFIG_MOTOR_IDLE_OFFSET = 6
 /** `dyn_idle_min_rpm` inside MSP_PID_ADVANCED (94). Same offset with and without USE_DYN_IDLE. */
 const PID_ADVANCED_DYN_IDLE_OFFSET = 49
 
 export interface MotorsSnapshot {
-  /** Raw MSP_ADVANCED_CONFIG payload; written back with only the protocol byte changed. */
+  /** Raw MSP_ADVANCED_CONFIG payload; written back with only the protocol byte and motor idle changed. */
   advancedConfig: number[]
   motorCount: number
   maxThrottle: number
@@ -51,6 +53,8 @@ export interface MotorsDraft {
   /** "Props out": yaw_motors_reversed. */
   propsOut: boolean
   dynIdle: number
+  /** `motor_idle` in 0.01 % of full throttle (550 = 5.5 %). */
+  motorIdle: number
   outputOrder: number[]
 }
 
@@ -61,6 +65,7 @@ export function readMotors(snapshot: MotorsSnapshot): MotorsDraft {
     poles: snapshot.poles,
     propsOut: snapshot.propsOut,
     dynIdle: snapshot.dynIdle,
+    motorIdle: decodeMotorIdle(snapshot.advancedConfig),
     outputOrder: [...snapshot.outputOrder],
   }
 }
@@ -71,6 +76,12 @@ export function validateMotors(draft: MotorsDraft, snapshot?: MotorsSnapshot): s
   const untouched = snapshot !== undefined && draft.dynIdle === snapshot.dynIdle
   if (!untouched && (draft.dynIdle < DYN_IDLE_MIN || draft.dynIdle > DYN_IDLE_MAX))
     problems.push(`Dynamic idle must be between ${DYN_IDLE_MIN} and ${DYN_IDLE_MAX}.`)
+  const idleUntouched =
+    snapshot !== undefined && draft.motorIdle === decodeMotorIdle(snapshot.advancedConfig)
+  if (!idleUntouched && (draft.motorIdle < MOTOR_IDLE_MIN || draft.motorIdle > MOTOR_IDLE_MAX))
+    problems.push(
+      `Motor idle must be between ${formatMotorIdle(MOTOR_IDLE_MIN)} and ${formatMotorIdle(MOTOR_IDLE_MAX)}.`,
+    )
   if (
     !Number.isInteger(draft.poles) ||
     draft.poles < 4 ||
@@ -261,11 +272,21 @@ export function decodeSetMotorConfig(payload: Uint8Array) {
   return { poles: r.u8(), bidirDshot: r.u8() !== 0 }
 }
 
-// ---- MSP_ADVANCED_CONFIG (90) / SET (91): read-modify-write, only the protocol byte changes ----
+// ---- MSP_ADVANCED_CONFIG (90) / SET (91): read-modify-write, only the protocol byte and motor idle change ----
+
+export function decodeMotorIdle(advancedConfig: number[]): number {
+  const low = advancedConfig[ADVANCED_CONFIG_MOTOR_IDLE_OFFSET] ?? 0
+  const high = advancedConfig[ADVANCED_CONFIG_MOTOR_IDLE_OFFSET + 1] ?? 0
+  return low | (high << 8)
+}
 
 export function encodeSetAdvancedConfig(snapshot: MotorsSnapshot, draft: MotorsDraft): Uint8Array {
   const payload = Uint8Array.from(snapshot.advancedConfig)
   payload[ADVANCED_CONFIG_PROTOCOL_OFFSET] = draft.protocol
+  if (payload.length >= ADVANCED_CONFIG_MOTOR_IDLE_OFFSET + 2) {
+    payload[ADVANCED_CONFIG_MOTOR_IDLE_OFFSET] = draft.motorIdle & 0xff
+    payload[ADVANCED_CONFIG_MOTOR_IDLE_OFFSET + 1] = (draft.motorIdle >> 8) & 0xff
+  }
   return payload
 }
 
@@ -300,43 +321,75 @@ export function encodeArmingDisabled(disabled: boolean): Uint8Array {
   return Uint8Array.of(disabled ? 1 : 0, 0)
 }
 
-// ---- dynamic idle (dyn_idle_min_rpm, ×100 rpm) ----
-
-export const DYN_IDLE_MIN = 12
-export const DYN_IDLE_MAX = 40
+// ---- idle zones: good, a warning band either side, danger beyond ----
 
 export type DroneType = 'five-inch'
 export type IdleZone = 'good' | 'warning' | 'danger'
 
-/** Recommended idle per drone type (SPEC §2 Motors). Everything outside good ± warningMargin is danger. */
-export const DYN_IDLE_ZONES: Record<
-  DroneType,
-  { label: string; goodMin: number; goodMax: number; warningMargin: number }
-> = {
-  'five-inch': { label: '5"', goodMin: 18, goodMax: 25, warningMargin: 3 },
+/** Bounds are inclusive. Everything below `warningMin` or above `warningMax` is danger. */
+export interface IdleZones {
+  label: string
+  warningMin: number
+  goodMin: number
+  goodMax: number
+  warningMax: number
 }
 
-export function decodeDynIdle(pidAdvanced: Uint8Array): number {
-  return pidAdvanced[PID_ADVANCED_DYN_IDLE_OFFSET] ?? 0
+export function idleZone(value: number, zones: IdleZones): IdleZone {
+  if (value >= zones.goodMin && value <= zones.goodMax) return 'good'
+  return value >= zones.warningMin && value <= zones.warningMax ? 'warning' : 'danger'
 }
 
-export function dynIdleZone(value: number, type: DroneType): IdleZone {
-  const { goodMin, goodMax, warningMargin } = DYN_IDLE_ZONES[type]
-  if (value >= goodMin && value <= goodMax) return 'good'
-  return value >= goodMin - warningMargin && value <= goodMax + warningMargin ? 'warning' : 'danger'
-}
-
-/** Contiguous zones across the slider range, for colouring its track. `to` is inclusive. */
-export function dynIdleSegments(type: DroneType): { from: number; to: number; zone: IdleZone }[] {
+/** Contiguous zones across a slider's range, for colouring its track. `to` is inclusive. */
+export function idleSegments(
+  min: number,
+  max: number,
+  step: number,
+  zones: IdleZones,
+): { from: number; to: number; zone: IdleZone }[] {
   const segments: { from: number; to: number; zone: IdleZone }[] = []
-  for (let value = DYN_IDLE_MIN; value <= DYN_IDLE_MAX; value++) {
-    const zone = dynIdleZone(value, type)
+  for (let value = min; value <= max; value += step) {
+    const zone = idleZone(value, zones)
     const last = segments.at(-1)
     if (last && last.zone === zone) last.to = value
     else segments.push({ from: value, to: value, zone })
   }
   return segments
 }
+
+// ---- dynamic idle (dyn_idle_min_rpm, ×100 rpm) ----
+
+export const DYN_IDLE_MIN = 12
+export const DYN_IDLE_MAX = 40
+
+/** Recommended dynamic idle per drone type (SPEC §2 Motors): good, 3 either side warning. */
+export const DYN_IDLE_ZONES: Record<DroneType, IdleZones> = {
+  'five-inch': { label: '5"', warningMin: 15, goodMin: 18, goodMax: 25, warningMax: 28 },
+}
+
+export function decodeDynIdle(pidAdvanced: Uint8Array): number {
+  return pidAdvanced[PID_ADVANCED_DYN_IDLE_OFFSET] ?? 0
+}
+
+export const dynIdleZone = (value: number, type: DroneType) => idleZone(value, DYN_IDLE_ZONES[type])
+
+export const dynIdleSegments = (type: DroneType) =>
+  idleSegments(DYN_IDLE_MIN, DYN_IDLE_MAX, 1, DYN_IDLE_ZONES[type])
+
+// ---- motor idle (motor_idle, 0.01 % of full throttle) ----
+
+/** Slider: 2–12 % in steps of 0.1 %. Betaflight itself accepts 0–20 %. */
+export const MOTOR_IDLE_MIN = 200
+export const MOTOR_IDLE_MAX = 1200
+export const MOTOR_IDLE_STEP = 10
+
+/** Recommended motor idle per drone type (SPEC §2 Motors). The warning bands differ: 3–4 % and 8–10 %. */
+export const MOTOR_IDLE_ZONES: Record<DroneType, IdleZones> = {
+  'five-inch': { label: '5"', warningMin: 300, goodMin: 400, goodMax: 800, warningMax: 1000 },
+}
+
+/** 550 → "5.5 %". */
+export const formatMotorIdle = (value: number) => `${(value / 100).toFixed(1)} %`
 
 // ---- MSP_MOTOR_TELEMETRY (139): count, then per motor rpm:u32 invalid:u16 temp:u8 voltage:u16 current:u16 mAh:u16 ----
 

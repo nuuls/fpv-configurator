@@ -314,7 +314,9 @@ describe('Motors tab', () => {
     await nudge(user, idle(), '{ArrowRight}{ArrowRight}{ArrowRight}') // 16
     expect(screen.getByText(/A bit low for a 5"/)).toBeInTheDocument()
     await nudge(user, idle(), '{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}') // 20
-    expect(screen.getByText('Good for a 5"')).toBeInTheDocument()
+    expect(
+      within(screen.getByRole('group', { name: 'Dynamic idle' })).getByText('Good for a 5"'),
+    ).toBeInTheDocument()
     expect(screen.getByText('20 (2000 rpm)')).toBeInTheDocument()
 
     await saveAndReboot(user)

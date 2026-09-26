@@ -115,6 +115,9 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
       - Green 18-25
       - 3 point warning zone
       - Rest danger zone
+  - Motor idle throttle % slider, works the same as dynamic idle
+    - Recommended 4-8%
+    - Warning 3-4% and 8-10%
   - Motor spin tester menu should be visual where you can drag the slider on each motor on a 2d quad
   - Also display reported RPM
 

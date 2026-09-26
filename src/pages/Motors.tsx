@@ -29,13 +29,18 @@ import {
   SWAP_RESTART_MS,
   DYN_IDLE_MIN,
   DYN_IDLE_ZONES,
-  dynIdleSegments,
-  dynIdleZone,
   isDshot,
   MOTOR_PROTOCOL_NAMES,
   MOTOR_STOP,
   MOTOR_TEST_MAX,
   fcMotorIndexes,
+  idleSegments,
+  idleZone,
+  formatMotorIdle,
+  MOTOR_IDLE_MAX,
+  MOTOR_IDLE_MIN,
+  MOTOR_IDLE_STEP,
+  MOTOR_IDLE_ZONES,
   motorSettingsChanged,
   readMotors,
   remappedMotors,
@@ -46,6 +51,7 @@ import {
   validateMotors,
   type DroneType,
   type IdleZone,
+  type IdleZones,
   type MotorsSnapshot,
 } from '@/lib/motors/model'
 import type { MspClient } from '@/lib/msp/client'
@@ -177,6 +183,14 @@ function Editor({
               value={draft.dynIdle}
               enabled={draft.bidirDshot && dshot}
               onChange={(dynIdle) => setDraft({ ...draft, dynIdle })}
+            />
+
+            <span id="motor-idle-label" className="self-start pt-1 font-medium">
+              Motor idle
+            </span>
+            <MotorIdle
+              value={draft.motorIdle}
+              onChange={(motorIdle) => setDraft({ ...draft, motorIdle })}
             />
           </CardContent>
         </Card>
@@ -665,23 +679,103 @@ function DynamicIdle({
   enabled: boolean
   onChange: (value: number) => void
 }) {
-  const inRange = value >= DYN_IDLE_MIN && value <= DYN_IDLE_MAX
   const zones = DYN_IDLE_ZONES[DRONE_TYPE]
-  const span = DYN_IDLE_MAX - DYN_IDLE_MIN
-  const percent = (v: number) =>
-    ((Math.min(DYN_IDLE_MAX, Math.max(DYN_IDLE_MIN, v)) - DYN_IDLE_MIN) / span) * 100
-
-  let status: { zone: IdleZone; text: string }
-  if (!inRange)
-    status = {
-      zone: 'warning',
-      text:
+  return (
+    <IdleSlider
+      labelId="dyn-idle-label"
+      min={DYN_IDLE_MIN}
+      max={DYN_IDLE_MAX}
+      step={1}
+      value={value}
+      enabled={enabled}
+      onChange={onChange}
+      zones={zones}
+      format={(v) => `${v} (${v * 100} rpm)`}
+      outOfRange={value === 0 ? 'off' : String(value)}
+      outOfRangeText={
         value === 0
           ? 'Off — drag the slider to turn dynamic idle on'
-          : `Set to ${value}, outside this slider`,
-    }
+          : `Set to ${value}, outside this slider`
+      }
+      recommended={`${zones.goodMin}–${zones.goodMax}`}
+      tooLow="Too low: motors can stall in hard moves"
+      tooHigh="Too high: the quad floats and motors run hot"
+      hint={
+        enabled
+          ? 'Lowest RPM the motors are allowed to drop to in flight.'
+          : 'Needs bidirectional DShot: the flight controller has to know the motor RPM.'
+      }
+    />
+  )
+}
+
+/** `motor_idle` slider (0.01 % units, shown in %) with the recommended zones painted under the track. */
+function MotorIdle({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+  const zones = MOTOR_IDLE_ZONES[DRONE_TYPE]
+  return (
+    <IdleSlider
+      labelId="motor-idle-label"
+      min={MOTOR_IDLE_MIN}
+      max={MOTOR_IDLE_MAX}
+      step={MOTOR_IDLE_STEP}
+      value={value}
+      enabled
+      onChange={onChange}
+      zones={zones}
+      format={formatMotorIdle}
+      outOfRange={formatMotorIdle(value)}
+      outOfRangeText={`Set to ${formatMotorIdle(value)}, outside this slider`}
+      recommended={`${zones.goodMin / 100}–${zones.goodMax / 100} %`}
+      tooLow="Too low: motors can desync or stall"
+      tooHigh="Too high: the quad floats and is hard to bring down"
+      hint="How fast the motors spin at zero throttle while armed, in % of full throttle."
+    />
+  )
+}
+
+/** A slider whose track carries good / warning / danger zones, with the zone as icon + text underneath. */
+function IdleSlider({
+  labelId,
+  min,
+  max,
+  step,
+  value,
+  enabled,
+  onChange,
+  zones,
+  format,
+  outOfRange,
+  outOfRangeText,
+  recommended,
+  tooLow,
+  tooHigh,
+  hint,
+}: {
+  labelId: string
+  min: number
+  max: number
+  step: number
+  value: number
+  enabled: boolean
+  onChange: (value: number) => void
+  zones: IdleZones
+  format: (value: number) => string
+  /** Readout and status for an FC value the slider can't show. */
+  outOfRange: string
+  outOfRangeText: string
+  /** The good range, for the warning text. */
+  recommended: string
+  tooLow: string
+  tooHigh: string
+  hint: string
+}) {
+  const inRange = value >= min && value <= max
+  const percent = (v: number) => ((Math.min(max, Math.max(min, v)) - min) / (max - min)) * 100
+
+  let status: { zone: IdleZone; text: string }
+  if (!inRange) status = { zone: 'warning', text: outOfRangeText }
   else {
-    const zone = dynIdleZone(value, DRONE_TYPE)
+    const zone = idleZone(value, zones)
     const low = value < zones.goodMin
     status = {
       zone,
@@ -689,35 +783,36 @@ function DynamicIdle({
         zone === 'good'
           ? `Good for a ${zones.label}`
           : zone === 'warning'
-            ? `${low ? 'A bit low' : 'A bit high'} for a ${zones.label} (${zones.goodMin}–${zones.goodMax} recommended)`
+            ? `${low ? 'A bit low' : 'A bit high'} for a ${zones.label} (${recommended} recommended)`
             : low
-              ? 'Too low: motors can stall in hard moves'
-              : 'Too high: the quad floats and motors run hot',
+              ? tooLow
+              : tooHigh,
     }
   }
   const { text, icon: Icon } = ZONE_STYLE[status.zone]
 
   return (
-    <div role="group" aria-labelledby="dyn-idle-label" className="flex flex-col gap-2">
-      <div className="font-mono tabular-nums">
-        {inRange ? `${value} (${value * 100} rpm)` : 'off'}
-      </div>
+    <div role="group" aria-labelledby={labelId} className="flex flex-col gap-2">
+      <div className="font-mono tabular-nums">{inRange ? format(value) : outOfRange}</div>
       <Slider
-        aria-labelledby="dyn-idle-label"
-        min={DYN_IDLE_MIN}
-        max={DYN_IDLE_MAX}
-        step={1}
+        aria-labelledby={labelId}
+        min={min}
+        max={max}
+        step={step}
         disabled={!enabled}
-        value={[inRange ? value : DYN_IDLE_MIN]}
+        value={[inRange ? value : min]}
         onValueChange={([v]) => v !== undefined && onChange(v)}
       />
       {/* zone band: each value owns the stretch around its tick */}
       <div className="relative mx-2 h-1.5" aria-hidden="true">
-        {dynIdleSegments(DRONE_TYPE).map(({ from, to, zone }) => (
+        {idleSegments(min, max, step, zones).map(({ from, to, zone }) => (
           <div
             key={from}
             className={cn('absolute h-full rounded-full', ZONE_STYLE[zone].bar)}
-            style={{ left: `${percent(from - 0.5)}%`, right: `${100 - percent(to + 0.5)}%` }}
+            style={{
+              left: `${percent(from - step / 2)}%`,
+              right: `${100 - percent(to + step / 2)}%`,
+            }}
           />
         ))}
       </div>
@@ -725,11 +820,7 @@ function DynamicIdle({
         <Icon className="size-4 shrink-0" />
         <span className="text-foreground">{status.text}</span>
       </p>
-      <p className="text-muted-foreground">
-        {enabled
-          ? 'Lowest RPM the motors are allowed to drop to in flight.'
-          : 'Needs bidirectional DShot: the flight controller has to know the motor RPM.'}
-      </p>
+      <p className="text-muted-foreground">{hint}</p>
     </div>
   )
 }
