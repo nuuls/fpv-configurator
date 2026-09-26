@@ -1,7 +1,8 @@
 /** Acceptance checks for the direction flip and motor swap of the Motors tab (docs/tabs/motors.md). */
 import { screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
-import { DIRECTION_CHECK, SWAP_RESTART_MS } from '@/lib/motors/model'
+import { afterEach, describe, expect, it } from 'vitest'
+import { DEFAULT_DRONE_TYPE, DIRECTION_CHECK, SWAP_RESTART_MS } from '@/lib/motors/model'
+import { useDroneTypeStore } from '@/stores/droneType'
 import { nudge, openTab, resetAppAfterEach, saveAndReboot } from '@/test/app'
 
 resetAppAfterEach()
@@ -177,5 +178,39 @@ describe('Motors tab — motor idle', () => {
     expect(group().getByText(/Dynamic idle is on: this is the most it may add/)).toBeInTheDocument()
     await nudge(user, group().getByRole('slider'), '{End}')
     expect(group().getByText(/Too high: motors spin hard on the ground/)).toBeInTheDocument()
+  })
+})
+
+describe('Motors tab — drone type', () => {
+  afterEach(() => useDroneTypeStore.setState({ droneType: DEFAULT_DRONE_TYPE }))
+
+  it('switches the recommended ranges by drone type without touching the values', async () => {
+    const user = await openTab('Motors')
+    const picker = within(screen.getByRole('group', { name: 'Recommendations for' }))
+    const dyn = () => within(screen.getByRole('group', { name: 'Dynamic idle' }))
+    const motorIdle = () => within(screen.getByRole('group', { name: 'Motor idle' }))
+    expect(picker.getByRole('button', { name: '5"' })).toHaveAttribute('aria-pressed', 'true')
+    await screen.findByRole('group', { name: 'Motor idle' })
+    expect(motorIdle().getByText('Good for a 5"')).toBeInTheDocument()
+
+    await user.click(picker.getByRole('button', { name: 'Whoop' }))
+    expect(picker.getByRole('button', { name: 'Whoop' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('65–75 mm whoops, 1–2S')).toBeInTheDocument()
+    expect(motorIdle().getByText('Good for a whoop')).toBeInTheDocument()
+
+    await user.click(screen.getByLabelText('Bidirectional DShot'))
+    expect(dyn().getByRole('slider')).toHaveAttribute('aria-valuemin', '30')
+    expect(dyn().getByRole('slider')).toHaveAttribute('aria-valuemax', '80')
+    await nudge(user, dyn().getByRole('slider'), '{ArrowRight}') // 31
+    expect(dyn().getByText('Too low: motors can stall in hard moves')).toBeInTheDocument()
+    await nudge(user, dyn().getByRole('slider'), '{Home}{PageUp}{PageUp}') // 50
+    expect(dyn().getByText('Good for a whoop')).toBeInTheDocument()
+    expect(dyn().getByText('50 (5000 rpm)')).toBeInTheDocument()
+
+    // far too high for a 5" and outside its slider; switching the type doesn't change the value
+    await user.click(picker.getByRole('button', { name: '5"' }))
+    expect(dyn().getByText('Set to 50, outside this slider')).toBeInTheDocument()
+    await user.click(picker.getByRole('button', { name: '7"' }))
+    expect(dyn().getByRole('slider')).toHaveAttribute('aria-valuemax', '32')
   })
 })

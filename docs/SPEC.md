@@ -109,15 +109,16 @@ configuring and chooses defaults based on that. A 5" freestyle drone will have d
   - Props out is the default
   - Bi-directional dshot is enabled by default, mark as warning if its disabled
   - Dynamic idle input
-    - Slider ranging from 12-40
+    - Slider ranging from 12-40 (5"; each drone type has its own range)
     - Add green, warning and danger zone according to type of drone
-    - Currently only 5" with the following
+    - 5" with the following (whoop, 3" and 7": estimates in docs/tabs/motors.md)
       - Green 18-25
       - 3 point warning zone
       - Rest danger zone
   - Motor idle throttle % slider, works the same as dynamic idle
     - Recommended 4-8%
     - Warning 3-4% and 8-10%
+  - Button group at the top to switch the recommended settings: Whoop, 3", 5", 7" (by prop size, not voltage)
   - Motor spin tester menu should be visual where you can drag the slider on each motor on a 2d quad
   - Also display reported RPM
 

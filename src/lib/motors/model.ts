@@ -321,14 +321,34 @@ export function encodeArmingDisabled(disabled: boolean): Uint8Array {
   return Uint8Array.of(disabled ? 1 : 0, 0)
 }
 
+// ---- drone types: pick the recommended ranges; nothing is written to the FC ----
+
+/**
+ * By prop size, not battery voltage: builders pick the motor KV to suit the voltage, so a 5" on 4S and on 6S reach
+ * about the same RPM and want the same idle. Until the drone-type setup step (SPEC §2) exists, the Motors tab
+ * picks one of these for its recommendations only.
+ */
+export const DRONE_TYPES = ['whoop', 'three-inch', 'five-inch', 'seven-inch'] as const
+export type DroneType = (typeof DRONE_TYPES)[number]
+
+export const DRONE_TYPE_INFO: Record<
+  DroneType,
+  { label: string; name: string; description: string }
+> = {
+  whoop: { label: 'Whoop', name: 'whoop', description: '65–75 mm whoops, 1–2S' },
+  'three-inch': { label: '3"', name: '3"', description: '2.5–3.5": toothpicks, cinewhoops' },
+  'five-inch': { label: '5"', name: '5"', description: '5" freestyle and racing' },
+  'seven-inch': { label: '7"', name: '7"', description: '6–7" long range' },
+}
+
+export const DEFAULT_DRONE_TYPE: DroneType = 'five-inch'
+
 // ---- idle zones: good, a warning band either side, danger beyond ----
 
-export type DroneType = 'five-inch'
 export type IdleZone = 'good' | 'warning' | 'danger'
 
 /** Bounds are inclusive. Everything below `warningMin` or above `warningMax` is danger. */
 export interface IdleZones {
-  label: string
   warningMin: number
   goodMin: number
   goodMax: number
@@ -359,22 +379,32 @@ export function idleSegments(
 
 // ---- dynamic idle (dyn_idle_min_rpm, ×100 rpm) ----
 
-export const DYN_IDLE_MIN = 12
-export const DYN_IDLE_MAX = 40
-
-/** Recommended dynamic idle per drone type (SPEC §2 Motors): good, 3 either side warning. */
-export const DYN_IDLE_ZONES: Record<DroneType, IdleZones> = {
-  'five-inch': { label: '5"', warningMin: 15, goodMin: 18, goodMax: 25, warningMax: 28 },
+/**
+ * Slider range and recommended zones per drone type (SPEC §2 Motors). 5" is the user's; the others are estimates
+ * of each class's RPM at the default 5.5 % static idle (KV × volts × idle), which reproduces the 5" range.
+ */
+export const DYN_IDLE_SCALES: Record<DroneType, IdleZones & { min: number; max: number }> = {
+  whoop: { min: 30, max: 80, warningMin: 39, goodMin: 45, goodMax: 60, warningMax: 66 },
+  'three-inch': { min: 16, max: 50, warningMin: 24, goodMin: 28, goodMax: 36, warningMax: 40 },
+  'five-inch': { min: 12, max: 40, warningMin: 15, goodMin: 18, goodMax: 25, warningMax: 28 },
+  'seven-inch': { min: 8, max: 32, warningMin: 11, goodMin: 14, goodMax: 20, warningMax: 23 },
 }
+
+/** What an edited value must stay within: the union of the sliders of all drone types. */
+export const DYN_IDLE_MIN = Math.min(...DRONE_TYPES.map((type) => DYN_IDLE_SCALES[type].min))
+export const DYN_IDLE_MAX = Math.max(...DRONE_TYPES.map((type) => DYN_IDLE_SCALES[type].max))
 
 export function decodeDynIdle(pidAdvanced: Uint8Array): number {
   return pidAdvanced[PID_ADVANCED_DYN_IDLE_OFFSET] ?? 0
 }
 
-export const dynIdleZone = (value: number, type: DroneType) => idleZone(value, DYN_IDLE_ZONES[type])
+export const dynIdleZone = (value: number, type: DroneType) =>
+  idleZone(value, DYN_IDLE_SCALES[type])
 
-export const dynIdleSegments = (type: DroneType) =>
-  idleSegments(DYN_IDLE_MIN, DYN_IDLE_MAX, 1, DYN_IDLE_ZONES[type])
+export const dynIdleSegments = (type: DroneType) => {
+  const scale = DYN_IDLE_SCALES[type]
+  return idleSegments(scale.min, scale.max, 1, scale)
+}
 
 // ---- motor idle (motor_idle, 0.01 % of full throttle) ----
 
@@ -383,9 +413,15 @@ export const MOTOR_IDLE_MIN = 200
 export const MOTOR_IDLE_MAX = 1200
 export const MOTOR_IDLE_STEP = 10
 
-/** Recommended motor idle per drone type (SPEC §2 Motors). The warning bands differ: 3–4 % and 8–10 %. */
-export const MOTOR_IDLE_ZONES: Record<DroneType, IdleZones> = {
-  'five-inch': { label: '5"', warningMin: 300, goodMin: 400, goodMax: 800, warningMax: 1000 },
+/**
+ * Recommended motor idle (SPEC §2 Motors), the same for every drone type: a share of full throttle already scales
+ * with KV × volts. The warning bands differ: 3–4 % and 8–10 %.
+ */
+export const MOTOR_IDLE_ZONES: IdleZones = {
+  warningMin: 300,
+  goodMin: 400,
+  goodMax: 800,
+  warningMax: 1000,
 }
 
 /** 550 → "5.5 %". */

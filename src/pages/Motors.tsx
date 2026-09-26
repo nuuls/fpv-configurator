@@ -25,10 +25,10 @@ import {
 } from '@/lib/motors/io'
 import {
   DIRECTION_CHECK,
-  DYN_IDLE_MAX,
+  DRONE_TYPE_INFO,
+  DRONE_TYPES,
   SWAP_RESTART_MS,
-  DYN_IDLE_MIN,
-  DYN_IDLE_ZONES,
+  DYN_IDLE_SCALES,
   isDshot,
   MOTOR_PROTOCOL_NAMES,
   MOTOR_STOP,
@@ -56,6 +56,7 @@ import {
 } from '@/lib/motors/model'
 import type { MspClient } from '@/lib/msp/client'
 import { cn } from '@/lib/utils'
+import { useDroneTypeStore } from '@/stores/droneType'
 
 const PATH = '/motors'
 
@@ -70,15 +71,13 @@ const QUAD_POSITIONS: { motor: number; className: string; badge: string }[] = [
   { motor: 1, className: 'right-0 bottom-0', badge: 'right-[7%] bottom-[7%]' },
 ]
 
-/** Until drone types exist (SPEC §2), every quad is treated as a 5". */
-const DRONE_TYPE: DroneType = 'five-inch'
-
 /** Spec: docs/tabs/motors.md */
 export function MotorsPage() {
   const { client, snapshot, error, reload } = useFcSnapshot(readMotorsSnapshot)
   return (
     <>
       <PageHeader title="Motors" description="ESC settings and motor testing." />
+      <DroneTypePicker />
       {client && snapshot ? (
         <Editor client={client} snapshot={snapshot} reload={reload} />
       ) : (
@@ -100,6 +99,7 @@ function Editor({
   const { draft, setDraft, dirty, revert } = useDraft(snapshot, readMotors)
   const { saving, error, save } = useSave(reload)
   useUnsavedChanges(PATH, dirty)
+  const droneType = useDroneTypeStore((s) => s.droneType)
 
   const current = readMotors(snapshot).protocol
   const protocols = SELECTABLE_PROTOCOLS.includes(current)
@@ -180,6 +180,7 @@ function Editor({
               Dynamic idle
             </span>
             <DynamicIdle
+              droneType={droneType}
               value={draft.dynIdle}
               enabled={draft.bidirDshot && dshot}
               onChange={(dynIdle) => setDraft({ ...draft, dynIdle })}
@@ -189,6 +190,7 @@ function Editor({
               Motor idle
             </span>
             <MotorIdle
+              droneType={droneType}
               value={draft.motorIdle}
               dynamicIdleOn={draft.bidirDshot && dshot && draft.dynIdle > 0}
               onChange={(motorIdle) => setDraft({ ...draft, motorIdle })}
@@ -670,27 +672,66 @@ const ZONE_STYLE: Record<IdleZone, { bar: string; text: string; icon: typeof Cir
   danger: { bar: 'bg-destructive', text: 'text-destructive', icon: OctagonAlert },
 }
 
+/**
+ * Which drone type the recommended ranges are for. Only changes what the sliders show and recommend; nothing is
+ * written to the FC.
+ */
+function DroneTypePicker() {
+  const droneType = useDroneTypeStore((s) => s.droneType)
+  const setDroneType = useDroneTypeStore((s) => s.setDroneType)
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+      <span id="drone-type-label" className="font-medium">
+        Recommendations for
+      </span>
+      <div
+        role="group"
+        aria-labelledby="drone-type-label"
+        className="bg-background inline-flex rounded-md border shadow-xs"
+      >
+        {DRONE_TYPES.map((type) => (
+          <Button
+            key={type}
+            size="sm"
+            variant={type === droneType ? 'default' : 'ghost'}
+            aria-pressed={type === droneType}
+            title={DRONE_TYPE_INFO[type].description}
+            className="rounded-none first:rounded-l-md last:rounded-r-md"
+            onClick={() => setDroneType(type)}
+          >
+            {DRONE_TYPE_INFO[type].label}
+          </Button>
+        ))}
+      </div>
+      <span className="text-muted-foreground">{DRONE_TYPE_INFO[droneType].description}</span>
+    </div>
+  )
+}
+
 /** `dyn_idle_min_rpm` slider with the recommended zones for the drone type painted under the track. */
 function DynamicIdle({
+  droneType,
   value,
   enabled,
   onChange,
 }: {
+  droneType: DroneType
   value: number
   enabled: boolean
   onChange: (value: number) => void
 }) {
-  const zones = DYN_IDLE_ZONES[DRONE_TYPE]
+  const scale = DYN_IDLE_SCALES[droneType]
   return (
     <IdleSlider
       labelId="dyn-idle-label"
-      min={DYN_IDLE_MIN}
-      max={DYN_IDLE_MAX}
+      min={scale.min}
+      max={scale.max}
       step={1}
       value={value}
       enabled={enabled}
       onChange={onChange}
-      zones={zones}
+      zones={scale}
+      typeName={DRONE_TYPE_INFO[droneType].name}
       format={(v) => `${v} (${v * 100} rpm)`}
       outOfRange={value === 0 ? 'off' : String(value)}
       outOfRangeText={
@@ -698,7 +739,7 @@ function DynamicIdle({
           ? 'Off — drag the slider to turn dynamic idle on'
           : `Set to ${value}, outside this slider`
       }
-      recommended={`${zones.goodMin}–${zones.goodMax}`}
+      recommended={`${scale.goodMin}–${scale.goodMax}`}
       tooLow="Too low: motors can stall in hard moves"
       tooHigh="Too high: the quad floats and motors run hot"
       hint={
@@ -716,15 +757,17 @@ function DynamicIdle({
  * between arming and the first throttle-up (`dynIdleStartIncrease` in mixer_init.c).
  */
 function MotorIdle({
+  droneType,
   value,
   dynamicIdleOn,
   onChange,
 }: {
+  droneType: DroneType
   value: number
   dynamicIdleOn: boolean
   onChange: (value: number) => void
 }) {
-  const zones = MOTOR_IDLE_ZONES[DRONE_TYPE]
+  const zones = MOTOR_IDLE_ZONES
   return (
     <IdleSlider
       labelId="motor-idle-label"
@@ -735,6 +778,7 @@ function MotorIdle({
       enabled
       onChange={onChange}
       zones={zones}
+      typeName={DRONE_TYPE_INFO[droneType].name}
       format={formatMotorIdle}
       outOfRange={formatMotorIdle(value)}
       outOfRangeText={`Set to ${formatMotorIdle(value)}, outside this slider`}
@@ -768,6 +812,7 @@ function IdleSlider({
   enabled,
   onChange,
   zones,
+  typeName,
   format,
   outOfRange,
   outOfRangeText,
@@ -784,6 +829,8 @@ function IdleSlider({
   enabled: boolean
   onChange: (value: number) => void
   zones: IdleZones
+  /** Drone type as used in "Good for a …". */
+  typeName: string
   format: (value: number) => string
   /** Readout and status for an FC value the slider can't show. */
   outOfRange: string
@@ -806,9 +853,9 @@ function IdleSlider({
       zone,
       text:
         zone === 'good'
-          ? `Good for a ${zones.label}`
+          ? `Good for a ${typeName}`
           : zone === 'warning'
-            ? `${low ? 'A bit low' : 'A bit high'} for a ${zones.label} (${recommended} recommended)`
+            ? `${low ? 'A bit low' : 'A bit high'} for a ${typeName} (${recommended} recommended)`
             : low
               ? tooLow
               : tooHigh,

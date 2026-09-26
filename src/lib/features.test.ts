@@ -20,6 +20,10 @@ import {
   stopMotors,
 } from '@/lib/motors/io'
 import {
+  DRONE_TYPES,
+  DYN_IDLE_MAX,
+  DYN_IDLE_MIN,
+  DYN_IDLE_SCALES,
   dynIdleSegments,
   dynIdleZone,
   formatMotorIdle,
@@ -460,13 +464,35 @@ describe('motors', () => {
     ])
   })
 
+  it('scales dynamic idle with prop size: every type has its own slider with zones inside it', () => {
+    expect(DYN_IDLE_SCALES['five-inch']).toMatchObject({ min: 12, max: 40 })
+    expect(dynIdleZone(50, 'whoop')).toBe('good')
+    expect(dynIdleZone(50, 'five-inch')).toBe('danger')
+    expect(dynIdleZone(16, 'seven-inch')).toBe('good')
+    for (const type of DRONE_TYPES) {
+      const { min, max, warningMin, goodMin, goodMax, warningMax } = DYN_IDLE_SCALES[type]
+      expect([min, warningMin, goodMin, goodMax, warningMax, max]).toEqual(
+        [min, warningMin, goodMin, goodMax, warningMax, max].sort((a, b) => a - b),
+      )
+      expect(dynIdleSegments(type).map((s) => s.zone)).toEqual([
+        'danger',
+        'warning',
+        'good',
+        'warning',
+        'danger',
+      ])
+    }
+    expect([DYN_IDLE_MIN, DYN_IDLE_MAX]).toEqual([8, 80])
+  })
+
   it('accepts an untouched "off" idle from the FC but not an edited out-of-range one', async () => {
     const { client } = await connect()
     const snapshot = await readMotorsSnapshot(client)
     expect(snapshot.dynIdle).toBe(0)
     expect(validateMotors(readMotors(snapshot), snapshot)).toEqual([])
-    expect(validateMotors({ ...readMotors(snapshot), dynIdle: 11 }, snapshot)).toHaveLength(1)
-    expect(validateMotors({ ...readMotors(snapshot), dynIdle: 20 }, snapshot)).toEqual([])
+    expect(validateMotors({ ...readMotors(snapshot), dynIdle: 7 }, snapshot)).toHaveLength(1)
+    expect(validateMotors({ ...readMotors(snapshot), dynIdle: 81 }, snapshot)).toHaveLength(1)
+    expect(validateMotors({ ...readMotors(snapshot), dynIdle: 60 }, snapshot)).toEqual([])
   })
 
   it('saves dynamic idle persistently', async () => {
@@ -479,7 +505,7 @@ describe('motors', () => {
   })
 
   it('classifies motor idle for a 5": 4–8 % good, 3–4 % and 8–10 % warning', () => {
-    const zones = MOTOR_IDLE_ZONES['five-inch']
+    const zones = MOTOR_IDLE_ZONES
     expect(
       [200, 290, 300, 390, 400, 800, 810, 1000, 1010, 1200].map((v) => idleZone(v, zones)),
     ).toEqual([
