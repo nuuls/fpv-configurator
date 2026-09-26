@@ -164,4 +164,18 @@ describe('Motors tab — motor idle', () => {
     await saveAndReboot(user)
     expect(await screen.findByText('7.1 %')).toBeInTheDocument()
   })
+
+  it('explains that motor idle only caps dynamic idle until take-off once dynamic idle is on', async () => {
+    const user = await openTab('Motors')
+    const group = () => within(screen.getByRole('group', { name: 'Motor idle' }))
+    expect(await screen.findByText(/How fast the motors spin at zero throttle/)).toBeInTheDocument()
+
+    await user.click(screen.getByLabelText('Bidirectional DShot'))
+    expect(group().getByText(/How fast the motors spin/)).toBeInTheDocument() // dynamic idle still 0
+    const dynIdle = within(screen.getByRole('group', { name: 'Dynamic idle' })).getByRole('slider')
+    await nudge(user, dynIdle, '{ArrowRight}')
+    expect(group().getByText(/Dynamic idle is on: this is the most it may add/)).toBeInTheDocument()
+    await nudge(user, group().getByRole('slider'), '{End}')
+    expect(group().getByText(/Too high: motors spin hard on the ground/)).toBeInTheDocument()
+  })
 })

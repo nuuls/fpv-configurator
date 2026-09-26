@@ -190,6 +190,7 @@ function Editor({
             </span>
             <MotorIdle
               value={draft.motorIdle}
+              dynamicIdleOn={draft.bidirDshot && dshot && draft.dynIdle > 0}
               onChange={(motorIdle) => setDraft({ ...draft, motorIdle })}
             />
           </CardContent>
@@ -709,8 +710,20 @@ function DynamicIdle({
   )
 }
 
-/** `motor_idle` slider (0.01 % units, shown in %) with the recommended zones painted under the track. */
-function MotorIdle({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+/**
+ * `motor_idle` slider (0.01 % units, shown in %) with the recommended zones painted under the track. With dynamic
+ * idle on, the firmware drops the static idle floor and uses `motor_idle` only as the most dynamic idle may add
+ * between arming and the first throttle-up (`dynIdleStartIncrease` in mixer_init.c).
+ */
+function MotorIdle({
+  value,
+  dynamicIdleOn,
+  onChange,
+}: {
+  value: number
+  dynamicIdleOn: boolean
+  onChange: (value: number) => void
+}) {
   const zones = MOTOR_IDLE_ZONES[DRONE_TYPE]
   return (
     <IdleSlider
@@ -726,9 +739,21 @@ function MotorIdle({ value, onChange }: { value: number; onChange: (value: numbe
       outOfRange={formatMotorIdle(value)}
       outOfRangeText={`Set to ${formatMotorIdle(value)}, outside this slider`}
       recommended={`${zones.goodMin / 100}–${zones.goodMax / 100} %`}
-      tooLow="Too low: motors can desync or stall"
-      tooHigh="Too high: the quad floats and is hard to bring down"
-      hint="How fast the motors spin at zero throttle while armed, in % of full throttle."
+      tooLow={
+        dynamicIdleOn
+          ? 'Too low: motors may not start reliably after arming'
+          : 'Too low: motors can desync or stall'
+      }
+      tooHigh={
+        dynamicIdleOn
+          ? 'Too high: motors spin hard on the ground after arming'
+          : 'Too high: the quad floats and is hard to bring down'
+      }
+      hint={
+        dynamicIdleOn
+          ? 'Dynamic idle is on: this is the most it may add from arming until the first throttle-up, so it sets how the motors start. In flight dynamic idle keeps the minimum RPM instead.'
+          : 'How fast the motors spin at zero throttle while armed, in % of full throttle.'
+      }
     />
   )
 }

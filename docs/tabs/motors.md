@@ -73,6 +73,7 @@ Mock FC:
 - [x] Dynamic idle: off → danger → warning → good as the slider moves; Save & Reboot persists it
 - [x] Motor idle: shows the FC's 5.5 %; danger / warning / good on both sides as the slider moves; Save & Reboot
       persists it, and only bytes 6–7 of the advanced config change
+- [x] Motor idle hint and too-low / too-high texts switch to the start-up meaning once dynamic idle is on
 - [x] Quad drawn from above with CW/CCW per motor; RPM shows "—" without bidirectional DShot and live values with it
 - [x] Sliders disabled until the switch is on
 - [x] An unsaved edit switches the test off and zeroes the sliders
@@ -110,6 +111,11 @@ On real hardware — **props off**:
 - Motor idle (user request, 2026-09-26) works like dynamic idle and is always editable: it applies with or without
   bidirectional DShot. It lives in `MSP_ADVANCED_CONFIG`, which the tab already writes back, so it needs no
   write by name. Slider 2–12 % so both danger ends are visible; Betaflight accepts 0–20 %.
+- With dynamic idle on (bidirectional DShot, a DShot protocol and `dyn_idle_min_rpm` > 0 in the draft) the hint
+  and the too-low / too-high texts change: the firmware then drops the static idle floor and uses `motor_idle`
+  only as the most dynamic idle may add from arming until the throttle first passes
+  `air_mode_activate_threshold` (`dynIdleStartIncrease`, `mixer_init.c`); after that `dyn_idle_max_increase`
+  applies. So it sets how the motors start, not the idle in flight. Same zones either way.
 - Motors other than 4 fall back to a plain slider grid.
 - Test throttle capped at 1300 — enough to see direction, not enough to be dangerous on the bench.
 - Direction via DShot commands (like the Betaflight Configurator's wizard) rather than through the ESC settings
